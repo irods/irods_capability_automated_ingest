@@ -11,6 +11,12 @@ irods prc
 
 tested under python 3.5
 
+start redis
+
+```
+./redis-server
+```
+
 start scheduler
 
 ```
