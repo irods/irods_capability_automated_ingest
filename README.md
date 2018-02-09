@@ -2,12 +2,12 @@
 
 requirements:
 
-setting up irods environment file
-redis
-rq
-rq-scheduler
-redis_lock
-irods prc
+ * setting up irods environment file
+ * redis
+ * rq
+ * rq-scheduler
+ * redis_lock
+ * irods prc
 
 tested under python 3.5
 
