@@ -1,5 +1,5 @@
 import os
-from os.path import dirname
+from os.path import dirname, getsize, getmtime
 from irods.session import iRODSSession
 import logging
 import sys
@@ -33,10 +33,10 @@ def sync_file(session, target, path):
     upload_file(session, target, path)
     
 def update_metadata(session, target, path):
-    logger.info("updating object: unregistering " + target)
-    session.data_objects.get(target).unregister()
-    logger.info("updating object: registering " + target)
-    session.data_objects.register(path, target)
+    logger.info("updating object: " + target)
+    size = getsize(path)
+    mtime = int(getmtime(path))
+    session.data_objects.modDataObjMeta(target, {"dataSize":size, "dataModify":mtime})
 
 def sync_data_from_file(target, path):
     try:
