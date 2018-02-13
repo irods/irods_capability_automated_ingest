@@ -58,7 +58,7 @@ rqscheduler -i 1
 
 start rq workers
 ```
-rq worker -v restart path file
+rq worker restart path file
 ```
 
 ### (optional) rq-dashboard ###
