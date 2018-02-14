@@ -60,6 +60,7 @@ start rq workers
 ```
 rq worker restart path file
 ```
+
 or
 ```
 for i in {1..<n>}; do rq worker restart path file & done
@@ -86,17 +87,17 @@ tested under python 3.5
 ### start sync ###
 
 ```
-python start_sync.py start <local_dir> <collection> -i <restart interval> --event_handler <module name>
+python start_sync.py start <local_dir> <collection> -i <restart interval> [ --event_handler <module name> ]
 ```
 
 ### event handler ###
 Create a module:
 ```
 on_create(session, target, source):
-  ...
+  <>
   
 on_modify(session, target, source):
-  ...
+  <>
 ```
 ### stop sync ###
 
