@@ -1,35 +1,87 @@
 # irods_rsync
 
-requirements:
+## requirements ##
 
- * setting up irods environment file
- * redis
- * rq
- * rq-scheduler
- * redis_lock
- * irods prc
+### setting up irods environment file ###
 
-tested under python 3.5
+### redis ###
+https://redis.io/topics/quickstart
 
 start redis
 
 ```
-./redis-server
+redis-server
 ```
 
-start scheduler
+### virtualenv ###
+```
+pip3 install virtualenv
+```
+
+You may need to upgrade pip
+```
+pip3 install --upgrade pip
+```
 
 ```
-rqscheduler
+virtualenv rodssync
 ```
 
-start worker
-
 ```
+source rodssync/bin/activate
+```
+
+### clone repo ###
+
+### rq ###
+ * rq
+ * rq-scheduler
+ * python-redis-lock
+```
+pip install rq python-redis-lock
+```
+<<<<<<< HEAD
 rq worker restart path file 
+=======
+
+As of this writing `rq-scheduler` doesn't work for this config because of argparse conflict. Use the following pull request instead.
+```
+pip install git+git://github.com/sourcepirate/rq-scheduler@9166f30d11849ebe60aacc94c6d072184de55b1d
 ```
 
-start sync
+make sure you are in the repo in the following commands
+>>>>>>> 1689cc4cfb8fb363db975b240acaa4395475083a
+```
+cd <repo dir>
+```
+
+start rqscheduler
+```
+rqscheduler -i 1
+```
+
+start rq workers
+```
+rq worker restart path file
+```
+
+### (optional) rq-dashboard ###
+```
+pip install rq-dashboard
+```
+```
+rq-dashboard
+```
+### irods prc ###
+```
+pip install git+https://github.com/irods/python-irodsclient.git
+```
+
+tested under python 3.5
+
+## irods rsync ###
+
+### start sync ###
 
 ```
 python start_sync.py <local_dir> <collection> -i <restart interval>
