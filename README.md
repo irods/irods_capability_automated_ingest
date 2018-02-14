@@ -43,7 +43,7 @@ pip install rq python-redis-lock
 
 As of this writing `rq-scheduler` doesn't work for this config because of argparse conflict. Use the following pull request instead.
 ```
-pip install https://github.com/sourcepirate/rq-scheduler@9166f30d11849ebe60aacc94c6d072184de55b1d
+pip install git+git://github.com/sourcepirate/rq-scheduler@9166f30d11849ebe60aacc94c6d072184de55b1d
 ```
 
 make sure you are in the repo in the following commands
