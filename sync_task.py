@@ -13,9 +13,14 @@ import sync_irods
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
+handler = logging.FileHandler("/tmp/sync.log")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+'''
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+'''
 
 def sync_time_key(path):
     return "sync_time:/"+path
@@ -36,11 +41,11 @@ def sync_path(path_q_name, file_q_name, target, root, path):
         r = StrictRedis()
         if isfile(path):
             logger.info("enqueue file path " + path)
-            q = Queue(path_q_name, connection=r)
+            q = Queue(file_q_name, connection=r)
             q.enqueue(sync_file, target, root, path)
         else:
             logger.info("walk dir " + path)
-            q = Queue(file_q_name, connection=r)
+            q = Queue(path_q_name, connection=r)
             for n in listdir(path):
                 q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n))
     except OSError as err:
@@ -51,6 +56,7 @@ def sync_path(path_q_name, file_q_name, target, root, path):
 
 def sync_file(target, root, path):
     try:
+        logger.info("synchronizing file. path = " + path)
         r = StrictRedis()
         with redis_lock.Lock(r, path):
             t = datetime.now().timestamp()
@@ -68,29 +74,27 @@ def sync_file(target, root, path):
         logger.error("Unexpected error: " + str(err))
         raise
 
-
 RESTART_JOB_ID = "restart"
 
-def restart(restart_q_name, path_q_name, file_q_name, target, root, path, interval):
+def restart(path_q_name, file_q_name, target, root, path):
     try:
         logger.info("***************** restart *****************")
         r = StrictRedis()
         path_q = Queue(path_q_name, connection=r)
         file_q = Queue(file_q_name, connection=r)
-        restart_q = Queue(restart_q_name, connection=r)
         path_q_workers = Worker.all(queue=path_q)
         file_q_workers = Worker.all(queue=file_q)
 
         def all_not_busy(ws):
             return all(w.get_state() != WorkerStatus.BUSY or w.get_current_job_id() == RESTART_JOB_ID for w in ws)            
 
-        if all_not_busy(path_q_workers) and all_not_busy(file_q_workers) and path_q.is_empty() and file_q.is_empty():
+        # this doesn't guarantee that there is only one tree walk, but it prevents tree walk when the file queue is not empty
+        if path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
+            logger.info("queue empty and worker not busy")
             path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path)
         else:
-            logger.info("queue not empty or worker busy" + str(path_q.get_job_ids()))
+            logger.info("queue not empty or worker busy")
 
-        scheduler = Scheduler(queue=restart_q, connection=r)
-        scheduler.enqueue_in(interval, restart, restart_q_name, path_q_name, file_q_name, target, root, path, interval, job_id=RESTART_JOB_ID)
     except OSError as err:
         logger.warning("Warning: " + str(err))        
     except Exception as err:
@@ -98,7 +102,21 @@ def restart(restart_q_name, path_q_name, file_q_name, target, root, path, interv
         raise
 
 def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root, interval):
+
     root_abs = realpath(root)
 
-    q = Queue("restart", connection=StrictRedis())
-    q.enqueue(restart, restart_q_name, path_q_name, file_q_name, target, root_abs, root_abs, interval, job_id=RESTART_JOB_ID)
+    r = StrictRedis()
+    scheduler = Scheduler(connection=r)
+    
+    if RESTART_JOB_ID in scheduler:
+        scheduler.cancel(RESTART_JOB_ID)
+        
+    scheduler.schedule(
+        scheduled_time = datetime.utcnow(),
+        func = restart,
+        args = [path_q_name, file_q_name, target, root_abs, root_abs],
+        interval = interval,
+        queue_name = restart_q_name,
+        id = RESTART_JOB_ID
+    )
+        

@@ -26,7 +26,7 @@ rqscheduler
 start worker
 
 ```
-rq worker path file restart
+rq worker restart path file 
 ```
 
 start sync

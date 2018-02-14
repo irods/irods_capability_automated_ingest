@@ -16,4 +16,4 @@ parser.add_argument('--restart_queue', action="store", metavar='RESTART QUEUE', 
 
 args = parser.parse_args()
 
-start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, timedelta(seconds=args.interval))
+start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval)
