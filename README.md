@@ -31,7 +31,6 @@ virtualenv rodssync
 source rodssync/bin/activate
 ```
 
-
 ### clone repo ###
 
 ### rq ###
@@ -87,10 +86,10 @@ python start_sync.py start <local_dir> <collection> -i <restart interval> --even
 ### event handler ###
 Create a module:
 ```
-on_create(session, target, src):
+on_create(session, target, source):
   ...
   
-on_modify(session, target, src):
+on_modify(session, target, source):
   ...
 ```
 ### stop sync ###
