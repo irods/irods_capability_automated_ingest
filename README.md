@@ -60,6 +60,12 @@ start rq workers
 ```
 rq worker restart path file
 ```
+or
+```
+for i in {1..<n>}; do rq worker restart path file & done
+```
+
+
 
 ### (optional) rq-dashboard ###
 ```
