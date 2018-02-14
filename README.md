@@ -79,10 +79,6 @@ tested under python 3.5
 
 ### start sync ###
 
-## irods rsync ###
-
-### start sync ###
-
 ```
 python start_sync.py start <local_dir> <collection> -i <restart interval> --event_handler <module name>
 ```
