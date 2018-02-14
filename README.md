@@ -84,9 +84,18 @@ tested under python 3.5
 ### start sync ###
 
 ```
-python start_sync.py start <local_dir> <collection> -i <restart interval>
+python start_sync.py start <local_dir> <collection> -i <restart interval> --event_handler <module name>
 ```
 
+### event handler ###
+Create a module:
+```
+on_create(session, target, path):
+  ...
+  
+on_modify(session, target, path):
+  ...
+```
 ### stop sync ###
 
 ```
