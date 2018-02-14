@@ -36,25 +36,25 @@ def get_with_key(r, key, path):
 def set_with_key(r, path, key, sync_time):
     r.set(key(path), sync_time)
 
-def sync_path(path_q_name, file_q_name, target, root, path):
+def sync_path(path_q_name, file_q_name, target, root, path, hdlr):
     try:
         r = StrictRedis()
         if isfile(path):
             logger.info("enqueue file path " + path)
             q = Queue(file_q_name, connection=r)
-            q.enqueue(sync_file, target, root, path)
+            q.enqueue(sync_file, target, root, path, hdlr)
         else:
             logger.info("walk dir " + path)
             q = Queue(path_q_name, connection=r)
             for n in listdir(path):
-                q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n))
+                q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n), hdlr)
     except OSError as err:
         logger.warning("Warning: " + str(err))        
     except Exception as err:
         logger.error("Unexpected error: " + str(err))
         raise
 
-def sync_file(target, root, path):
+def sync_file(target, root, path, hdlr):
     try:
         logger.info("synchronizing file. path = " + path)
         r = StrictRedis()
@@ -64,7 +64,7 @@ def sync_file(target, root, path):
             mtime = getmtime(path)
             if sync_time == None or mtime >= sync_time:
                 logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", mtime = " + str(mtime) + ".")
-                sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path)
+                sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, hdlr)
                 set_with_key(r, path, sync_time_key, str(t))
             else:
                 logger.info("file hasn't changed. path = " + path + ".")
@@ -76,7 +76,7 @@ def sync_file(target, root, path):
 
 RESTART_JOB_ID = "restart"
 
-def restart(path_q_name, file_q_name, target, root, path):
+def restart(path_q_name, file_q_name, target, root, path, hdlr):
     try:
         logger.info("***************** restart *****************")
         r = StrictRedis()
@@ -91,7 +91,7 @@ def restart(path_q_name, file_q_name, target, root, path):
         # this doesn't guarantee that there is only one tree walk, but it prevents tree walk when the file queue is not empty
         if path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
             logger.info("queue empty and worker not busy")
-            path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path)
+            path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path, hdlr)
         else:
             logger.info("queue not empty or worker busy")
 
@@ -101,7 +101,7 @@ def restart(path_q_name, file_q_name, target, root, path):
         logger.error("Unexpected error: " + str(err))
         raise
 
-def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root, interval):
+def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root, interval, hdlr):
 
     root_abs = realpath(root)
 
@@ -114,9 +114,17 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
     scheduler.schedule(
         scheduled_time = datetime.utcnow(),
         func = restart,
-        args = [path_q_name, file_q_name, target, root_abs, root_abs],
+        args = [path_q_name, file_q_name, target, root_abs, root_abs, hdlr],
         interval = interval,
         queue_name = restart_q_name,
         id = RESTART_JOB_ID
     )
         
+def stop_synchronization():
+
+    root_abs = realpath(root)
+
+    r = StrictRedis()
+    scheduler = Scheduler(connection=r)
+    
+    scheduler.cancel(RESTART_JOB_ID)
