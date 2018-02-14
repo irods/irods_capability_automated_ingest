@@ -86,3 +86,9 @@ tested under python 3.5
 ```
 python start_sync.py start <local_dir> <collection> -i <restart interval>
 ```
+
+### stop sync ###
+
+```
+python start_sync.py stop
+```
