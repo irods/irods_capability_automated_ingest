@@ -122,8 +122,6 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
         
 def stop_synchronization():
 
-    root_abs = realpath(root)
-
     r = StrictRedis()
     scheduler = Scheduler(connection=r)
     
