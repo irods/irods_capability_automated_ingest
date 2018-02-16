@@ -93,12 +93,15 @@ python start_sync.py start <local_dir> <collection> -i <restart interval> [ --ev
 ### event handler ###
 Create a module:
 ```
-on_create(session, target, source):
-  <>
-  
-on_modify(session, target, source):
-  <>
+on_create(session, target, source)
 ```
+  
+```
+on_modify(session, target, source)
+```
+
+example: `evhdlr.py`
+
 ### stop sync ###
 
 ```
