@@ -1,11 +1,26 @@
-def on_create(session, target, path, **options):
-    print("create", target)
+from core import Core
 
-def on_modify(session, target, path, **options):
-    print("modify", target)
+class event_handler(Core):
+    
+    @staticmethod
+    def post_data_obj_create(hdlr_mod, session, target, path, **options):
+        print("create", target)
 
-def to_resource(session, target, path, **options):
-    return "demoResc"
+    @staticmethod
+    def post_data_obj_modify(hdlr_mod, session, target, path, **options):
+        print("modify", target)
 
-def as_user(target, path, **options):
-    return "tempZone", "rods"
+    @staticmethod
+    def post_coll_create(hdlr_mod, session, target, path, **options):
+        print("create coll ", target)
+
+    @staticmethod
+    def to_resource(session, target, path, **options):
+        return "demoResc"
+
+    @staticmethod
+    def as_user(target, path, **options):
+        return "tempZone", "rods"
+
+
+
