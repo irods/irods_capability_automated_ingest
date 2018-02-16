@@ -91,13 +91,13 @@ python start_sync.py start <local_dir> <collection> -i <restart interval> [ --ev
 ```
 
 ### event handler ###
-Create a module:
+
 ```
-on_create(session, target, source, **options):
+{pre,post}_data_obj_{create,modify}(session, target, source, **options):
 ```
   
 ```
-on_modify(session, target, source, **options):
+{pre,post}_coll_create(hdlr_mod, func, session, target, source, **options):
 ```
 
 ```
@@ -106,10 +106,6 @@ as_user(target, source, **options):
 
 ```
 to_resource_hier(session, target, source, **options):
-```
-
-```
-to_resource(session, target, source, **options):
 ```
 
 example: `evhdlr.py`
