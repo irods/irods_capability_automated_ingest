@@ -62,10 +62,16 @@ def sync_file(target, root, path, hdlr):
             t = datetime.now().timestamp()
             sync_time = get_with_key(r, sync_time_key, path)
             mtime = getmtime(path)
-            if sync_time == None or mtime >= sync_time:
-                logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", mtime = " + str(mtime) + ".")
-                sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, hdlr)
-                set_with_key(r, path, sync_time_key, str(t))
+            ctime = getctime(path)
+            if sync_time == None or ctime >= sync_time:
+                if mtime >= sync_time:
+                    logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", mtime = " + str(mtime) + ".")
+                    sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, hdlr)
+                    set_with_key(r, path, sync_time_key, str(t))
+                else:
+                    logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", mtime = " + str(mtime) + ".")
+                    sync_irods.sync_metadata_from_file(join(target, relpath(path, start=root)), path, hdlr)
+                    set_with_key(r, path, sync_time_key, str(t))
             else:
                 logger.info("file hasn't changed. path = " + path + ".")
     except OSError as err:
