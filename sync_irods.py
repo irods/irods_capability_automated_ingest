@@ -111,5 +111,7 @@ def sync_data_from_file(target, path, hdlr, **options):
 
             call(hdlr_mod, "on_data_obj_modify", mfunc, hdlr_mod, session, target, path, **options)
 
+def sync_metadata_from_file(target, path, hdlr, **options):
+    sync_data_from_file(target, path, hdlr, **options)
                 
         
