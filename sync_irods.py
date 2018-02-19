@@ -1,5 +1,5 @@
 import os
-from os.path import dirname, getsize, getmtime
+from os.path import dirname, getsize, getmtime, getctime
 from irods.session import iRODSSession
 import logging
 import sys
