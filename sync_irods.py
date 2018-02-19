@@ -35,14 +35,14 @@ def create_dirs(hdlr_mod, session, target, path, **options):
 
 def register_file(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "to_resource_hier"):
-        options["resc_hier"] = hdlr_mod.to_resource_hier(session, target, path, **options)
+        options["rescHier"] = hdlr_mod.to_resource_hier(session, target, path, **options)
 
     logger.info("registering object " + target + ", options = " + str(options))
     session.data_objects.register(path, target, **options)
 
 def upload_file(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "to_resource_hier"):
-        options["resc_hier"] = hdlr_mod.to_resource_hier(session, target, path, **options)
+        options["rescHier"] = hdlr_mod.to_resource_hier(session, target, path, **options)
 
     logger.info("uploading object " + target + ", options = " + str(options))
     session.data_objects.put(path, target, **options)
