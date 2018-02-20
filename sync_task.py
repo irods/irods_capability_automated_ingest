@@ -2,7 +2,7 @@ from redis import StrictRedis
 from rq import Queue, Worker
 from rq.worker import WorkerStatus
 from os import listdir
-from os.path import isfile, join, getmtime, realpath, relpath
+from os.path import isfile, join, getmtime, realpath, relpath, getctime
 from datetime import datetime
 from rq_scheduler import Scheduler
 import logging
@@ -64,14 +64,12 @@ def sync_file(target, root, path, hdlr):
             mtime = getmtime(path)
             ctime = getctime(path)
             if sync_time == None or ctime >= sync_time:
-                if mtime >= sync_time:
-                    logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", mtime = " + str(mtime) + ".")
+                logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", mtime = " + str(mtime) + ".")
+                if sync_time == None or mtime >= sync_time:
                     sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, hdlr)
-                    set_with_key(r, path, sync_time_key, str(t))
                 else:
-                    logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", mtime = " + str(mtime) + ".")
                     sync_irods.sync_metadata_from_file(join(target, relpath(path, start=root)), path, hdlr)
-                    set_with_key(r, path, sync_time_key, str(t))
+                set_with_key(r, path, sync_time_key, str(t))
             else:
                 logger.info("file hasn't changed. path = " + path + ".")
     except OSError as err:

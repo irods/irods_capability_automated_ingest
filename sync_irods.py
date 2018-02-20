@@ -1,5 +1,5 @@
 import os
-from os.path import dirname, getsize, getmtime, getctime
+from os.path import dirname, getsize, getmtime
 from irods.session import iRODSSession
 import logging
 import sys
@@ -27,11 +27,11 @@ def create_dirs(hdlr_mod, session, target, path, **options):
             raise Exception("create_dirs: Cannot create root")
         create_dirs(hdlr_mod, session, dirname(target), dirname(path), **options)
 
-        def ccfunc(session, target, path, **options):
+        def ccfunc(hdlr_mod, session, target, path, **options):
             logger.info("creating collection " + target)
             session.collections.create(target)
 
-        call(hdlr_mod, "on_coll_create", ccfunc, session, target, path, **options)
+        call(hdlr_mod, "on_coll_create", ccfunc, hdlr_mod, session, target, path, **options)
 
 def register_file(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "to_resource_hier"):
