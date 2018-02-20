@@ -15,7 +15,11 @@ class event_handler(Core):
         print("create coll ", target)
 
     @staticmethod
-    def to_resource(session, target, path, **options):
+    def to_root_resource(session, target, path, **options):
+        return "demoResc"
+
+    @staticmethod
+    def to_leaf_resource(session, target, path, **options):
         return "demoResc"
 
     @staticmethod
@@ -26,5 +30,9 @@ class event_handler(Core):
     def as_user(target, path, **options):
         return "tempZone", "rods"
 
+    @staticmethod
+    def put(session, target, path, **options):
+        return False
+    
 
 

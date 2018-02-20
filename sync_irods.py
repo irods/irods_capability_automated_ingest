@@ -35,22 +35,26 @@ def create_dirs(hdlr_mod, session, target, path, **options):
         call(hdlr_mod, "on_coll_create", ccfunc, hdlr_mod, session, target, path, **options)
 
 def register_file(hdlr_mod, session, target, path, **options):
-    if hasattr(hdlr_mod, "to_resource"):
-        options["destRescName"] = hdlr_mod.to_resource(session, target, path, **options)
+    if hasattr(hdlr_mod, "to_leaf_resource"):
+        options["destRescName"] = hdlr_mod.to_leaf_resource(session, target, path, **options)
 
     logger.info("registering object " + target + ", options = " + str(options))
     session.data_objects.register(path, target, **options)
 
 def upload_file(hdlr_mod, session, target, path, **options):
-    if hasattr(hdlr_mod, "to_resource"):
-        options["destRescName"] = hdlr_mod.to_resource(session, target, path, **options)
+    if hasattr(hdlr_mod, "to_root_resource"):
+        options["destRescName"] = hdlr_mod.to_root_resource(session, target, path, **options)
 
     logger.info("uploading object " + target + ", options = " + str(options))
     session.data_objects.put(path, target, **options)
 
 def sync_file(hdlr_mod, session, target, path, **options):
     logger.info("syncing object " + target + ", options = " + str(options))
-    upload_file(hdlr_mod, session, target, path, **options)
+    if hasattr(hdlr_mod, "to_root_resource"):
+        options["destRescName"] = hdlr_mod.to_root_resource(session, target, path, **options)
+
+    logger.info("uploading object " + target + ", options = " + str(options))
+    session.data_objects.put(path, target, **options)
     
 def update_metadata(hdlr_mod, session, target, path, **options):
     size = getsize(path)
@@ -61,9 +65,15 @@ def update_metadata(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "to_resource_hier"):
         data_obj_info["rescHier"] = hdlr_mod.to_resource_hier(session, target, path, **options)
 
+    if hasattr(hdlr_mod, "to_leaf_resource"):
+        resc_name = hdlr_mod.to_leaf_resource(session, target, path, **options)
+    else:
+        resc_name = None
+
     for row in session.query(Resource.name, DataObject.path).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
-        if (data_obj_info.get("rescHier") is None or data_obj_info["rescHier"] == row[Resource.name]) and row[DataObject.path] == path:
+        if (resc_name is None or row[Resource.name] == resc_name) and row[DataObject.path] == path:
             found = True
+            break
 
     if not found:
         logger.error("updating object: wrong resource or path, target = " + target + ", path = " + path + ", options = " + str(options))
@@ -74,7 +84,7 @@ def update_metadata(hdlr_mod, session, target, path, **options):
 def sync_file_meta(hdlr_mod, session, target, path, **options):
     pass
     
-def sync_data_from_file(target, path, put, hdlr, content, **options):
+def sync_data_from_file(target, path, hdlr, content, **options):
     if hdlr is not None:
         hdlr_mod0 = importlib.import_module(hdlr)
         hdlr_mod = getattr(hdlr_mod0, "event_handler", None)
@@ -90,6 +100,7 @@ def sync_data_from_file(target, path, put, hdlr, content, **options):
         sess_ctx = iRODSSession(irods_env_file=env_file, client_user = client_user, client_zone = client_zone)
     else:
         sess_ctx = iRODSSession(irods_env_file=env_file)
+
         
     with sess_ctx as session:    
 
@@ -100,14 +111,18 @@ def sync_data_from_file(target, path, put, hdlr, content, **options):
         else:
             create = True
 
+        put = False
+        if hasattr(hdlr_mod, "put"):
+            put = hdlr_mod.put(session, target, path, **options)
+                    
         replica = False
         if hasattr(hdlr_mod, "as_replica"):
             replica = hdlr_mod.as_replica(session, target, path, **options)
         
 
         if not create and not put and replica:
-            if hasattr(hdlr_mod, "to_resource"):
-                resc_name = hdlr_mod.to_resource(session, target, path, **options)
+            if hasattr(hdlr_mod, "to_leaf_resource"):
+                resc_name = hdlr_mod.to_leaf_resource(session, target, path, **options)
             else:
                 raise Exception("no resource name defined")
 
