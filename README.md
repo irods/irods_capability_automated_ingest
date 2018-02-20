@@ -128,8 +128,3 @@ to_resource_hier(session, target, source, **options):
 
 example: `evhdlr.py`
 
-### stop sync ###
-
-```
-python start_sync.py stop
-```
