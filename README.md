@@ -86,8 +86,26 @@ tested under python 3.5
 
 ### start sync ###
 
+If `-i` is not present, then only sync once
+
+Register
 ```
-python start_sync.py start <local_dir> <collection> -i <restart interval> [ --event_handler <module name> ]
+python start_sync.py register_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
+```
+
+Put
+```
+python start_sync.py put_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
+```
+
+List restarting jobs
+```
+python start_sync.py list
+```
+
+Stop
+```
+python start_sync.py stop <job name>
 ```
 
 ### event handler ###
