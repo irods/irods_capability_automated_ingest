@@ -125,7 +125,7 @@ as_user(target, source, **options):
 ```
 to_resource(session, target, source, **options):
 ```
-used by register, upload, and when `as_replica` returns `True` determine whether it is a register or a update
+used by register, upload, sync, and when `as_replica` returns `True` determine whether it is a register or a update
 
 ```
 to_resource_hier(session, target, source, **options):
