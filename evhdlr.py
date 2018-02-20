@@ -31,8 +31,10 @@ class event_handler(Core):
         return "tempZone", "rods"
 
     @staticmethod
+    def as_replica(session, target, path, **options):
+        return False
+
+    @staticmethod
     def put(session, target, path, **options):
         return False
-    
-
 
