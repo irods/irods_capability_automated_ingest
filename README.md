@@ -88,22 +88,22 @@ tested under python 3.5
 
 If `-i` is not present, then only sync once
 
-Register
+#### register
 ```
 python start_sync.py register_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
 ```
 
-Put
+#### put
 ```
 python start_sync.py put_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
 ```
 
-List restarting jobs
+#### list restarting jobs
 ```
 python start_sync.py list
 ```
 
-Stop
+#### stop
 ```
 python start_sync.py stop <job name>
 ```
