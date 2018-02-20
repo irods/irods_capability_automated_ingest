@@ -15,6 +15,10 @@ class event_handler(Core):
         print("create coll ", target)
 
     @staticmethod
+    def to_resource(session, target, path, **options):
+        return "demoResc"
+
+    @staticmethod
     def to_resource_hier(session, target, path, **options):
         return "demoResc"
 
