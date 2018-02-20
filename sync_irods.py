@@ -62,7 +62,10 @@ def update_metadata(hdlr_mod, session, target, path, **options):
 
     session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime}, **options)
 
-def sync_data_from_file(target, path, hdlr, **options):
+def sync_file_meta(hdlr_mod, session, target, path, **options):
+    pass
+    
+def sync_data_from_file(target, path, hdlr, put, content, **options):
     if hdlr is not None:
         hdlr_mod0 = __import__(hdlr)
         hdlr_mod = getattr(hdlr_mod0, "event_handler", None)
@@ -79,9 +82,6 @@ def sync_data_from_file(target, path, hdlr, **options):
     else:
         sess_ctx = iRODSSession(irods_env_file=env_file)
         
-    def remote_host(session):
-        return session.host not in ('localhost', socket.gethostname())
-
     with sess_ctx as session:    
 
         if session.data_objects.exists(target):
@@ -96,22 +96,24 @@ def sync_data_from_file(target, path, hdlr, **options):
 
         if create:
             def cfunc(hdlr_mod, session, target, path, **options):
-                if remote_host(session):
+                if put:
                     upload_file(hdlr_mod, session, target, path, **options)
                 else:
                     register_file(hdlr_mod, session, target, path, **options)
 
             call(hdlr_mod, "on_data_obj_create", cfunc, hdlr_mod, session, target, path, **options)
-        else:
+        elif content:
             def mfunc(hdlr_mod, session, target, path, **options):
-                if remote_host(session):
+                if put:
                     sync_file(hdlr_mod, session, target, path, **options)
                 else:
                     update_metadata(hdlr_mod, session, target, path, **options)
 
             call(hdlr_mod, "on_data_obj_modify", mfunc, hdlr_mod, session, target, path, **options)
+        else:
+            call(hdlr_mod, "on_data_obj_modify", sync_file_meta, hdlr_mod, session, target, path, **options)
 
-def sync_metadata_from_file(target, path, hdlr, **options):
-    sync_data_from_file(target, path, hdlr, **options)
+def sync_metadata_from_file(target, path, hdlr, put, **options):
+    sync_data_from_file(target, path, hdlr, put, False, **options)
                 
         

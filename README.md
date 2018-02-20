@@ -93,11 +93,11 @@ python start_sync.py start <local_dir> <collection> -i <restart interval> [ --ev
 ### event handler ###
 
 ```
-{pre,post}_data_obj_{create,modify}(session, target, source, **options):
+{pre,post}_data_obj_{create,modify}(hdlr_mod, session, target, source, **options):
 ```
   
 ```
-{pre,post}_coll_create(session, target, source, **options):
+{pre,post}_coll_create(hdlr_mod, session, target, source, **options):
 ```
 
 ```
