@@ -1,6 +1,7 @@
 import os
-from os.path import dirname, getsize, getmtime
+from os.path import dirname, getsize, getmtime, basename
 from irods.session import iRODSSession
+from irods.models import Resource, DataObject, Collection
 import logging
 import sys
 import socket
@@ -59,6 +60,14 @@ def update_metadata(hdlr_mod, session, target, path, **options):
     data_obj_info = {"objPath": target}
     if hasattr(hdlr_mod, "to_resource_hier"):
         data_obj_info["rescHier"] = hdlr_mod.to_resource_hier(session, target, path, **options)
+
+    for row in session.query(Resource.name, DataObject.path).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
+        if (data_obj_info.get("rescHier") is None or data_obj_info["rescHier"] == row[Resource.name]) and row[DataObject.path] == path:
+            found = True
+
+    if not found:
+        logger.error("updating object: wrong resource or path, target = " + target + ", path = " + path + ", options = " + str(options))
+        raise Exception("wrong resource or path")
 
     session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime}, **options)
 
