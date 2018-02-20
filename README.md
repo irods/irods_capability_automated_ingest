@@ -90,22 +90,22 @@ If `-i` is not present, then only sync once
 
 #### register
 ```
-python start_sync.py register_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
+python irods_sync.py register_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
 ```
 
 #### put
 ```
-python start_sync.py put_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
+python irods_sync.py put_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
 ```
 
 #### list restarting jobs
 ```
-python start_sync.py list
+python irods_sync.py list
 ```
 
 #### stop
 ```
-python start_sync.py stop <job name>
+python irods_sync.py stop <job name>
 ```
 
 ### event handler ###
@@ -123,7 +123,17 @@ as_user(target, source, **options):
 ```
 
 ```
+to_resource(session, target, source, **options):
+```
+used by register, upload, and when `as_replica` returns `True` determine whether it is a register or a update
+
+```
 to_resource_hier(session, target, source, **options):
+```
+used by update
+
+```
+as_replica(session, target, source, **options):
 ```
 
 example: `evhdlr.py`
