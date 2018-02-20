@@ -141,12 +141,12 @@ used by
 ```
 as_replica(session, target, source, **options):
 ```
-default `False`
+default: `False`
 
 ```
 put(session, target, source, **options):
 ```
-default `False`
+default: `False`
 
 example: `evhdlr.py`
 
