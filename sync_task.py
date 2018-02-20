@@ -69,11 +69,11 @@ def sync_file(target, root, path, put, hdlr):
             ctime = getctime(path)
             if sync_time == None or mtime >= sync_time:
                 logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", mtime = " + str(mtime) + ".")
-                sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, hdlr, put, True)
+                sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, put, hdlr, True)
                 set_with_key(r, sync_time_key, path, str(t))
             elif ctime >= sync_time:
                 logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", ctime = " + str(ctime) + ".")
-                sync_irods.sync_metadata_from_file(join(target, relpath(path, start=root)), path, hdlr, put)
+                sync_irods.sync_metadata_from_file(join(target, relpath(path, start=root)), path, put, hdlr)
                 set_with_key(r, sync_time_key, path, str(t))
             else:
                 logger.info("file hasn't changed. path = " + path + ".")

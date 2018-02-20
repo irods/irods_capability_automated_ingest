@@ -7,8 +7,11 @@ import logging
 import sys
 from uuid import uuid1
 
-def handle_start(args):
-    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, args.put, args.job_name, args.event_handler)
+def handle_register_start(args):
+    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, False, args.job_name, args.event_handler)
+
+def handle_put_start(args):
+    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, True, args.job_name, args.event_handler)
 
 def handle_stop(args):
     stop_synchronization(args.job_name)
@@ -32,7 +35,7 @@ parser_start.add_argument('--event_handler', action="store", metavar='EVENT HAND
 parser_start.add_argument('--job_name', action="store", metavar='JOB NAME', type=str, default=uuid, help='job name')
 
 
-parser_start.set_defaults(func=handle_start, put=True)
+parser_start.set_defaults(func=handle_put_start)
 
 parser_start = subparsers.add_parser("register_start", help="start help")
 parser_start.add_argument('root', metavar='ROOT', type=str, help='root directory')
@@ -44,7 +47,7 @@ parser_start.add_argument('--restart_queue', action="store", metavar='RESTART QU
 parser_start.add_argument('--event_handler', action="store", metavar='EVENT HANDLER', type=str, default=None, help='event handler')
 parser_start.add_argument('--job_name', action="store", metavar='JOB NAME', type=str, default=uuid, help='job name')
 
-parser_start.set_defaults(func=handle_start, put=False)
+parser_start.set_defaults(func=handle_register_start)
 
 parser_stop = subparsers.add_parser("stop", help="stop help")
 parser_stop.add_argument('job_name', action="store", metavar='JOB NAME', type=str, help='job name')

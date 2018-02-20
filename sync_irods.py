@@ -4,7 +4,7 @@ from irods.session import iRODSSession
 from irods.models import Resource, DataObject, Collection
 import logging
 import sys
-import socket
+import importlib
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -35,8 +35,8 @@ def create_dirs(hdlr_mod, session, target, path, **options):
         call(hdlr_mod, "on_coll_create", ccfunc, hdlr_mod, session, target, path, **options)
 
 def register_file(hdlr_mod, session, target, path, **options):
-    if hasattr(hdlr_mod, "to_resource_hier"):
-        options["rescHier"] = hdlr_mod.to_resource_hier(session, target, path, **options)
+    if hasattr(hdlr_mod, "to_resource"):
+        options["destRescName"] = hdlr_mod.to_resource(session, target, path, **options)
 
     logger.info("registering object " + target + ", options = " + str(options))
     session.data_objects.register(path, target, **options)
@@ -74,9 +74,9 @@ def update_metadata(hdlr_mod, session, target, path, **options):
 def sync_file_meta(hdlr_mod, session, target, path, **options):
     pass
     
-def sync_data_from_file(target, path, hdlr, put, content, **options):
+def sync_data_from_file(target, path, put, hdlr, content, **options):
     if hdlr is not None:
-        hdlr_mod0 = __import__(hdlr)
+        hdlr_mod0 = importlib.import_module(hdlr)
         hdlr_mod = getattr(hdlr_mod0, "event_handler", None)
     else:
         hdlr_mod = None
@@ -99,6 +99,25 @@ def sync_data_from_file(target, path, hdlr, put, content, **options):
             raise Exception("sync: cannot syncing file " + path + " to collection " + target)
         else:
             create = True
+
+        replica = False
+        if hasattr(hdlr_mod, "as_replica"):
+            replica = hdlr_mod.as_replica(session, target, path, **options)
+        
+
+        if not create and not put and replica:
+            if hasattr(hdlr_mod, "to_resource"):
+                resc_name = hdlr_mod.to_resource(session, target, path, **options)
+            else:
+                raise Exception("no resource name defined")
+
+            create = True
+            for replica in session.data_objects.get(target).replicas:
+                if replica.resource_name == resc_name:
+                    create = False
+
+            if create:
+                options["regRepl"] = ""
 
         if create:
             create_dirs(hdlr_mod, session, dirname(target), dirname(path), **options)
