@@ -88,14 +88,9 @@ tested under python 3.5
 
 If `-i` is not present, then only sync once
 
-#### register
+#### start
 ```
-python irods_sync.py register_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
-```
-
-#### put
-```
-python irods_sync.py put_start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
+python irods_sync.py start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
 ```
 
 #### list restarting jobs
@@ -123,18 +118,35 @@ as_user(target, source, **options):
 ```
 
 ```
-to_resource(session, target, source, **options):
+to_leaf_resource(session, target, source, **options):
 ```
-used by register, upload, sync, and when `as_replica` returns `True` determine whether it is a register or a update
+used by 
+ * register
+ * update to determine register resource
+ * when `as_replica` returns `True` determine whether it is a register or a update
+ 
+```
+to_root_resource(session, target, source, **options):
+```
+used by
+ * upload
+ * sync
 
 ```
 to_resource_hier(session, target, source, **options):
 ```
-used by update
+used by 
+ * update
 
 ```
 as_replica(session, target, source, **options):
 ```
+default `False`
+
+```
+put(session, target, source, **options):
+```
+default `False`
 
 example: `evhdlr.py`
 
