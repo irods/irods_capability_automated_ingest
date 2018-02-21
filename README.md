@@ -84,9 +84,11 @@ tested under python 3.5
 
 ## irods rsync ###
 
-### test cases ###
+### run test ###
 
+```
 python -m test.test_irods_sync
+```
 
 ### start sync ###
 
