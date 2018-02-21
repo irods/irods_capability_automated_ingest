@@ -84,6 +84,10 @@ tested under python 3.5
 
 ## irods rsync ###
 
+### test cases ###
+
+python -m test.test_irods_sync
+
 ### start sync ###
 
 If `-i` is not present, then only sync once

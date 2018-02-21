@@ -1,5 +1,5 @@
 from redis import StrictRedis
-from rq import Queue, Worker
+from rq import Queue, Worker, get_current_job
 from rq.worker import WorkerStatus
 from os import listdir
 from os.path import isfile, join, getmtime, realpath, relpath, getctime
@@ -83,8 +83,6 @@ def sync_file(target, root, path, hdlr):
         logger.error("Unexpected error: " + str(err))
         raise
 
-RESTART_JOB_ID = "restart"
-
 def restart(path_q_name, file_q_name, target, root, path, hdlr):
     try:
         logger.info("***************** restart *****************")
@@ -94,8 +92,9 @@ def restart(path_q_name, file_q_name, target, root, path, hdlr):
         path_q_workers = Worker.all(queue=path_q)
         file_q_workers = Worker.all(queue=file_q)
 
+        job_id = get_current_job().id
         def all_not_busy(ws):
-            return all(w.get_state() != WorkerStatus.BUSY or w.get_current_job_id() == RESTART_JOB_ID for w in ws)            
+            return all(w.get_state() != WorkerStatus.BUSY or w.get_current_job_id() == job_id for w in ws)            
 
         # this doesn't guarantee that there is only one tree walk, but it prevents tree walk when the file queue is not empty
         if path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
