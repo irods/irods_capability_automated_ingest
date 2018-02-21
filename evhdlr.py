@@ -38,3 +38,7 @@ class event_handler(Core):
     def put(session, target, path, **options):
         return False
 
+    @staticmethod
+    def sync(session, target, path, **options):
+        return True
+

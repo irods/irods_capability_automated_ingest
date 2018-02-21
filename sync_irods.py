@@ -50,6 +50,7 @@ def upload_file(hdlr_mod, session, target, path, **options):
 
 def sync_file(hdlr_mod, session, target, path, **options):
     logger.info("syncing object " + target + ", options = " + str(options))
+    
     if hasattr(hdlr_mod, "to_root_resource"):
         options["destRescName"] = hdlr_mod.to_root_resource(session, target, path, **options)
 
@@ -119,7 +120,6 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         if hasattr(hdlr_mod, "as_replica"):
             replica = hdlr_mod.as_replica(session, target, path, **options)
         
-
         if not create and not put and replica:
             if hasattr(hdlr_mod, "to_leaf_resource"):
                 resc_name = hdlr_mod.to_leaf_resource(session, target, path, **options)
@@ -146,13 +146,19 @@ def sync_data_from_file(target, path, hdlr, content, **options):
 
             call(hdlr_mod, "on_data_obj_create", cfunc, hdlr_mod, session, target, path, **options)
         elif content:
-            def mfunc(hdlr_mod, session, target, path, **options):
-                if put:
-                    sync_file(hdlr_mod, session, target, path, **options)
-                else:
-                    update_metadata(hdlr_mod, session, target, path, **options)
+            sync = True
+            if put:
+                if hasattr(hdlr_mod, "sync"):
+                    sync = hdlr_mod.sync(session, target, path, **options)
 
-            call(hdlr_mod, "on_data_obj_modify", mfunc, hdlr_mod, session, target, path, **options)
+            if sync:
+                def mfunc(hdlr_mod, session, target, path, **options):
+                    if put:
+                        sync_file(hdlr_mod, session, target, path, **options)
+                    else:
+                        update_metadata(hdlr_mod, session, target, path, **options)
+
+                call(hdlr_mod, "on_data_obj_modify", mfunc, hdlr_mod, session, target, path, **options)
         else:
             call(hdlr_mod, "on_data_obj_modify", sync_file_meta, hdlr_mod, session, target, path, **options)
 

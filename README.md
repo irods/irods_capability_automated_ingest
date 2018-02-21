@@ -154,5 +154,10 @@ put(session, target, source, **options):
 ```
 default: `False`
 
+```
+sync(session, target, source, **options):
+```
+default: `True`
+
 example: `evhdlr.py`
 
