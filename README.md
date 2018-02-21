@@ -126,8 +126,9 @@ as_user(target, source, **options):
 ```
 to_leaf_resource(session, target, source, **options):
 ```
-used by 
+used by
  * register
+ * update
  * update to determine register resource
  * when `as_replica` returns `True` determine whether it is a register or a update
  
@@ -141,7 +142,8 @@ used by
 ```
 to_resource_hier(session, target, source, **options):
 ```
-used by 
+(optional) used by
+ * register
  * update
 
 ```
