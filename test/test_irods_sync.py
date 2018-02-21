@@ -43,6 +43,11 @@ def create_files():
         with open(join(A,str(i)), "w") as f:
             f.write("i" * i)
 
+def recreate_files():
+    for i in range(10):
+        with open(join(A,str(i)), "w") as f:
+            f.write("i" * (i * 2 + 1))
+
 def delete_files():
     rmtree(A)
 
@@ -102,6 +107,41 @@ class TestRegister(TestCase):
                 obj = session.data_objects.get(rpath)
                 self.assertEqual(obj.replicas[0].path, realpath(path))
 
+    def test_no_sync(self):
+
+        proc = Popen(["python", "irods_sync.py", "start", A, A_COLL, "--event_handler", "examples.no_sync"])
+        proc.wait()
+        
+        workers = start_workers(1)
+        wait(workers)
+
+        with iRODSSession(irods_env_file=env_file) as session:
+            self.assertTrue(session.collections.exists(A_COLL))
+            for i in listdir(A):
+                path = join(A, i)
+                rpath = A_COLL + "/" + i
+                self.assertTrue(session.data_objects.exists(rpath))
+                a1 = read_file(path)
+                
+                a2 = read_data_object(session, rpath)
+                self.assertEqual(a1, a2)
+
+        recreate_files()
+
+        proc = Popen(["python", "irods_sync.py", "start", A, A_COLL, "--event_handler", "examples.no_sync"])
+        proc.wait()
+        
+        workers = start_workers(1)
+        wait(workers)
+
+        with iRODSSession(irods_env_file=env_file) as session:
+            for i in listdir(A):
+                path = join(A, i)
+                rpath = A_COLL + "/" + i
+                a1 = read_file(path)
+                
+                a2 = read_data_object(session, rpath)
+                self.assertNotEqual(a1, a2)
         
 if __name__ == '__main__':
         unittest.main()
