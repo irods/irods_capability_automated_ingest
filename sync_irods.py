@@ -40,6 +40,13 @@ def register_file(hdlr_mod, session, target, path, **options):
 
     logger.info("registering object " + target + ", options = " + str(options))
     session.data_objects.register(path, target, **options)
+    size = getsize(path)
+
+    data_obj_info = {"objPath": target}
+    if "destRescName" in options:
+        data_obj_info["rescName"] = options["destRescName"]
+
+    session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size}, **options)
 
 def upload_file(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "to_root_resource"):
@@ -68,6 +75,7 @@ def update_metadata(hdlr_mod, session, target, path, **options):
 
     if hasattr(hdlr_mod, "to_leaf_resource"):
         resc_name = hdlr_mod.to_leaf_resource(session, target, path, **options)
+        data_obj_info["rescName"] = resc_name
     else:
         resc_name = None
 
@@ -119,7 +127,7 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         replica = False
         if hasattr(hdlr_mod, "as_replica"):
             replica = hdlr_mod.as_replica(session, target, path, **options)
-        
+
         if not create and not put and replica:
             if hasattr(hdlr_mod, "to_leaf_resource"):
                 resc_name = hdlr_mod.to_leaf_resource(session, target, path, **options)
