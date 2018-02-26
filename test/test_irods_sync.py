@@ -22,6 +22,13 @@ NFILES = 10
 REGISTER_RESC = "regiResc"
 REGISTER_RESC_PATH = "/var/lib/irods/Vault2"
 
+REGISTER_RESC2 = "regiResc2"
+
+REGISTER_RESC2A = "regiResc2a"
+REGISTER_RESC_PATH2A = "/var/lib/irods/Vault2a"
+REGISTER_RESC2B = "regiResc2b"
+REGISTER_RESC_PATH2B = "/var/lib/irods/Vault2b"
+
 PUT_RESC = "putResc"
 PUT_RESC_PATH = "/var/lib/irods/Vault3"
 
@@ -74,11 +81,21 @@ def create_resources():
     with iRODSSession(irods_env_file=env_file) as session:
         session.resources.create(REGISTER_RESC, "unixfilesystem", host="localhost", path=REGISTER_RESC_PATH)
         session.resources.create(PUT_RESC, "unixfilesystem", host="localhost", path=PUT_RESC_PATH)
+        session.resources.create(REGISTER_RESC2, "random")
+        session.resources.create(REGISTER_RESC2A, "unixfilesystem", host="localhost", path=REGISTER_RESC_PATH2A)
+        session.resources.create(REGISTER_RESC2B, "unixfilesystem", host="localhost", path=REGISTER_RESC_PATH2B)
+        session.resources.add_child(REGISTER_RESC2, REGISTER_RESC2A)
+        session.resources.add_child(REGISTER_RESC2, REGISTER_RESC2B)
 
 def delete_resources():
     with iRODSSession(irods_env_file=env_file) as session:
         session.resources.remove(REGISTER_RESC)
         session.resources.remove(PUT_RESC)
+        session.resources.remove_child(REGISTER_RESC2, REGISTER_RESC2A)
+        session.resources.remove_child(REGISTER_RESC2, REGISTER_RESC2B)
+        session.resources.remove(REGISTER_RESC2)
+        session.resources.remove(REGISTER_RESC2A)
+        session.resources.remove(REGISTER_RESC2B)
     
 def irmtrash():
     proc = Popen(["irmtrash"])
@@ -133,12 +150,12 @@ class Test_irods_sync(TestCase):
         proc.wait()
         self.do_register2()
                 
-    def do_register(self, eh, resc_name = "demoResc"):
+    def do_register(self, eh, resc_name = ["demoResc"]):
         proc = Popen(["python", "irods_sync.py", "start", A, A_COLL, "--event_handler", eh])
         proc.wait()
         self.do_register2(resc_name = resc_name)
 
-    def do_register2(self, resc_name = "demoResc"):
+    def do_register2(self, resc_name = ["demoResc"]):
         workers = start_workers(1)
         wait(workers)
 
@@ -155,7 +172,7 @@ class Test_irods_sync(TestCase):
                 
                 obj = session.data_objects.get(rpath)
                 self.assertEqual(obj.replicas[0].path, realpath(path))
-                self.assertEqual(obj.replicas[0].resource_name, resc_name)
+                self.assertIn(obj.replicas[0].resource_name, resc_name)
                 
     def do_put(self, eh, resc_name = "demoResc", resc_root = "/var/lib/irods/Vault"):
         proc = Popen(["python", "irods_sync.py", "start", A, A_COLL, "--event_handler", eh])
@@ -207,7 +224,7 @@ class Test_irods_sync(TestCase):
                 self.assertIn(realpath(path), map(lambda i : obj.replicas[i].path, range(2)))
                 self.assertNotEqual(size(session, rpath, resc_name = resc_name), len(a1))
 
-    def do_update(self, eh, resc_name = "demoResc"):
+    def do_update(self, eh, resc_name = ["demoResc"]):
         recreate_files()
         self.do_register(eh, resc_name = resc_name)
         with iRODSSession(irods_env_file=env_file) as session:
@@ -246,22 +263,22 @@ class Test_irods_sync(TestCase):
         self.do_register("examples.register")
 
     def test_register_with_resc_hier(self):
-        self.do_register("examples.register_with_resc_hier", resc_name = REGISTER_RESC)
+        self.do_register("examples.register_with_resc_hier", resc_name = [REGISTER_RESC])
 
     def test_register_with_resc_name(self):
-        self.do_register("examples.register_with_resc_name", resc_name = REGISTER_RESC)
+        self.do_register("examples.register_with_resc_name", resc_name = [REGISTER_RESC])
 
     def test_update(self):
         self.do_register("examples.update")
         self.do_update("examples.update")
         
     def test_update_with_resc_hier(self):
-        self.do_register("examples.update_with_resc_hier", resc_name = REGISTER_RESC)
-        self.do_update("examples.update_with_resc_hier", resc_name = REGISTER_RESC)
+        self.do_register("examples.update_with_resc_hier", resc_name = [REGISTER_RESC])
+        self.do_update("examples.update_with_resc_hier", resc_name = [REGISTER_RESC])
                 
     def test_update_with_resc_name(self):
-        self.do_register("examples.update_with_resc_name", resc_name = REGISTER_RESC)
-        self.do_update("examples.update_with_resc_name", resc_name = REGISTER_RESC)
+        self.do_register("examples.update_with_resc_name", resc_name = [REGISTER_RESC])
+        self.do_update("examples.update_with_resc_name", resc_name = [REGISTER_RESC])
                 
     def test_put(self):
         self.do_put("examples.put")
@@ -290,6 +307,10 @@ class Test_irods_sync(TestCase):
     def test_no_sync(self):
         self.do_put("examples.no_sync")
         self.do_no_sync("examples.no_sync")
+        
+    def test_register_non_leaf_with_resc_name(self):
+        self.do_register("examples.register_non_leaf_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_update("examples.register_non_leaf_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
         
 if __name__ == '__main__':
         unittest.main()

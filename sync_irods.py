@@ -79,10 +79,27 @@ def update_metadata(hdlr_mod, session, target, path, **options):
     else:
         resc_name = None
 
-    for row in session.query(Resource.name, DataObject.path).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
-        if (resc_name is None or row[Resource.name] == resc_name) and row[DataObject.path] == path:
-            found = True
-            break
+    found = False
+    if resc_name is None:
+        found = True
+    else:
+        for row in session.query(Resource.name, DataObject.path).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
+            if row[DataObject.path] == path:
+                if row[Resource.name] == resc_name:
+                    found = True
+                else:
+                    child_resc_name = row[Resource.name]
+                    while child_resc_name != "":
+                        child_resc = session.resources.get(child_resc_name)
+                        parent_resc_id = child_resc.parent
+                        for row in session.query(Resource.name).filter(Resource.id == parent_resc_id):
+                            parent_resc_name = row[Resource.name]
+                        if parent_resc_name == resc_name:
+                            found = True
+                            break
+                        child_resc_name = parent_resc_name
+                if found:
+                    break
 
     if not found:
         logger.error("updating object: wrong resource or path, target = " + target + ", path = " + path + ", options = " + str(options))
