@@ -89,7 +89,7 @@ def update_metadata(hdlr_mod, session, target, path, **options):
                     found = True
                 else:
                     child_resc_name = row[Resource.name]
-                    while Truechild_resc_name != "":
+                    while child_resc_name != "":
                         child_resc = session.resources.get(child_resc_name)
                         parent_resc_id = child_resc.parent
                         parent_resc_name = ""
