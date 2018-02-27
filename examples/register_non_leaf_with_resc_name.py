@@ -3,7 +3,7 @@ from core import Core
 class event_handler(Core):
     
     @staticmethod
-    def to_leaf_resource(session, target, path, **options):
+    def to_resource(session, target, path, **options):
         return "regiResc2"
 
     @staticmethod

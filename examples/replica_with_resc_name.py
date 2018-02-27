@@ -11,7 +11,7 @@ class event_handler(Core):
         return True
 
     @staticmethod
-    def to_leaf_resource(session, target, path, **options):
+    def to_resource(session, target, path, **options):
         return "regiResc"
     
 

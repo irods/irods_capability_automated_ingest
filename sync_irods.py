@@ -22,6 +22,22 @@ def call(hdlr_mod, hdlr, func, *args, **options):
     else:
         func(*args, **options)
 
+def child_of(session, child_resc_name, resc_name):
+    if child_resc_name == resc_name:
+        return True
+    else:
+        while True:
+            child_resc = session.resources.get(child_resc_name)
+            parent_resc_id = child_resc.parent
+            if parent_resc_id == None:
+                break
+
+            for row in session.query(Resource.name).filter(Resource.id == parent_resc_id):
+                parent_resc_name = row[Resource.name]
+            if parent_resc_name == resc_name:
+                return True
+            child_resc_name = parent_resc_name
+        return False
     
 def create_dirs(hdlr_mod, session, target, path, **options):
     if not session.collections.exists(target):
@@ -36,8 +52,8 @@ def create_dirs(hdlr_mod, session, target, path, **options):
         call(hdlr_mod, "on_coll_create", ccfunc, hdlr_mod, session, target, path, **options)
 
 def register_file(hdlr_mod, session, target, path, **options):
-    if hasattr(hdlr_mod, "to_leaf_resource"):
-        options["destRescName"] = hdlr_mod.to_leaf_resource(session, target, path, **options)
+    if hasattr(hdlr_mod, "to_resource"):
+        options["destRescName"] = hdlr_mod.to_resource(session, target, path, **options)
 
     logger.info("registering object " + target + ", options = " + str(options))
     session.data_objects.register(path, target, **options)
@@ -106,21 +122,8 @@ def update_metadata(hdlr_mod, session, target, path, **options):
     else:
         for row in session.query(Resource.name, DataObject.path).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
             if row[DataObject.path] == path:
-                if row[Resource.name] == resc_name:
+                if child_of(session, row[Resource.name], resc_name):
                     found = True
-                else:
-                    child_resc_name = row[Resource.name]
-                    while child_resc_name != "":
-                        child_resc = session.resources.get(child_resc_name)
-                        parent_resc_id = child_resc.parent
-                        parent_resc_name = ""
-                        for row in session.query(Resource.name).filter(Resource.id == parent_resc_id):
-                            parent_resc_name = row[Resource.name]
-                        if parent_resc_name == resc_name:
-                            found = True
-                            break
-                        child_resc_name = parent_resc_name
-                if found:
                     break
 
     if not found:
@@ -168,14 +171,14 @@ def sync_data_from_file(target, path, hdlr, content, **options):
             replica = hdlr_mod.as_replica(session, target, path, **options)
 
         if not create and not put and replica:
-            if hasattr(hdlr_mod, "to_leaf_resource"):
-                resc_name = hdlr_mod.to_leaf_resource(session, target, path, **options)
+            if hasattr(hdlr_mod, "to_resource"):
+                resc_name = hdlr_mod.to_resource(session, target, path, **options)
             else:
                 raise Exception("no resource name defined")
 
             create = True
             for replica in session.data_objects.get(target).replicas:
-                if replica.resource_name == resc_name:
+                if child_of(session, replica.resource_name, resc_name):
                     create = False
 
             if create:
