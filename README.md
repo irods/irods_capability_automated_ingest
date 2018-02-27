@@ -159,7 +159,16 @@ default: `False`
 ```
 sync(session, target, source, **options):
 ```
+used by
+  * sync
 default: `True`
+
+```
+append(session, target, source, **options):
+```
+used by
+  * sync
+default: `False`
 
 example: `evhdlr.py`
 
