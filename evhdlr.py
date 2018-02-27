@@ -42,3 +42,7 @@ class event_handler(Core):
     def sync(session, target, path, **options):
         return True
 
+    @staticmethod
+    def append(session, target, path, **options):
+        return False
+
