@@ -5,6 +5,7 @@ from irods.models import Resource, DataObject, Collection
 import logging
 import sys
 import importlib
+from sync_utils import size
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -61,8 +62,28 @@ def sync_file(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "to_root_resource"):
         options["destRescName"] = hdlr_mod.to_root_resource(session, target, path, **options)
 
-    logger.info("uploading object " + target + ", options = " + str(options))
-    session.data_objects.put(path, target, **options)
+    append = False
+    if hasattr(hdlr_mod, "append"):
+        append = hdlr_mod.append(session, target, path, **options)
+
+    if append:
+        BUFFER_SIZE = 1024
+        logger.info("appending object " + target + ", options = " + str(options))
+        tsize = size(session, target)
+        tfd = session.data_objects.open(target, "a", **options)
+        tfd.seek(tsize)
+        with open(path, "rb") as sfd:
+            sfd.seek(tsize)
+            while True:
+                buf = sfd.read(BUFFER_SIZE)
+                if buf == b"":
+                    break
+                tfd.write(buf)
+        tfd.close()
+        
+    else:
+        logger.info("uploading object " + target + ", options = " + str(options))
+        session.data_objects.put(path, target, **options)
     
 def update_metadata(hdlr_mod, session, target, path, **options):
     size = getsize(path)
@@ -73,8 +94,8 @@ def update_metadata(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "to_resource_hier"):
         data_obj_info["rescHier"] = hdlr_mod.to_resource_hier(session, target, path, **options)
 
-    if hasattr(hdlr_mod, "to_leaf_resource"):
-        resc_name = hdlr_mod.to_leaf_resource(session, target, path, **options)
+    if hasattr(hdlr_mod, "to_resource"):
+        resc_name = hdlr_mod.to_resource(session, target, path, **options)
         data_obj_info["rescName"] = resc_name
     else:
         resc_name = None

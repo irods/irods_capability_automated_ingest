@@ -12,6 +12,7 @@ from irods.session import iRODSSession
 from irods.models import Collection, DataObject
 from tempfile import NamedTemporaryFile
 from datetime import datetime
+from sync_utils import size
 
 A = "a"
 A_REMOTE = "a_remote"
@@ -114,17 +115,6 @@ def modify_time(session, path):
     for row in session.query(DataObject.modify_time).filter(Collection.name == dirname(path), DataObject.name == basename(path)):
         return row[DataObject.modify_time]
     
-def size(session, path, replica_num = None, resc_name = None):
-    args = [Collection.name == dirname(path), DataObject.name == basename(path)]
-    
-    if replica_num is not None:
-        args.append(DataObject.replica_number == replica_num)
-        
-    if resc_name is not None:
-        args.append(DataObject.resource_name == resc_name)
-        
-    for row in session.query(DataObject.size).filter(*args):
-        return int(row[DataObject.size])
 
 try:
     env_file = os.environ['IRODS_ENVIRONMENT_FILE']
@@ -295,6 +285,16 @@ class Test_irods_sync(TestCase):
         self.do_put("examples.sync_with_resc_name", resc_name = PUT_RESC, resc_root = PUT_RESC_PATH)
         recreate_files()
         self.do_put("examples.sync_with_resc_name", resc_name = PUT_RESC, resc_root = PUT_RESC_PATH)
+
+    def test_append(self):
+        self.do_put("examples.append")
+        recreate_files()
+        self.do_put("examples.append")
+
+    def test_append_with_resc_name(self):
+        self.do_put("examples.append_with_resc_name", resc_name = PUT_RESC, resc_root = PUT_RESC_PATH)
+        recreate_files()
+        self.do_put("examples.append_with_resc_name", resc_name = PUT_RESC, resc_root = PUT_RESC_PATH)
 
     def test_register_as_replica_with_resc_name(self):
         self.do_put("examples.put")
