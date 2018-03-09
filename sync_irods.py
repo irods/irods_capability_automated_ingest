@@ -112,25 +112,35 @@ def update_metadata(hdlr_mod, session, target, path, **options):
 
     if hasattr(hdlr_mod, "to_resource"):
         resc_name = hdlr_mod.to_resource(session, target, path, **options)
-        data_obj_info["rescName"] = resc_name
+        # data_obj_info["rescName"] = resc_name
     else:
         resc_name = None
 
+    outdated_repl_nums = []
     found = False
     if resc_name is None:
         found = True
     else:
-        for row in session.query(Resource.name, DataObject.path).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
+        for row in session.query(Resource.name, DataObject.path, DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
             if row[DataObject.path] == path:
                 if child_of(session, row[Resource.name], resc_name):
                     found = True
-                    break
+                    repl_num = row[DataObject.replica_number]
+                    data_obj_info["replNum"] = repl_num
+                    continue
+            outdated_repl_nums.append(row[DataObject.replica_number])
 
     if not found:
         logger.error("updating object: wrong resource or path, target = " + target + ", path = " + path + ", options = " + str(options))
         raise Exception("wrong resource or path")
 
-    session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime}, **options)
+    session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime, "replStatus":1}, **options)
+
+    outdated_data_obj_info = {"objPath": target}
+
+    for outdated_repl_num in outdated_repl_nums:
+        outdated_data_obj_info["replNum"] = outdated_repl_num
+        session.data_objects.modDataObjMeta(outdated_data_obj_info, {"replStatus":0})
 
 def sync_file_meta(hdlr_mod, session, target, path, **options):
     pass
