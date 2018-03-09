@@ -6,6 +6,7 @@ from redis import StrictRedis
 from subprocess import Popen, DEVNULL, PIPE
 from signal import SIGINT
 from os import makedirs, listdir, environ
+from rq import Queue
 from shutil import rmtree
 from os.path import join, realpath, getmtime, getsize, dirname, basename
 from irods.session import iRODSSession
@@ -114,7 +115,7 @@ def delete_collection_if_exists(coll):
 def modify_time(session, path):
     for row in session.query(DataObject.modify_time).filter(Collection.name == dirname(path), DataObject.name == basename(path)):
         return row[DataObject.modify_time]
-    
+
 
 try:
     env_file = os.environ['IRODS_ENVIRONMENT_FILE']
@@ -187,7 +188,7 @@ class Test_irods_sync(TestCase):
                 self.assertEqual(obj.replicas[0].path, vaultpath)
                 self.assertEqual(obj.replicas[0].resource_name, resc_name)
 
-    def do_register_as_replica(self, eh, resc_name = "demoResc"):
+    def do_register_as_replica_no_assertions(self, eh, resc_name = "demoResc"):
         clear_redis()
         recreate_files()
         
@@ -197,6 +198,8 @@ class Test_irods_sync(TestCase):
         workers = start_workers(1)
         wait(workers)
 
+    def do_register_as_replica(self, eh, resc_name="demoResc"):
+        self.do_register_as_replica_no_assertions(eh, resc_name=resc_name)
         with iRODSSession(irods_env_file=env_file) as session:
             self.assertTrue(session.collections.exists(A_COLL))
             for i in listdir(A):
@@ -204,15 +207,18 @@ class Test_irods_sync(TestCase):
                 rpath = A_COLL + "/" + i
                 self.assertTrue(session.data_objects.exists(rpath))
                 a1 = read_file(path)
-                
+
                 a2 = read_data_object(session, rpath, resc_name = resc_name)
                 self.assertEqual(a1, a2)
-                
+
                 obj = session.data_objects.get(rpath)
                 self.assertEqual(len(obj.replicas), 2)
-                self.assertNotEqual(size(session, rpath, replica_num = 0), size(session, rpath, replica_num = 1))
-                self.assertIn(realpath(path), map(lambda i : obj.replicas[i].path, range(2)))
-                self.assertNotEqual(size(session, rpath, resc_name = resc_name), len(a1))
+                self.assertNotEqual(size(session, rpath, replica_num=0), len(a1))
+                self.assertEqual(size(session, rpath, replica_num=1), len(a1))
+                self.assertNotEqual(realpath(path), obj.replicas[0].path)
+                self.assertEqual(realpath(path), obj.replicas[1].path)
+                # self.assertEqual(obj.replicas[0].status, "0")
+                # self.assertEqual(obj.replicas[1].status, "1")
 
     def do_update(self, eh, resc_name = ["demoResc"]):
         recreate_files()
@@ -246,6 +252,21 @@ class Test_irods_sync(TestCase):
                 a2 = read_data_object(session, rpath)
                 self.assertNotEqual(a1, a2)
 
+    def do_put_to_child(self):
+        with iRODSSession(irods_env_file=env_file) as session:
+            session.resources.remove_child(REGISTER_RESC2, REGISTER_RESC2A)
+        self.do_put("examples.put_with_resc_name_regiResc2a", resc_name = REGISTER_RESC2A, resc_root=REGISTER_RESC_PATH2A)
+        with iRODSSession(irods_env_file=env_file) as session:
+            session.resources.add_child(REGISTER_RESC2, REGISTER_RESC2A)
+
+    def do_assert_failed_queue(self, errmsg):
+        r = StrictRedis()
+        rq = Queue(connection=r, name="failed")
+        self.assertEqual(rq.count, NFILES)
+        for job in rq.jobs:
+            self.assertIn(errmsg, job.exc_info)
+
+
     def test_no_event_handler(self):
         self.do_no_event_handler()
         
@@ -269,7 +290,17 @@ class Test_irods_sync(TestCase):
     def test_update_with_resc_name(self):
         self.do_register("examples.update_with_resc_name", resc_name = [REGISTER_RESC])
         self.do_update("examples.update_with_resc_name", resc_name = [REGISTER_RESC])
-                
+
+    def test_update_with_resc_hier_with_two_replicas(self):
+        self.do_put("examples.put")
+        self.do_register_as_replica("examples.replica_with_resc_hier", resc_name = REGISTER_RESC)
+        self.do_register_as_replica("examples.replica_with_resc_hier", resc_name= REGISTER_RESC)
+
+    def test_update_with_resc_name_with_two_replicas(self):
+        self.do_put("examples.put")
+        self.do_register_as_replica("examples.replica_with_resc_name", resc_name = REGISTER_RESC)
+        self.do_register_as_replica("examples.replica_with_resc_name", resc_name= REGISTER_RESC)
+
     def test_put(self):
         self.do_put("examples.put")
 
@@ -303,6 +334,22 @@ class Test_irods_sync(TestCase):
     def test_register_as_replica_with_resc_hier(self):
         self.do_put("examples.put")
         self.do_register_as_replica("examples.replica_with_resc_hier", resc_name = REGISTER_RESC)
+
+    def test_register_as_replica_with_resc_name_with_another_replica_in_hier(self):
+        self.do_put_to_child()
+        self.do_register_as_replica_no_assertions("examples.replica_with_resc_name_regiResc2", resc_name = REGISTER_RESC2)
+        self.do_assert_failed_queue("wrong paths")
+
+    def test_register_as_replica_with_resc_hier_with_another_replica_in_hier(self):
+        self.do_put_to_child()
+        self.do_register_as_replica_no_assertions("examples.replica_with_resc_hier_regiResc2", resc_name = REGISTER_RESC2)
+        self.do_assert_failed_queue("wrong paths")
+
+    def test_register_with_as_replica_event_handler_with_resc_name(self):
+        self.do_register("examples.replica_with_resc_name", resc_name = REGISTER_RESC)
+
+    def test_register_with_as_replica_event_handler_with_resc_hier(self):
+        self.do_register("examples.replica_with_resc_hier", resc_name = REGISTER_RESC)
 
     def test_no_sync(self):
         self.do_put("examples.no_sync")

@@ -61,7 +61,8 @@ def register_file(hdlr_mod, session, target, path, **options):
 
     data_obj_info = {"objPath": target}
     if "destRescName" in options:
-        data_obj_info["rescName"] = options["destRescName"]
+        for row in session.query(DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target), DataObject.resource_name == options["destRescName"]):
+            data_obj_info["replNum"] = int(row[DataObject.replica_number])
 
     session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size}, **options)
 
@@ -166,11 +167,11 @@ def sync_data_from_file(target, path, hdlr, content, **options):
     with sess_ctx as session:    
 
         if session.data_objects.exists(target):
-            create = False
+            exists = True
         elif session.collections.exists(target):
             raise Exception("sync: cannot syncing file " + path + " to collection " + target)
         else:
-            create = True
+            exists = False
 
         put = False
         if hasattr(hdlr_mod, "put"):
@@ -180,49 +181,53 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         if hasattr(hdlr_mod, "as_replica"):
             replica = hdlr_mod.as_replica(session, target, path, **options)
 
-        if not create and not put and replica:
+        createRepl = False
+        if exists and replica:
             if hasattr(hdlr_mod, "to_resource"):
                 resc_name = hdlr_mod.to_resource(session, target, path, **options)
             else:
                 raise Exception("no resource name defined")
 
-            create = True
+            found = False
+            foundPath = False
             for replica in session.data_objects.get(target).replicas:
                 if child_of(session, replica.resource_name, resc_name):
-                    create = False
+                    found = True
+                    if replica.path == path:
+                        foundPath = True
+            if found:
+                if not foundPath:
+                    raise Exception("there is at least one replica under resource but all replicas have wrong paths")
+            else:
+                createRepl = True
 
-            if create:
-                options["regRepl"] = ""
-
-        if create:
+        if not exists:
             create_dirs(hdlr_mod, session, dirname(target), dirname(path), **options)
 
-        if create:
-            def cfunc(hdlr_mod, session, target, path, **options):
-                if put:
-                    upload_file(hdlr_mod, session, target, path, **options)
-                else:
-                    register_file(hdlr_mod, session, target, path, **options)
-
-            call(hdlr_mod, "on_data_obj_create", cfunc, hdlr_mod, session, target, path, **options)
-        elif content:
-            sync = True
+        if not exists:
             if put:
+                call(hdlr_mod, "on_data_obj_create", upload_file, hdlr_mod, session, target, path, **options)
+            else:
+                call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, session, target, path, **options)
+        elif createRepl:
+            if put:
+                call(hdlr_mod, "on_data_obj_create", upload_file, hdlr_mod, session, target, path, **options)
+            else:
+                options["regRepl"] = ""
+
+                call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, session, target, path, **options)
+        elif content:
+            if put:
+                sync = True
                 if hasattr(hdlr_mod, "sync"):
                     sync = hdlr_mod.sync(session, target, path, **options)
 
-            if sync:
-                def mfunc(hdlr_mod, session, target, path, **options):
-                    if put:
-                        sync_file(hdlr_mod, session, target, path, **options)
-                    else:
-                        update_metadata(hdlr_mod, session, target, path, **options)
-
-                call(hdlr_mod, "on_data_obj_modify", mfunc, hdlr_mod, session, target, path, **options)
+                if sync:
+                    call(hdlr_mod, "on_data_obj_modify", sync_file, hdlr_mod, session, target, path, **options)
+            else:
+                call(hdlr_mod, "on_data_obj_modify", update_metadata, hdlr_mod, session, target, path, **options)
         else:
             call(hdlr_mod, "on_data_obj_modify", sync_file_meta, hdlr_mod, session, target, path, **options)
 
 def sync_metadata_from_file(target, path, hdlr, put, **options):
     sync_data_from_file(target, path, hdlr, put, False, **options)
-                
-        
