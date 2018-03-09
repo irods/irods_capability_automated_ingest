@@ -210,9 +210,12 @@ class Test_irods_sync(TestCase):
                 
                 obj = session.data_objects.get(rpath)
                 self.assertEqual(len(obj.replicas), 2)
-                self.assertNotEqual(size(session, rpath, replica_num = 0), size(session, rpath, replica_num = 1))
-                self.assertIn(realpath(path), map(lambda i : obj.replicas[i].path, range(2)))
-                self.assertNotEqual(size(session, rpath, resc_name = resc_name), len(a1))
+                self.assertNotEqual(size(session, rpath, replica_num=0), len(a1))
+                self.assertEqual(size(session, rpath, replica_num=1), len(a1))
+                self.assertNotEqual(realpath(path), obj.replicas[0].path)
+                self.assertEqual(realpath(path), obj.replicas[1].path)
+                # self.assertEqual(obj.replicas[0].status, "0")
+                # self.assertEqual(obj.replicas[1].status, "1")
 
     def do_update(self, eh, resc_name = ["demoResc"]):
         recreate_files()
@@ -269,7 +272,17 @@ class Test_irods_sync(TestCase):
     def test_update_with_resc_name(self):
         self.do_register("examples.update_with_resc_name", resc_name = [REGISTER_RESC])
         self.do_update("examples.update_with_resc_name", resc_name = [REGISTER_RESC])
-                
+
+    def test_update_with_resc_hier_with_two_replicas(self):
+        self.do_put("examples.put")
+        self.do_register_as_replica("examples.replica_with_resc_hier", resc_name = REGISTER_RESC)
+        self.do_register_as_replica("examples.replica_with_resc_hier", resc_name= REGISTER_RESC)
+
+    def test_update_with_resc_name_with_two_replicas(self):
+        self.do_put("examples.put")
+        self.do_register_as_replica("examples.replica_with_resc_name", resc_name = REGISTER_RESC)
+        self.do_register_as_replica("examples.replica_with_resc_name", resc_name= REGISTER_RESC)
+
     def test_put(self):
         self.do_put("examples.put")
 
@@ -303,6 +316,12 @@ class Test_irods_sync(TestCase):
     def test_register_as_replica_with_resc_hier(self):
         self.do_put("examples.put")
         self.do_register_as_replica("examples.replica_with_resc_hier", resc_name = REGISTER_RESC)
+
+    def test_register_with_as_replica_event_handler_with_resc_name(self):
+        self.do_register("examples.replica_with_resc_name", resc_name = REGISTER_RESC)
+
+    def test_register_with_as_replica_event_handler_with_resc_hier(self):
+        self.do_register("examples.replica_with_resc_hier", resc_name = REGISTER_RESC)
 
     def test_no_sync(self):
         self.do_put("examples.no_sync")

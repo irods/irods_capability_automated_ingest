@@ -61,7 +61,8 @@ def register_file(hdlr_mod, session, target, path, **options):
 
     data_obj_info = {"objPath": target}
     if "destRescName" in options:
-        data_obj_info["rescName"] = options["destRescName"]
+        for row in session.query(DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target), DataObject.resource_name == options["destRescName"]):
+            data_obj_info["replNum"] = int(row[DataObject.replica_number])
 
     session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size}, **options)
 
