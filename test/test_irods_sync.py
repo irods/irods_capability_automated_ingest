@@ -188,7 +188,7 @@ class Test_irods_sync(TestCase):
                 self.assertEqual(obj.replicas[0].path, vaultpath)
                 self.assertEqual(obj.replicas[0].resource_name, resc_name)
 
-    def do_register_as_replica_no_assertions(self, eh, resc_name = "demoResc"):
+    def do_register_as_replica_no_assertions(self, eh):
         clear_redis()
         recreate_files()
         
@@ -337,12 +337,12 @@ class Test_irods_sync(TestCase):
 
     def test_register_as_replica_with_resc_name_with_another_replica_in_hier(self):
         self.do_put_to_child()
-        self.do_register_as_replica_no_assertions("examples.replica_with_resc_name_regiResc2", resc_name = REGISTER_RESC2)
+        self.do_register_as_replica_no_assertions("examples.replica_with_resc_name_regiResc2")
         self.do_assert_failed_queue("wrong paths")
 
     def test_register_as_replica_with_resc_hier_with_another_replica_in_hier(self):
         self.do_put_to_child()
-        self.do_register_as_replica_no_assertions("examples.replica_with_resc_hier_regiResc2", resc_name = REGISTER_RESC2)
+        self.do_register_as_replica_no_assertions("examples.replica_with_resc_hier_regiResc2")
         self.do_assert_failed_queue("wrong paths")
 
     def test_register_with_as_replica_event_handler_with_resc_name(self):
