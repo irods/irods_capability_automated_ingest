@@ -199,7 +199,7 @@ class Test_irods_sync(TestCase):
         wait(workers)
 
     def do_register_as_replica(self, eh, resc_name="demoResc"):
-        self.do_register_as_replica_no_assertions(eh, resc_name=resc_name)
+        self.do_register_as_replica_no_assertions(eh)
         with iRODSSession(irods_env_file=env_file) as session:
             self.assertTrue(session.collections.exists(A_COLL))
             for i in listdir(A):
