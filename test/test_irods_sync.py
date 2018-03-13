@@ -4,9 +4,9 @@ import os.path
 import stat
 from unittest import TestCase
 from redis import StrictRedis
-from subprocess import Popen, DEVNULL, PIPE
+from subprocess import Popen
 from signal import SIGINT
-from os import makedirs, listdir, environ
+from os import makedirs, listdir
 from rq import Queue
 from shutil import rmtree
 from os.path import join, realpath, getmtime, getsize, dirname, basename
@@ -35,27 +35,33 @@ REGISTER_RESC_PATH2B = "/var/lib/irods/Vault2b"
 PUT_RESC = "putResc"
 PUT_RESC_PATH = "/var/lib/irods/Vault3"
 
+
 def clear_redis():
     r = StrictRedis()
     r.flushdb()
+
 
 def start_workers(n):
     workers = map(lambda x: Popen(["rq", "worker", "--burst", "restart", "path", "file"]), range(n))
 
     return workers
     
+
 def start_scheduler(n):
     scheduler = Popen(["rqscheduler", "-i", "1"])
     return scheduler
+
 
 def wait(workers):
     for worker in workers:
         worker.wait()
 
+
 def interrupt(scheduler):
     scheduler.send_signal(SIGINT)
 
     scheduler.wait()
+
 
 def create_files():
     makedirs(A)
@@ -63,27 +69,33 @@ def create_files():
         with open(join(A,str(i)), "w") as f:
             f.write("i" * i)
 
+
 def recreate_files():
     for i in range(NFILES):
         with open(join(A,str(i)), "w") as f:
             f.write("i" * (i * 2 + 1))
+
 
 def ctime_files():
     for i in range(NFILES):
         os.chmod(join(A, str(i)), stat.S_IRUSR )
         os.chmod(join(A, str(i)), stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
 
+
 def delete_files():
     rmtree(A)
+
 
 def read_file(path):
     with open(path) as f:
         return f.read()
 
+
 def read_data_object(session, path, resc_name = "demoResc"):
     with NamedTemporaryFile() as tf:
         session.data_objects.get(path, file=tf.name, forceFlag="", rescName = resc_name)
         return read_file(tf.name)
+
 
 def create_resources():
     with iRODSSession(irods_env_file=env_file) as session:
@@ -95,6 +107,7 @@ def create_resources():
         session.resources.add_child(REGISTER_RESC2, REGISTER_RESC2A)
         session.resources.add_child(REGISTER_RESC2, REGISTER_RESC2B)
 
+
 def delete_resources():
     with iRODSSession(irods_env_file=env_file) as session:
         session.resources.remove(REGISTER_RESC)
@@ -105,18 +118,22 @@ def delete_resources():
         session.resources.remove(REGISTER_RESC2A)
         session.resources.remove(REGISTER_RESC2B)
     
+
 def irmtrash():
     proc = Popen(["irmtrash"])
     proc.wait()
     
+
 def delete_collection(coll):
     with iRODSSession(irods_env_file=env_file) as session:
         session.collections.remove(coll)
+
 
 def delete_collection_if_exists(coll):
     with iRODSSession(irods_env_file=env_file) as session:
         if(session.collections.exists(coll)):
            session.collections.remove(coll)
+
 
 def modify_time(session, path):
     for row in session.query(DataObject.modify_time).filter(Collection.name == dirname(path), DataObject.name == basename(path)):
@@ -127,6 +144,7 @@ try:
     env_file = os.environ['IRODS_ENVIRONMENT_FILE']
 except KeyError:
     env_file = os.path.expanduser('~/.irods/irods_environment.json')
+
 
 class Test_irods_sync(TestCase):
     def setUp(self):
@@ -292,7 +310,6 @@ class Test_irods_sync(TestCase):
         for job in rq.jobs:
             self.assertIn(errmsg, job.exc_info)
 
-
     def test_no_event_handler(self):
         self.do_no_event_handler()
         
@@ -397,5 +414,6 @@ class Test_irods_sync(TestCase):
         self.do_register("examples.register_non_leaf_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_update("examples.register_non_leaf_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
         
+
 if __name__ == '__main__':
         unittest.main()
