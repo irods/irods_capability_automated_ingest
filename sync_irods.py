@@ -58,13 +58,14 @@ def register_file(hdlr_mod, session, target, path, **options):
     logger.info("registering object " + target + ", options = " + str(options))
     session.data_objects.register(path, target, **options)
     size = getsize(path)
+    mtime = int(getmtime(path))
 
     data_obj_info = {"objPath": target}
     if "destRescName" in options:
         for row in session.query(DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target), DataObject.resource_name == options["destRescName"]):
             data_obj_info["replNum"] = int(row[DataObject.replica_number])
 
-    session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size}, **options)
+    session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime}, **options)
 
 def upload_file(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "to_root_resource"):
@@ -229,5 +230,5 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         else:
             call(hdlr_mod, "on_data_obj_modify", sync_file_meta, hdlr_mod, session, target, path, **options)
 
-def sync_metadata_from_file(target, path, hdlr, put, **options):
-    sync_data_from_file(target, path, hdlr, put, False, **options)
+def sync_metadata_from_file(target, path, hdlr, **options):
+    sync_data_from_file(target, path, hdlr, False, **options)
