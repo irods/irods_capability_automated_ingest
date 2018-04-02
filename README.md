@@ -124,7 +124,7 @@ as_user(target, source, **options):
 ```
 
 ```
-to_leaf_resource(session, target, source, **options):
+to_resource(session, target, source, **options):
 ```
 used by
  * register
