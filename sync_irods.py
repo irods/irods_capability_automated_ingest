@@ -2,18 +2,11 @@ import os
 from os.path import dirname, getsize, getmtime, basename
 from irods.session import iRODSSession
 from irods.models import Resource, DataObject, Collection
-import logging
-import sys
 import importlib
 from sync_utils import size
+import sync_logging
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
+logger = sync_logging.get_sync_logger()
 
 def call(hdlr_mod, hdlr, func, *args, **options):
     if hasattr(hdlr_mod, hdlr):
@@ -40,16 +33,19 @@ def child_of(session, child_resc_name, resc_name):
         return False
     
 def create_dirs(hdlr_mod, session, target, path, **options):
-    if not session.collections.exists(target):
-        if target == "/":
-            raise Exception("create_dirs: Cannot create root")
-        create_dirs(hdlr_mod, session, dirname(target), dirname(path), **options)
+    if target.startswith("/"):
+        if not session.collections.exists(target):
+            if target == "/":
+                raise Exception("create_dirs: Cannot create root")
+            create_dirs(hdlr_mod, session, dirname(target), dirname(path), **options)
 
-        def ccfunc(hdlr_mod, session, target, path, **options):
-            logger.info("creating collection " + target)
-            session.collections.create(target)
+            def ccfunc(hdlr_mod, session, target, path, **options):
+                logger.info("creating collection " + target)
+                session.collections.create(target)
 
-        call(hdlr_mod, "on_coll_create", ccfunc, hdlr_mod, session, target, path, **options)
+            call(hdlr_mod, "on_coll_create", ccfunc, hdlr_mod, session, target, path, **options)
+    else:
+        raise Exception("create_dirs: relative path")
 
 def register_file(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "to_resource"):

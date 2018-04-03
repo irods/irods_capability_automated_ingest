@@ -8,13 +8,13 @@ import sys
 from uuid import uuid1
 
 def handle_start(args):
-    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, args.job_name, args.event_handler)
+    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, args.job_name, args.event_handler, args.log_file)
 
 def handle_stop(args):
-    stop_synchronization(args.job_name)
+    stop_synchronization(args.job_name, args.log_file)
 
 def handle_list(args):
-    list_synchronization()
+    list_synchronization(args.log_file)
 
 uuid = str(uuid1())
 
@@ -30,15 +30,18 @@ parser_start.add_argument('--path_queue', action="store", metavar='PATH QUEUE', 
 parser_start.add_argument('--restart_queue', action="store", metavar='RESTART QUEUE', type=str, default="restart", help='restart queue')
 parser_start.add_argument('--event_handler', action="store", metavar='EVENT HANDLER', type=str, default=None, help='event handler')
 parser_start.add_argument('--job_name', action="store", metavar='JOB NAME', type=str, default=uuid, help='job name')
+parser_start.add_argument('--log_file', action="store", metavar="LOG FILE", type=str, default=None, help="log file")
 
 
 parser_start.set_defaults(func=handle_start)
 
 parser_stop = subparsers.add_parser("stop", help="stop help")
 parser_stop.add_argument('job_name', action="store", metavar='JOB NAME', type=str, help='job name')
+parser_stop.add_argument('--log_file', action="store", metavar="LOG FILE", type=str, default=None, help="log file")
 parser_stop.set_defaults(func=handle_stop)
 
 parser_list = subparsers.add_parser("list", help="list help")
+parser_list.add_argument('--log_file', action="store", metavar="LOG FILE", type=str, default=None, help="log file")
 parser_list.set_defaults(func=handle_list)
 
 args = parser.parse_args()
