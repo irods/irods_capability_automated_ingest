@@ -126,7 +126,7 @@ python irods_sync.py stop <job name>
 as_user(target, source, **options):
 ```
 
-Set client user to be not the default user. Returns tuple `<userzone>, <username>`.
+This method sets client user to be not the default user. The method should return tuple `<userzone>, <username>`.
 
 ```
 to_resource(session, target, source, **options):
