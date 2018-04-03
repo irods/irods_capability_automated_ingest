@@ -86,6 +86,9 @@ tested under python 3.5
 
 ### run test ###
 
+
+The tests should be run without running rq workers.
+
 ```
 python -m test.test_irods_sync
 ```
@@ -122,6 +125,8 @@ python irods_sync.py stop <job name>
 ```
 as_user(target, source, **options):
 ```
+
+Set client user to be not the default user. Returns tuple `<userzone>, <username>`.
 
 ```
 to_resource(session, target, source, **options):
