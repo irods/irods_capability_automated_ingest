@@ -8,11 +8,13 @@ def create_sync_logger(logging_config):
     log_file = logging_config.get("filename")
     when = logging_config.get("when")
     interval = logging_config.get("interval")
+    level = logging_config.get("level")
 
     logger = logging.getLogger(irods_sync_logger)
 
+    if level is not None:
+        logger.setLevel(logging.getLevelName(level))
 
-    logger.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
     if log_file is not None:
         if when is not None:

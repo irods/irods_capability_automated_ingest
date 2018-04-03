@@ -11,7 +11,8 @@ def get_logging_config(args):
     return {
         "filename": getattr(args, "log_filename", None),
         "when": getattr(args, "log_when", None),
-        "interval": getattr(args, "log_interval", None)
+        "interval": getattr(args, "log_interval", None),
+        "level" : getattr(args, "log_level", None)
     }
 
 def add_logging_arguments(parser):
@@ -19,6 +20,8 @@ def add_logging_arguments(parser):
     parser.add_argument('--log_when', action="store", metavar="LOG WHEN", type=str, default=None, help="log when")
     parser.add_argument('--log_interval', action="store", metavar="LOG INTERVAL", type=int, default=None,
                         help="log interval")
+    parser.add_argument('--log_level', action="store", metavar="LOG LEVEL", type=str, default=None,
+                        help="log level")
 
 
 def handle_start(args):
