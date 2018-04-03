@@ -31,27 +31,27 @@ def set_with_key(r, key, path, sync_time):
 def reset_with_key(r, key, path):
     r.delete(key(path))
 
-def sync_path(path_q_name, file_q_name, target, root, path, hdlr, log_file):
-    logger = sync_logging.create_sync_logger(log_file)
+def sync_path(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
+    logger = sync_logging.create_sync_logger(logging_config)
     try:
         r = StrictRedis()
         if isfile(path):
             logger.info("enqueue file path " + path)
             q = Queue(file_q_name, connection=r)
-            q.enqueue(sync_file, target, root, path, hdlr, log_file)
+            q.enqueue(sync_file, target, root, path, hdlr, logging_config)
         else:
             logger.info("walk dir " + path)
             q = Queue(path_q_name, connection=r)
             for n in listdir(path):
-                q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n), hdlr, log_file)
+                q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n), hdlr, logging_config)
     except OSError as err:
         logger.warning("Warning: " + str(err))        
     except Exception as err:
         logger.error("Unexpected error: " + str(err))
         raise
 
-def sync_file(target, root, path, hdlr, log_file):
-    logger = sync_logging.create_sync_logger(log_file)
+def sync_file(target, root, path, hdlr, logging_config):
+    logger = sync_logging.create_sync_logger(logging_config)
     try:
         logger.info("synchronizing file. path = " + path)
         r = StrictRedis()
@@ -76,8 +76,8 @@ def sync_file(target, root, path, hdlr, log_file):
         logger.error("Unexpected error: " + str(err))
         raise
 
-def restart(path_q_name, file_q_name, target, root, path, hdlr, log_file):
-    logger = sync_logging.create_sync_logger(log_file)
+def restart(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
+    logger = sync_logging.create_sync_logger(logging_config)
     try:
         logger.info("***************** restart *****************")
         r = StrictRedis()
@@ -93,7 +93,7 @@ def restart(path_q_name, file_q_name, target, root, path, hdlr, log_file):
         # this doesn't guarantee that there is only one tree walk, but it prevents tree walk when the file queue is not empty
         if path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
             logger.info("queue empty and worker not busy")
-            path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path, hdlr)
+            path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path, hdlr, logging_config)
         else:
             logger.info("queue not empty or worker busy")
 
@@ -103,8 +103,8 @@ def restart(path_q_name, file_q_name, target, root, path, hdlr, log_file):
         logger.error("Unexpected error: " + str(err))
         raise
 
-def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root, interval, job_name, hdlr, log_file):
-    logger = sync_logging.create_sync_logger(log_file)
+def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root, interval, job_name, hdlr, logging_config):
+    logger = sync_logging.create_sync_logger(logging_config)
 
     root_abs = realpath(root)
 
@@ -119,17 +119,17 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
         scheduler.schedule(
             scheduled_time = datetime.utcnow(),
             func = restart,
-            args = [path_q_name, file_q_name, target, root_abs, root_abs, hdlr, log_file],
+            args = [path_q_name, file_q_name, target, root_abs, root_abs, hdlr, logging_config],
             interval = interval,
             queue_name = restart_q_name,
             id = job_name
         )
     else:
         restart_q = Queue(restart_q_name, connection=r)
-        restart_q.enqueue(restart, path_q_name, file_q_name, target, root_abs, root_abs, hdlr, log_file, job_id=job_name)
+        restart_q.enqueue(restart, path_q_name, file_q_name, target, root_abs, root_abs, hdlr, logging_config, job_id=job_name)
         
-def stop_synchronization(job_name, log_file):
-    logger = sync_logging.create_sync_logger(log_file)
+def stop_synchronization(job_name, logging_config):
+    logger = sync_logging.create_sync_logger(logging_config)
 
     r = StrictRedis()
     scheduler = Scheduler(connection=r)
@@ -140,8 +140,8 @@ def stop_synchronization(job_name, log_file):
 
     scheduler.cancel(job_name)
 
-def list_synchronization(log_file):
-    logger = sync_logging.create_sync_logger(log_file)
+def list_synchronization(logging_config):
+    logger = sync_logging.create_sync_logger(logging_config)
     r = StrictRedis()
     scheduler = Scheduler(connection=r)
     list_of_job_instances = scheduler.get_jobs()
