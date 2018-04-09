@@ -3,8 +3,8 @@ from os.path import dirname, getsize, getmtime, basename
 from irods.session import iRODSSession
 from irods.models import Resource, DataObject, Collection
 import importlib
-from sync_utils import size
-import sync_logging
+from irods_capability_automated_ingest.sync_utils import size
+from irods_capability_automated_ingest import sync_logging
 
 logger = sync_logging.get_sync_logger()
 

@@ -90,7 +90,7 @@ tested under python 3.5
 The tests should be run without running rq workers.
 
 ```
-python -m test.test_irods_sync
+python -m irods_capability_automated_ingest.test.test_irods_sync
 ```
 
 ### start sync ###
@@ -99,7 +99,7 @@ If `-i` is not present, then only sync once
 
 #### start
 ```
-python irods_sync.py start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
+python irods_capability_automated_ingest/irods_sync.py start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
 ```
 
 #### list restarting jobs
@@ -177,4 +177,12 @@ default: `False`
 
 example: `evhdlr.py`
 
+### Deployment
+
+ * manual redis, rq-scheduler, pip
+ * dockerize, manually config
+ * kubernetes
+
 ### features
+
+

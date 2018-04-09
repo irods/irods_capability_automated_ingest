@@ -5,11 +5,9 @@ from os import listdir
 from os.path import isfile, join, getmtime, realpath, relpath, getctime
 from datetime import datetime
 from rq_scheduler import Scheduler
-import logging
-import sys
 import redis_lock
-import sync_irods
-import sync_logging
+from irods_capability_automated_ingest import sync_logging, sync_irods
+
 
 def sync_time_key(path):
     return "sync_time:/"+path

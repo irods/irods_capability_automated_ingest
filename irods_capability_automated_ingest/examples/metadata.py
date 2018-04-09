@@ -1,4 +1,4 @@
-from core import Core
+from irods_capability_automated_ingest.core import Core
 import os
 
 filesystem_mode = 'filesystem::mode'
