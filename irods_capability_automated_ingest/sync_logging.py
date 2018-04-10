@@ -5,10 +5,10 @@ import logging.handlers
 irods_sync_logger = "irods_sync"
 
 def create_sync_logger(logging_config):
-    log_file = logging_config.get("filename")
-    when = logging_config.get("when")
-    interval = logging_config.get("interval")
-    level = logging_config.get("level")
+    log_file = logging_config["log"].get("filename")
+    when = logging_config["log"].get("when")
+    interval = logging_config["log"].get("interval")
+    level = logging_config["log"].get("level")
 
     logger = logging.getLogger(irods_sync_logger)
 

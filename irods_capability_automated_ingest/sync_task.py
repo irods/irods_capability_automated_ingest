@@ -1,4 +1,3 @@
-from redis import StrictRedis
 from rq import Queue, Worker, get_current_job
 from rq.worker import WorkerStatus
 from os import listdir
@@ -7,6 +6,7 @@ from datetime import datetime
 from rq_scheduler import Scheduler
 import redis_lock
 from irods_capability_automated_ingest import sync_logging, sync_irods
+from irods_capability_automated_ingest.sync_utils import get_redis
 
 
 def sync_time_key(path):
@@ -32,7 +32,7 @@ def reset_with_key(r, key, path):
 def sync_path(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
     try:
-        r = StrictRedis()
+        r = get_redis(logging_config)
         if isfile(path):
             logger.info("enqueue file path " + path)
             q = Queue(file_q_name, connection=r)
@@ -52,7 +52,7 @@ def sync_file(target, root, path, hdlr, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
     try:
         logger.info("synchronizing file. path = " + path)
-        r = StrictRedis()
+        r = get_redis(logging_config)
         with redis_lock.Lock(r, path):
             t = datetime.now().timestamp()
             sync_time = get_with_key(r, sync_time_key, path, float)
@@ -78,7 +78,7 @@ def restart(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
     try:
         logger.info("***************** restart *****************")
-        r = StrictRedis()
+        r = get_redis(logging_config)
         path_q = Queue(path_q_name, connection=r)
         file_q = Queue(file_q_name, connection=r)
         path_q_workers = Worker.all(queue=path_q)
@@ -106,7 +106,7 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
 
     root_abs = realpath(root)
 
-    r = StrictRedis()
+    r = get_redis(logging_config)
     scheduler = Scheduler(connection=r)
     
     if job_name in scheduler:
@@ -129,7 +129,7 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
 def stop_synchronization(job_name, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
 
-    r = StrictRedis()
+    r = get_redis(logging_config)
     scheduler = Scheduler(connection=r)
     
     if job_name not in scheduler:
@@ -140,7 +140,7 @@ def stop_synchronization(job_name, logging_config):
 
 def list_synchronization(logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
-    r = StrictRedis()
+    r = get_redis(logging_config)
     scheduler = Scheduler(connection=r)
     list_of_job_instances = scheduler.get_jobs()
     for job_instance in list_of_job_instances:
