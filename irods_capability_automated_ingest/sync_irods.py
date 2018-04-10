@@ -178,6 +178,9 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         if hasattr(hdlr_mod, "as_replica"):
             replica = hdlr_mod.as_replica(session, target, path, **options)
 
+        if put and replica:
+            raise Exception("putting replica not supported")
+
         createRepl = False
         if exists and replica:
             if hasattr(hdlr_mod, "to_resource"):
@@ -207,12 +210,9 @@ def sync_data_from_file(target, path, hdlr, content, **options):
             else:
                 call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, session, target, path, **options)
         elif createRepl:
-            if put:
-                call(hdlr_mod, "on_data_obj_create", upload_file, hdlr_mod, session, target, path, **options)
-            else:
-                options["regRepl"] = ""
+            options["regRepl"] = ""
 
-                call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, session, target, path, **options)
+            call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, session, target, path, **options)
         elif content:
             if put:
                 sync = True
