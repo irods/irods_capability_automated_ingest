@@ -99,17 +99,17 @@ If `-i` is not present, then only sync once
 
 #### start
 ```
-python irods_capability_automated_ingest/irods_sync.py start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
+python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
 ```
 
 #### list restarting jobs
 ```
-python irods_sync.py list
+python -m irods_capability_automated_ingest.irods_sync list
 ```
 
 #### stop
 ```
-python irods_sync.py stop <job name>
+python -m irods_capability_automated_ingest.irods_sync stop <job name>
 ```
 
 ### event handler ###
