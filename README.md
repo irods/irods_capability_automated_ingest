@@ -41,12 +41,12 @@ source rodssync/bin/activate
 pip install rq python-redis-lock
 ```
 
-As of this writing `rq-scheduler` doesn't work for this config because of argparse conflict. Use the following pull request instead.
+As of this writing `rq-scheduler` doesn't work for this config because of an argparse conflict. Use the following pull request instead.
 ```
 pip install git+git://github.com/sourcepirate/rq-scheduler@9166f30d11849ebe60aacc94c6d072184de55b1d
 ```
 
-make sure you are in the repo in the following commands
+make sure you are in the repo for the following commands
 ```
 cd <repo dir>
 ```
@@ -56,7 +56,7 @@ start rqscheduler
 rqscheduler -i 1
 ```
 
-start rq workers
+start rq worker(s)
 ```
 rq worker restart path file
 ```
@@ -75,6 +75,10 @@ pip install rq-dashboard
 ```
 rq-dashboard
 ```
+or alternately, just use rq to monitor progress
+```
+rq info
+```
 ### irods prc ###
 ```
 pip install git+https://github.com/irods/python-irodsclient.git
@@ -82,7 +86,7 @@ pip install git+https://github.com/irods/python-irodsclient.git
 
 tested under python 3.5
 
-## irods rsync ###
+## irods_sync ###
 
 ### run test ###
 
@@ -164,25 +168,28 @@ default: `False`
 ```
 sync(session, target, source, **options):
 ```
+only applies if `put=True`
+
 used by
   * sync
+
 default: `True`
 
 ```
 append(session, target, source, **options):
 ```
+only applies if both `put=True;sync=True`
+
 used by
   * sync
+
 default: `False`
 
 example: `evhdlr.py`
 
 ### Deployment
 
- * manual redis, rq-scheduler, pip
- * dockerize, manually config
- * kubernetes
-
-### features
-
+ * Basic: manual redis, rq-scheduler, pip
+ * Intermediate: dockerize, manually config
+ * Advanced: kubernetes
 
