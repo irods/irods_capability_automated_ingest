@@ -1,13 +1,14 @@
 from irods_capability_automated_ingest.core import Core
+from irods_capability_automated_ingest.utils import Operation
 
 class event_handler(Core):
     
     @staticmethod
-    def to_root_resource(session, target, path, **options):
+    def to_resource(session, target, path, **options):
         return "putResc"
 
     @staticmethod
-    def put(session, target, path, **options):
-        return True
+    def operation(session, target, path, **options):
+        return Operation.PUT
 
 

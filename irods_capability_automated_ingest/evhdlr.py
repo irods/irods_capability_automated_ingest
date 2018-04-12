@@ -1,4 +1,5 @@
 from irods_capability_automated_ingest.core import Core
+from irods_capability_automated_ingest.utils import Operation
 
 class event_handler(Core):
     
@@ -15,15 +16,7 @@ class event_handler(Core):
         print("create coll ", target)
 
     @staticmethod
-    def to_root_resource(session, target, path, **options):
-        return "demoResc"
-
-    @staticmethod
     def to_resource(session, target, path, **options):
-        return "demoResc"
-
-    @staticmethod
-    def to_resource_hier(session, target, path, **options):
         return "demoResc"
 
     @staticmethod
@@ -31,18 +24,5 @@ class event_handler(Core):
         return "tempZone", "rods"
 
     @staticmethod
-    def as_replica(session, target, path, **options):
-        return False
-
-    @staticmethod
-    def put(session, target, path, **options):
-        return False
-
-    @staticmethod
-    def sync(session, target, path, **options):
-        return True
-
-    @staticmethod
-    def append(session, target, path, **options):
-        return False
-
+    def op(session, target, path, **options):
+        return Operation.REGISTER

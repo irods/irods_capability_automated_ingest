@@ -121,7 +121,7 @@ setup(
     #
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['python-irodsclient',"redis","rq","rq_scheduler","python-redis-lock"],  # Optional
+    install_requires=['python-irodsclient',"redis>=2.10.6","rq>=0.10.0","rq-scheduler>=0.8.2","python-redis-lock>=3.2.0"],  # Optional
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow

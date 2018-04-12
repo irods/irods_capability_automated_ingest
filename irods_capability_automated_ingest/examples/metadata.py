@@ -21,7 +21,9 @@ class event_handler(Core):
         obj = session.data_objects.get(target)
         obj.metadata[filesystem_mode] = iRODSMeta(filesystem_mode, str(mode))
 
-
+    @staticmethod
+    def operation(session, target, path, **options):
+        return Operation.REGISTER
 
 
 

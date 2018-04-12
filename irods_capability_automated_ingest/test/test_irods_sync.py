@@ -318,9 +318,6 @@ class Test_irods_sync(TestCase):
     def test_register(self):
         self.do_register("irods_capability_automated_ingest.examples.register")
 
-    def test_register_with_resc_hier(self):
-        self.do_register("irods_capability_automated_ingest.examples.register_with_resc_hier", resc_name = [REGISTER_RESC])
-
     def test_register_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_with_resc_name", resc_name = [REGISTER_RESC])
 
@@ -328,18 +325,9 @@ class Test_irods_sync(TestCase):
         self.do_register("irods_capability_automated_ingest.examples.update")
         self.do_update("irods_capability_automated_ingest.examples.update")
         
-    def test_update_with_resc_hier(self):
-        self.do_register("irods_capability_automated_ingest.examples.update_with_resc_hier", resc_name = [REGISTER_RESC])
-        self.do_update("irods_capability_automated_ingest.examples.update_with_resc_hier", resc_name = [REGISTER_RESC])
-                
     def test_update_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.update_with_resc_name", resc_name = [REGISTER_RESC])
         self.do_update("irods_capability_automated_ingest.examples.update_with_resc_name", resc_name = [REGISTER_RESC])
-
-    def test_update_with_resc_hier_with_two_replicas(self):
-        self.do_put("irods_capability_automated_ingest.examples.put")
-        self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_with_resc_hier", resc_name = REGISTER_RESC)
-        self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_with_resc_hier", resc_name= REGISTER_RESC)
 
     def test_update_with_resc_name_with_two_replicas(self):
         self.do_put("irods_capability_automated_ingest.examples.put")
@@ -376,41 +364,25 @@ class Test_irods_sync(TestCase):
         self.do_put("irods_capability_automated_ingest.examples.put")
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_with_resc_name", resc_name = REGISTER_RESC)
 
-    def test_register_as_replica_with_resc_hier(self):
-        self.do_put("irods_capability_automated_ingest.examples.put")
-        self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_with_resc_hier", resc_name = REGISTER_RESC)
-
     def test_register_as_replica_with_resc_name_with_another_replica_in_hier(self):
         self.do_put_to_child()
         self.do_register_as_replica_no_assertions("irods_capability_automated_ingest.examples.replica_with_resc_name_regiResc2")
         self.do_assert_failed_queue("wrong paths")
 
-    def test_register_as_replica_with_resc_hier_with_another_replica_in_hier(self):
-        self.do_put_to_child()
-        self.do_register_as_replica_no_assertions("irods_capability_automated_ingest.examples.replica_with_resc_hier_regiResc2")
-        self.do_assert_failed_queue("wrong paths")
-
     def test_register_with_as_replica_event_handler_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.replica_with_resc_name", resc_name = REGISTER_RESC)
-
-    def test_register_with_as_replica_event_handler_with_resc_hier(self):
-        self.do_register("irods_capability_automated_ingest.examples.replica_with_resc_hier", resc_name = REGISTER_RESC)
 
     def test_update_metadata(self):
         self.do_register("irods_capability_automated_ingest.examples.update")
         self.do_update_metadata("irods_capability_automated_ingest.examples.update")
-
-    def test_update_metadata_with_resc_hier(self):
-        self.do_register("irods_capability_automated_ingest.examples.update_with_resc_hier", resc_name=[REGISTER_RESC])
-        self.do_update_metadata("irods_capability_automated_ingest.examples.update_with_resc_hier", resc_name=[REGISTER_RESC])
 
     def test_update_metadata_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.update_with_resc_name", resc_name=[REGISTER_RESC])
         self.do_update_metadata("irods_capability_automated_ingest.examples.update_with_resc_name", resc_name=[REGISTER_RESC])
 
     def test_no_sync(self):
-        self.do_put("irods_capability_automated_ingest.examples.no_sync")
-        self.do_no_sync("irods_capability_automated_ingest.examples.no_sync")
+        self.do_put("irods_capability_automated_ingest.examples.put")
+        self.do_no_sync("irods_capability_automated_ingest.examples.put")
         
     def test_register_non_leaf_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_non_leaf_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])

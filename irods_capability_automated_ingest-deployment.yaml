@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: irods_capability_automated_ingest-deployment
+  labels:
+    app: irods_capability_automated_ingest
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: irods_capability_automated_ingest
+  template:
+    metadata:
+      labels:
+        app: irods_capability_automated_ingest
+    spec:
+      containers:
+      - name: irods_capability_automated_ingest
+        image: redis:4.0.8
+        ports:
+        - containerPort: 6379
+      - name: irods_rq
+        image: irods_rq:0.1.0
+        ports:
+        - containerPort: 6379
+      - name: irods_rq-scheduler
+        image: irods_rq-scheuler:0.1.0
+        ports:
+        - containerPort: 6379

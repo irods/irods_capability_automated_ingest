@@ -140,20 +140,8 @@ used by
  * update
  * update to determine register resource
  * when `as_replica` returns `True` determine whether it is a register or a update
- 
-```
-to_root_resource(session, target, source, **options):
-```
-used by
  * upload
  * sync
-
-```
-to_resource_hier(session, target, source, **options):
-```
-(optional) used by
- * register
- * update
 
 ```
 as_replica(session, target, source, **options):

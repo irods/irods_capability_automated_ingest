@@ -5,6 +5,7 @@ from irods.models import Resource, DataObject, Collection
 import importlib
 from irods_capability_automated_ingest.sync_utils import size
 from irods_capability_automated_ingest import sync_logging
+from irods_capability_automated_ingest.utils import Operation
 
 logger = sync_logging.get_sync_logger()
 
@@ -64,8 +65,8 @@ def register_file(hdlr_mod, session, target, path, **options):
     session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime}, **options)
 
 def upload_file(hdlr_mod, session, target, path, **options):
-    if hasattr(hdlr_mod, "to_root_resource"):
-        options["destRescName"] = hdlr_mod.to_root_resource(session, target, path, **options)
+    if hasattr(hdlr_mod, "to_resource"):
+        options["destRescName"] = hdlr_mod.to_resource(session, target, path, **options)
 
     logger.info("uploading object " + target + ", options = " + str(options))
     session.data_objects.put(path, target, **options)
@@ -73,14 +74,12 @@ def upload_file(hdlr_mod, session, target, path, **options):
 def sync_file(hdlr_mod, session, target, path, **options):
     logger.info("syncing object " + target + ", options = " + str(options))
     
-    if hasattr(hdlr_mod, "to_root_resource"):
-        options["destRescName"] = hdlr_mod.to_root_resource(session, target, path, **options)
+    if hasattr(hdlr_mod, "to_resource"):
+        options["destRescName"] = hdlr_mod.to_resource(session, target, path, **options)
 
-    append = False
-    if hasattr(hdlr_mod, "append"):
-        append = hdlr_mod.append(session, target, path, **options)
+    op = hdlr_mod.operation(session, target, path, **options)
 
-    if append:
+    if op == Operation.APPEND:
         BUFFER_SIZE = 1024
         logger.info("appending object " + target + ", options = " + str(options))
         tsize = size(session, target)
@@ -105,8 +104,6 @@ def update_metadata(hdlr_mod, session, target, path, **options):
     logger.info("updating object: " + target + ", options = " + str(options))
 
     data_obj_info = {"objPath": target}
-    if hasattr(hdlr_mod, "to_resource_hier"):
-        data_obj_info["rescHier"] = hdlr_mod.to_resource_hier(session, target, path, **options)
 
     if hasattr(hdlr_mod, "to_resource"):
         resc_name = hdlr_mod.to_resource(session, target, path, **options)
@@ -170,19 +167,13 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         else:
             exists = False
 
-        put = False
-        if hasattr(hdlr_mod, "put"):
-            put = hdlr_mod.put(session, target, path, **options)
-                    
-        replica = False
-        if hasattr(hdlr_mod, "as_replica"):
-            replica = hdlr_mod.as_replica(session, target, path, **options)
-
-        if put and replica:
-            raise Exception("putting replica not supported")
+        if hasattr(hdlr_mod, "operation"):
+            op = hdlr_mod.operation(session, target, path, **options)
+        else:
+            op = Operation.REGISTER
 
         createRepl = False
-        if exists and replica:
+        if exists and op == Operation.REGISTER_AS_REPLICA:
             if hasattr(hdlr_mod, "to_resource"):
                 resc_name = hdlr_mod.to_resource(session, target, path, **options)
             else:
@@ -204,6 +195,9 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         if not exists:
             create_dirs(hdlr_mod, session, dirname(target), dirname(path), **options)
 
+        put = op in [Operation.PUT, Operation.SYNC, Operation.APPEND]
+        sync = op in [Operation.SYNC, Operation.APPEND]
+
         if not exists:
             if put:
                 call(hdlr_mod, "on_data_obj_create", upload_file, hdlr_mod, session, target, path, **options)
@@ -215,10 +209,6 @@ def sync_data_from_file(target, path, hdlr, content, **options):
             call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, session, target, path, **options)
         elif content:
             if put:
-                sync = True
-                if hasattr(hdlr_mod, "sync"):
-                    sync = hdlr_mod.sync(session, target, path, **options)
-
                 if sync:
                     call(hdlr_mod, "on_data_obj_modify", sync_file, hdlr_mod, session, target, path, **options)
             else:
