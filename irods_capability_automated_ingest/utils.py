@@ -1,9 +1,9 @@
 from enum import Enum
 
 class Operation(Enum):
-    REGISTER = 0
-    REGISTER_AS_REPLICA = 1
+    REGISTER_SYNC = 0
+    REGISTER_AS_REPLICA_SYNC = 1
     PUT = 2
-    SYNC = 3
-    APPEND = 4
+    PUT_SYNC = 3
+    PUT_APPEND = 4
 

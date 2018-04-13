@@ -5,9 +5,9 @@ class event_handler(Core):
     
     @staticmethod
     def to_resource(session, target, path, **options):
-        return "regiResc2"
+        return "regiResc2Root"
 
     @staticmethod
     def operation(session, target, path, **options):
-        return Operation.REGISTER
+        return Operation.REGISTER_SYNC
 

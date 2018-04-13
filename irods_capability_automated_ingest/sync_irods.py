@@ -79,7 +79,7 @@ def sync_file(hdlr_mod, session, target, path, **options):
 
     op = hdlr_mod.operation(session, target, path, **options)
 
-    if op == Operation.APPEND:
+    if op == Operation.PUT_APPEND:
         BUFFER_SIZE = 1024
         logger.info("appending object " + target + ", options = " + str(options))
         tsize = size(session, target)
@@ -170,10 +170,10 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         if hasattr(hdlr_mod, "operation"):
             op = hdlr_mod.operation(session, target, path, **options)
         else:
-            op = Operation.REGISTER
+            op = Operation.REGISTER_SYNC
 
         createRepl = False
-        if exists and op == Operation.REGISTER_AS_REPLICA:
+        if exists and op == Operation.REGISTER_AS_REPLICA_SYNC:
             if hasattr(hdlr_mod, "to_resource"):
                 resc_name = hdlr_mod.to_resource(session, target, path, **options)
             else:
@@ -195,8 +195,8 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         if not exists:
             create_dirs(hdlr_mod, session, dirname(target), dirname(path), **options)
 
-        put = op in [Operation.PUT, Operation.SYNC, Operation.APPEND]
-        sync = op in [Operation.SYNC, Operation.APPEND]
+        put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
+        sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]
 
         if not exists:
             if put:

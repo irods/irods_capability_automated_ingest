@@ -25,4 +25,4 @@ class event_handler(Core):
 
     @staticmethod
     def op(session, target, path, **options):
-        return Operation.REGISTER
+        return Operation.REGISTER_SYNC

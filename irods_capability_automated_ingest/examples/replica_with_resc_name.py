@@ -5,11 +5,11 @@ class event_handler(Core):
 
     @staticmethod
     def operation(session, target, path, **options):
-        return Operation.REGISTER_AS_REPLICA
+        return Operation.REGISTER_AS_REPLICA_SYNC
 
     @staticmethod
     def to_resource(session, target, path, **options):
-        return "regiResc"
+        return "regiResc2a"
     
 
 

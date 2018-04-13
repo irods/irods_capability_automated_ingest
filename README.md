@@ -135,43 +135,15 @@ This method sets client user to be not the default user. The method should retur
 ```
 to_resource(session, target, source, **options):
 ```
-used by
- * register
- * update
- * update to determine register resource
- * when `as_replica` returns `True` determine whether it is a register or a update
- * upload
- * sync
+
+This method sets the resource.
 
 ```
-as_replica(session, target, source, **options):
+operation(session, target, source, **options):
 ```
-default: `False`
+`Operation.REGISTER`, `Operation.REGISTER_AS_REPLICA`, `Operation.PUT`,  `Operation.SYNC`, `Operation.APPEND`
 
-```
-put(session, target, source, **options):
-```
-default: `False`
-
-```
-sync(session, target, source, **options):
-```
-only applies if `put=True`
-
-used by
-  * sync
-
-default: `True`
-
-```
-append(session, target, source, **options):
-```
-only applies if both `put=True;sync=True`
-
-used by
-  * sync
-
-default: `False`
+default: `Operation.REGISTER`
 
 example: `evhdlr.py`
 
