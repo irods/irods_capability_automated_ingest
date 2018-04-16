@@ -126,7 +126,7 @@ def recreate_files():
 def ctime_files():
     for i in range(NFILES):
         os.chmod(join(A, str(i)), stat.S_IRUSR )
-        os.chmod(join(A, str(i)), stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+        os.chmod(join(A, str(i)), stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
 
 def delete_files():

@@ -38,12 +38,7 @@ source rodssync/bin/activate
  * rq-scheduler
  * python-redis-lock
 ```
-pip install rq python-redis-lock
-```
-
-As of this writing `rq-scheduler` doesn't work for this config because of an argparse conflict. Use the following pull request instead.
-```
-pip install git+git://github.com/sourcepirate/rq-scheduler@9166f30d11849ebe60aacc94c6d072184de55b1d
+pip install rq python-redis-lock rq-scheduler
 ```
 
 make sure you are in the repo for the following commands
