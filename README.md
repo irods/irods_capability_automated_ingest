@@ -130,7 +130,7 @@ python -m irods_capability_automated_ingest.irods_sync stop <job name>
 | operation |  new files  | updated files  |
 | ----   |   ----- | ----- |
 | `Operation.REGISTER_SYNC` (default)   |  registers in catalog | updates size in catalog |
-| `Operation.REGISTER_AS_REPLICA`  |   registers first or additional replica | updates size in catalog |
+| `Operation.REGISTER_AS_REPLICA_SYNC`  |   registers first or additional replica | updates size in catalog |
 | `Operation.PUT`  |   copies file to target vault, and registers in catalog | no action |
 | `Operation.PUT_SYNC`  |   copies file to target vault, and registers in catalog | copies entire file again, and updates catalog |
 | `Operation.PUT_APPEND`  |   copies file to target vault, and registers in catalog | copies only appended part of file, and updates catalog |
