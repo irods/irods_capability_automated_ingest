@@ -63,7 +63,7 @@ for i in {1..<n>}; do rq worker restart path file & done
 
 
 
-### (optional) rq-dashboard ###
+### job monitoring ###
 ```
 pip install rq-dashboard
 ```
@@ -79,7 +79,7 @@ rq info
 pip install git+https://github.com/irods/python-irodsclient.git
 ```
 
-tested under python 3.5
+tested with python 3.4+
 
 ## irods_sync ###
 
@@ -111,36 +111,32 @@ python -m irods_capability_automated_ingest.irods_sync list
 python -m irods_capability_automated_ingest.irods_sync stop <job name>
 ```
 
-### event handler ###
+## available `--event_handler` methods
 
-```
-{pre,post}_data_obj_{create,modify}(hdlr_mod, session, target, source, **options):
-```
-  
-```
-{pre,post}_coll_create(hdlr_mod, session, target, source, **options):
-```
+| method |  effect  | default |
+| ----   |   ----- |  ----- |  
+| pre_data_obj_create   |   user-defined python  |  none |
+| post_data_obj_create   | user-defined python  |  none |
+| pre_data_obj_modify     |   user-defined python   |  none |
+| post_data_obj_modify     | user-defined python  |  none |
+| pre_coll_create    |   user-defined python |  none |
+| post_coll_create    |  user-defined python   |  none |
+| as_user |   takes action as this iRODS user |  authenticated user |
+| to_resource | defines  target resource request of operation |  as provided by client environment |
+| operation | defines the mode of operation |  `Operation.REGISTER_SYNC` |
 
-```
-as_user(target, source, **options):
-```
+### operation mode ###
 
-This method sets client user to be not the default user. The method should return a tuple `<userzone>, <username>`.
+| operation |  new files  | updated files  |
+| ----   |   ----- | ----- |
+| `Operation.REGISTER_SYNC` (default)   |  registers in catalog | updates size in catalog |
+| `Operation.REGISTER_AS_REPLICA`  |   registers first or additional replica | updates size in catalog |
+| `Operation.PUT`  |   copies file to target vault, and registers in catalog | no action |
+| `Operation.PUT_SYNC`  |   copies file to target vault, and registers in catalog | copies entire file again, and updates catalog |
+| `Operation.PUT_APPEND`  |   copies file to target vault, and registers in catalog | copies only appended part of file, and updates catalog |
 
-```
-to_resource(session, target, source, **options):
-```
+`--event_handler` usage examples can be found [in the examples directory](irods_capability_automated_ingest/examples).
 
-This method sets the resource.
-
-```
-operation(session, target, source, **options):
-```
-`Operation.REGISTER`, `Operation.REGISTER_AS_REPLICA`, `Operation.PUT`,  `Operation.SYNC`, `Operation.APPEND`
-
-default: `Operation.REGISTER`
-
-example: `evhdlr.py`
 
 ### Deployment
 
