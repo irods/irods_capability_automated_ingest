@@ -15,15 +15,44 @@ spec:
         app: irods_capability_automated_ingest
     spec:
       containers:
-      - name: irods_capability_automated_ingest
+      - name: redis
         image: redis:4.0.8
         ports:
         - containerPort: 6379
       - name: irods_rq
         image: irods_rq:0.1.0
-        ports:
-        - containerPort: 6379
+        env:
+        - name: IRODS_HOST
+          value: 172.17.0.1
+        - name: IRODS_PORT
+          value: 1247
+        - name: IRODS_USER_NAME
+          value: rods
+        - name: IRODS_ZONE_NAME
+          value: tempZone
+        - name: IRODS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysecret
+              key: irods_password
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: event_handler.py
+          mountPath: /event_handler.py
+        command: ["worker"]
+        args: ["-u", "redis://redis:6379/0", "restart", "path", "file"]
       - name: irods_rq-scheduler
         image: irods_rq-scheuler:0.1.0
-        ports:
-        - containerPort: 6379
+#      - name: irods_capability_automated_ingest
+#        image: irods_capability_automated_ingest:4.0.8
+      volumes:
+      - name: data
+        hostPath:
+          path: /tmp/data
+          type: Directory
+      - name: event_handler.py
+        hostPath:
+          path: /tmp/event_handler.py
+          type: File
+

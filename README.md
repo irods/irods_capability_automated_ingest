@@ -143,5 +143,44 @@ python -m irods_capability_automated_ingest.irods_sync stop <job name>
 
  * Basic: manual redis, rq-scheduler, pip
  * Intermediate: dockerize, manually config
+
+`/tmp/mount.py`
+
+```
+from irods_capability_automated_ingest.core import Core
+from irods_capability_automated_ingest.utils import Operation
+
+class event_handler(Core):
+
+    @staticmethod
+    def target_path(session, target, path, **options):
+        return "/tmp" + path
+
+```
+
+`irods.env`
+```
+IRODS_PORT=1247
+IRODS_HOST=172.17.0.1
+IRODS_USER_NAME=rods
+IRODS_ZONE_NAME=tempZone
+IRODS_PASSWORD=rods
+```
+
+```
+docker run --rm --name some-redis -d redis:4.0.8
+```
+
+```
+docker run --rm --link some-redis:redis -v /tmp/mount.py:/mount.py irods_rq-scheduler:0.1.0 worker -u redis://redis:6379/0 restart path file
+```
+
+```
+docker run --rm --link some-redis:redis -v /tmp/mount.py:/mount.py irods_capability_automated_ingest:0.1.0 start /data /tempZone/home/rods/data --redis_host=redis --event_handler=mount
+```
+
+```
+docker run --rm --link some-redis:redis --env-file icommands.env -v /tmp/data:/data -v /tmp/mount.py:/mount.py irods_rq:0.1.0 worker -u redis://redis:6379/0 restart path file
+```
  * Advanced: kubernetes
 
