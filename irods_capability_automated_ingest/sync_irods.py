@@ -148,7 +148,7 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         hdlr_mod = None
 
     env_irods_host = os.environ.get("IRODS_HOST")
-    env_irods_port = os.environ.get("IRODS_HOST")
+    env_irods_port = os.environ.get("IRODS_PORT")
     env_irods_user_name = os.environ.get("IRODS_USER_NAME")
     env_irods_user_zone = os.environ.get("IRODS_USER_ZONE")
     env_irods_password = os.environ.get("IRODS_PASSWORD")
