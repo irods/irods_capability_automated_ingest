@@ -147,18 +147,35 @@ def sync_data_from_file(target, path, hdlr, content, **options):
     else:
         hdlr_mod = None
 
+    env_irods_host = os.environ.get("IRODS_HOST")
+    env_irods_port = os.environ.get("IRODS_HOST")
+    env_irods_user_name = os.environ.get("IRODS_USER_NAME")
+    env_irods_user_zone = os.environ.get("IRODS_USER_ZONE")
+    env_irods_password = os.environ.get("IRODS_PASSWORD")
+
     env_file = os.environ.get('IRODS_ENVIRONMENT_FILE')
-    if env_file is None:
-        env_file = os.path.expanduser('~/.irods/irods_environment.json')
+
+    kwargs = {}
+    if env_irods_host is None:
+        if env_file is None:
+            env_file = os.path.expanduser('~/.irods/irods_environment.json')
+
+        kwargs["irods_env_file"] = env_file
+    else:
+        kwargs["host"] = env_irods_host
+        kwargs["port"] = env_irods_port
+        kwargs["user"] = env_irods_user_name
+        kwargs["zone"] = env_irods_user_zone
+        kwargs["password"] = env_irods_password
 
     if hasattr(hdlr_mod, "as_user"):
         client_zone, client_user = hdlr_mod.as_user(target, path, **options)
-        sess_ctx = iRODSSession(irods_env_file=env_file, client_user = client_user, client_zone = client_zone)
-    else:
-        sess_ctx = iRODSSession(irods_env_file=env_file)
+        kwargs["client_user"] = client_user
+        kwargs["client_zone"] = client_zone
 
-        
-    with sess_ctx as session:    
+    sess_ctx = iRODSSession(**kwargs)
+
+    with sess_ctx as session:
 
         if session.data_objects.exists(target):
             exists = True
