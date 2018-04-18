@@ -25,7 +25,7 @@ A = "a"
 A_REMOTE = "a_remote"
 A_COLL = "/tempZone/home/rods/" + A_REMOTE
 
-NFILES = 1
+NFILES = 10
 
 REGISTER_RESC = "regiResc"
 REGISTER_RESC_PATH = "/var/lib/irods/Vault2"
