@@ -54,7 +54,7 @@ def create_dirs(hdlr_mod, session, target, path, **options):
 
 def get_target_path(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "target_path"):
-        return hdlr_mod.path(session, target, path, **options)
+        return hdlr_mod.target_path(session, target, path, **options)
     else:
         return None
 
