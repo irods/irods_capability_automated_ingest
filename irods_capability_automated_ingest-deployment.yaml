@@ -5,7 +5,7 @@ metadata:
   labels:
     app: irods_capability_automated_ingest
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: irods_capability_automated_ingest
