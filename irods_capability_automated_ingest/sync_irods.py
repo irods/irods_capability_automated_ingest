@@ -173,7 +173,7 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         kwargs["client_user"] = client_user
         kwargs["client_zone"] = client_zone
 
-    print("session=", kwargs)
+    logger.warning("session=", kwargs)
 
     sess_ctx = iRODSSession(**kwargs)
 
