@@ -122,6 +122,7 @@ python -m irods_capability_automated_ingest.irods_sync stop <job name>
 | pre_coll_create    |   user-defined python |  none |
 | post_coll_create    |  user-defined python   |  none |
 | as_user |   takes action as this iRODS user |  authenticated user |
+| target_path | set mount path on the irods server which can be different from client mount path | client mount path |
 | to_resource | defines  target resource request of operation |  as provided by client environment |
 | operation | defines the mode of operation |  `Operation.REGISTER_SYNC` |
 

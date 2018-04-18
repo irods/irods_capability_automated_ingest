@@ -20,9 +20,13 @@ class event_handler(Core):
         return "demoResc"
 
     @staticmethod
+    def target_path(session, target, path, **options):
+        return path
+
+    @staticmethod
     def as_user(target, path, **options):
         return "tempZone", "rods"
 
     @staticmethod
-    def op(session, target, path, **options):
+    def operation(session, target, path, **options):
         return Operation.REGISTER_SYNC
