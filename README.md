@@ -158,7 +158,7 @@ class event_handler(Core):
 
 ```
 
-`irods.env`
+`icommands.env`
 ```
 IRODS_PORT=1247
 IRODS_HOST=172.17.0.1
