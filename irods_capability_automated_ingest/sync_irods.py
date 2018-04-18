@@ -150,13 +150,17 @@ def sync_data_from_file(target, path, hdlr, content, **options):
     env_irods_host = os.environ.get("IRODS_HOST")
     env_irods_port = os.environ.get("IRODS_PORT")
     env_irods_user_name = os.environ.get("IRODS_USER_NAME")
-    env_irods_user_zone = os.environ.get("IRODS_USER_ZONE")
+    env_irods_zone_name = os.environ.get("IRODS_ZONE_NAME")
     env_irods_password = os.environ.get("IRODS_PASSWORD")
 
     env_file = os.environ.get('IRODS_ENVIRONMENT_FILE')
 
     kwargs = {}
-    if env_irods_host is None:
+    if env_irods_host is None or \
+            env_irods_port is None or \
+            env_irods_user_name is None or \
+            env_irods_zone_name is None or \
+            env_irods_password is None:
         if env_file is None:
             env_file = os.path.expanduser('~/.irods/irods_environment.json')
 
@@ -165,7 +169,7 @@ def sync_data_from_file(target, path, hdlr, content, **options):
         kwargs["host"] = env_irods_host
         kwargs["port"] = env_irods_port
         kwargs["user"] = env_irods_user_name
-        kwargs["zone"] = env_irods_user_zone
+        kwargs["zone"] = env_irods_zone_name
         kwargs["password"] = env_irods_password
 
     if hasattr(hdlr_mod, "as_user"):
