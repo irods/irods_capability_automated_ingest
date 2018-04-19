@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: irods-capability-automated-ingest-deployment
+  labels:
+    app: irods_capability_automated_ingest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: irods_capability_automated_ingest
+  template:
+    metadata:
+      labels:
+        app: irods_capability_automated_ingest
+    spec:
+      containers:
+      - name: redis
+        image: redis:4.0.8
+        ports:
+        - containerPort: 6379
+      - name: irods-rq
+        image: irods_rq:0.1.0
+        env:
+        - name: IRODS_HOST
+          value: "172.17.0.1"
+        - name: IRODS_PORT
+          value: "1247"
+        - name: IRODS_USER_NAME
+          value: rods
+        - name: IRODS_ZONE_NAME
+          value: tempZone
+        - name: IRODS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysecret
+              key: irods_password
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: event-handler
+          mountPath: /event_handler.py
+        command: ["worker"]
+        args: ["-u", "redis://redis:6379/0", "restart", "path", "file"]
+      - name: irods-rq-scheduler
+        image: irods-rq-scheuler:0.1.0
+#      - name: irods_capability_automated_ingest
+#        image: irods_capability_automated_ingest:4.0.8
+      volumes:
+      - name: data
+        hostPath:
+          path: /tmp/data
+          type: Directory
+      - name: event-handler
+        hostPath:
+          path: /tmp/event_handler.py
+          type: File
+
