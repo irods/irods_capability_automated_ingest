@@ -141,8 +141,8 @@ python -m irods_capability_automated_ingest.irods_sync stop <job name>
 
 ### Deployment
 
- * Basic: manual redis, rq-scheduler, pip
- * Intermediate: dockerize, manually config
+#### Basic: manual redis, rq-scheduler, pip
+#### Intermediate: dockerize, manually config
 
 `/tmp/mount.py`
 
@@ -172,15 +172,43 @@ docker run --rm --name some-redis -d redis:4.0.8
 ```
 
 ```
-docker run --rm --link some-redis:redis -v /tmp/mount.py:/mount.py irods_rq-scheduler:0.1.0 worker -u redis://redis:6379/0 restart path file
+docker run --rm --link some-redis:redis -v /tmp/host/mount.py:/mount.py irods_rq-scheduler:0.1.0 worker -u redis://redis:6379/0 restart path file
 ```
 
 ```
-docker run --rm --link some-redis:redis -v /tmp/mount.py:/mount.py irods_capability_automated_ingest:0.1.0 start /data /tempZone/home/rods/data --redis_host=redis --event_handler=mount
+docker run --rm --link some-redis:redis -v /tmp/host/mount.py:/mount.py irods_capability_automated_ingest:0.1.0 start /data /tempZone/home/rods/data --redis_host=redis --event_handler=mount
 ```
 
 ```
-docker run --rm --link some-redis:redis --env-file icommands.env -v /tmp/data:/data -v /tmp/mount.py:/mount.py irods_rq:0.1.0 worker -u redis://redis:6379/0 restart path file
+docker run --rm --link some-redis:redis --env-file icommands.env -v /tmp/host/data:/data -v /tmp/host/mount.py:/mount.py irods_rq:0.1.0 worker -u redis://redis:6379/0 restart path file
 ```
- * Advanced: kubernetes
+#### Advanced: kubernetes
+
+##### install minikube and helm
+
+https://continuous.lu/2017/04/28/minikube-and-helm-kubernetes-package-manager/
+
+##### mount host dirs
+
+```
+minikube mount /tmp/host:/host
+```
+
+##### build local docker images (optional)
+
+```
+eval (minikube docker-env)
+```
+
+```
+docker build . -t irods_capability_automated_ingest:0.1.0
+```
+
+```
+docker build . -t irods_rq:0.1.0
+```
+
+```
+docker build . -t irods_rq-scheduler:0.1.0
+```
 

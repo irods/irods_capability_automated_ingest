@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rq-scheduler-deployment
+  labels:
+    app: rq-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rq-scheduler
+  template:
+    metadata:
+      labels:
+        app: rq-scheduler
+    spec:
+      containers:
+      - name: irods-rq-scheduler
+        image: irods_rq-scheduler:0.1.0
+        args: ["-i","1","--host", "{{ .Release.Name }}-redis-ha.default.svc.cluster.local"]
+
+
