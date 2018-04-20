@@ -9,7 +9,6 @@ from irods_capability_automated_ingest import sync_logging, sync_irods
 from irods_capability_automated_ingest.sync_utils import get_redis
 import time
 
-
 def sync_time_key(path):
     return "sync_time:/"+path
 
@@ -110,9 +109,9 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
     r = get_redis(logging_config)
     scheduler = Scheduler(connection=r)
     
-    if job_name in scheduler:
+    if job_name.encode("utf-8") in r.lrange("periodic", 0, -1):
         logger.error("job exists")
-        return
+        raise Exception("job exists")
 
     if interval is not None:
         scheduler.schedule(
@@ -136,7 +135,7 @@ def stop_synchronization(job_name, logging_config):
     
     if job_name.encode("utf-8") not in r.lrange("periodic", 0, -1):
         logger.error("job not exists")
-        return
+        raise Exception("job not exists")
 
     while scheduler.cancel(job_name) == 0:
         time.sleep(.1)

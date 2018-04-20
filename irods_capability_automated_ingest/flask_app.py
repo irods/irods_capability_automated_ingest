@@ -2,9 +2,11 @@ from irods_capability_automated_ingest.sync_task import start_synchronization, s
 from uuid import uuid1
 from flask import Flask
 from flask_restful import reqparse, Resource, Api
+
 import os
 
 app = Flask(__name__)
+
 api = Api(app)
 
 parser_start = reqparse.RequestParser()
@@ -17,6 +19,14 @@ parser_start.add_argument('path_queue', type=str, default="path", help='path que
 parser_start.add_argument('restart_queue', type=str, default="restart", help='restart queue')
 parser_start.add_argument('event_handler', type=str, default=None, help='event handler')
 
+def put(job_name):
+    args = parser_start.parse_args(strict=True)
+    try:
+        start_synchronization(args["restart_queue"], args["path_queue"], args["file_queue"], args["target"], args["source"], args["interval"], job_name, args["event_handler"], get_config())
+        return job_name, 201
+    except Exception as e:
+        return str(e), 400
+
 class Jobs(Resource):
     def get(self):
         jobs = list_synchronization(get_config())
@@ -24,19 +34,19 @@ class Jobs(Resource):
 
     def put(self):
         job_name = str(uuid1())
-        args = parser_start.parse_args(strict=True)
-        start_synchronization(args["restart_queue"], args["path_queue"], args["file_queue"], args["target"], args["source"], args["interval"], job_name, args["event_handler"], get_config())
-        return job_name, 201
-
+        return put(job_name)
+        
 class Job(Resource):
     def put(self, job_name):
-        args = parser_start.parse_args(strict=True)
-        start_synchronization(args["restart_queue"], args["path_queue"], args["file_queue"], args["target"], args["source"], args["interval"], job_name, args["event_handler"], get_config())
-        return job_name, 201
-        
+        return put(job_name)
+    
     def delete(self, job_name):
-        stop_synchronization(job_name, get_config())
-        return "", 204
+        try:
+            stop_synchronization(job_name, get_config())
+            return "", 204
+        except Exception as e:
+            return str(e), 400
+        
 
 api.add_resource(Jobs, "/job")
 api.add_resource(Job, "/job/<job_name>")
