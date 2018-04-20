@@ -7,6 +7,7 @@ from rq_scheduler import Scheduler
 import redis_lock
 from irods_capability_automated_ingest import sync_logging, sync_irods
 from irods_capability_automated_ingest.sync_utils import get_redis
+import time
 
 
 def sync_time_key(path):
@@ -122,6 +123,7 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
             queue_name = restart_q_name,
             id = job_name
         )
+        r.rpush("periodic", job_name)
     else:
         restart_q = Queue(restart_q_name, connection=r)
         restart_q.enqueue(restart, path_q_name, file_q_name, target, root_abs, root_abs, hdlr, logging_config, job_id=job_name)
@@ -132,18 +134,24 @@ def stop_synchronization(job_name, logging_config):
     r = get_redis(logging_config)
     scheduler = Scheduler(connection=r)
     
-    if job_name not in scheduler:
+    if job_name not in r.lrange("periodic", 0, -1):
         logger.error("job not exists")
         return
 
-    scheduler.cancel(job_name)
+    while scheduler.cancel(job_name) == 0:
+        time.sleep(.1)
+        
+    r.lrem("periodic", 1, job_name)
 
 def list_synchronization(logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
     r = get_redis(logging_config)
-    scheduler = Scheduler(connection=r)
-    list_of_job_instances = scheduler.get_jobs()
-    for job_instance in list_of_job_instances:
-        job_id = job_instance.id
+    # scheduler = Scheduler(connection=r)
+    # list_of_job_instances = scheduler.get_jobs()
+    # for job_instance in list_of_job_instances:
+    #     job_id = job_instance.id
+    #     print(job_id)
+    for job_id in r.lrange("periodic",0,-1):
         print(job_id)
+    
     
