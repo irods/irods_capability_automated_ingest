@@ -193,7 +193,7 @@ This is where you data and event handler. In this setup, we assume that your eve
 
 and similarly, 
 
-`/tmp/host/event_handler.py` -> minikube `/host/event_handler` -> container `/event_handler`. You setup may differ.
+`/tmp/host/event_handler` -> minikube `/host/event_handler` -> container `/event_handler`. You setup may differ.
 
 ```
 mkdir /tmp/host/event_handler
