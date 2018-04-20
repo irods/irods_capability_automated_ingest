@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: rq-scheduler-deployment
+  name: {{ .Release.Name }}-rq-scheduler-deployment
   labels:
     app: rq-scheduler
 spec:

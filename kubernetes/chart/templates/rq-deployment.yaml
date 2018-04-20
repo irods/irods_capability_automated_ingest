@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: rq-deployment
+  name: {{ .Release.Name }}-rq-deployment
   labels:
     app: rq
 spec:
@@ -31,18 +31,20 @@ spec:
             secretKeyRef:
               name: passwd
               key: irods
+        - name: PYTHONPATH
+          value: /event_handler
         volumeMounts:
         - name: data
           mountPath: /data
         - name: event-handler
-          mountPath: /event_handler.py
+          mountPath: /event_handler
         args: ["worker", "-u", "redis://{{ .Release.Name }}-redis-master:6379/0", "restart", "path", "file"]
       volumes:
       - name: data
         hostPath:
-          path: /host/data
+          path: {{ .Values.data }}
           type: Directory
       - name: event-handler
         hostPath:
-          path: /host/event_handler.py
-          type: File
+          path: {{ .Values.event_handler }}
+          type: Directory

@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: irods-capability-automated-ingest-deployment
+  name: {{ .Release.Name }}-irods-capability-automated-ingest-deployment
   labels:
     app: irods-capability-automated-ingest
 spec:
@@ -22,13 +22,15 @@ spec:
           value: {{ .Release.Name }}-redis-master
         - name: FLASK_APP
           value: irods_capability_automated_ingest.flask_app
+        - name: PYTHONPATH
+          value: /event_handler
         volumeMounts:
         - name: event-handler
-          mountPath: /event_handler.py
+          mountPath: /event_handler
         command: ["flask", "run"]
         args: []
       volumes:
       - name: event-handler
         hostPath:
-          path: /host/event_handler.py
-          type: File
+          path: {{ .Values.event_handler }}
+          type: Directory
