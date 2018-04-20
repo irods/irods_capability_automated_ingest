@@ -19,13 +19,13 @@ spec:
         image: irods_rq:0.1.0
         env:
         - name: IRODS_HOST
-          value: "172.17.0.1"
+          value: {{ .Values.IRODS_HOST }}
         - name: IRODS_PORT
-          value: "1247"
+          value: "{{ .Values.IRODS_PORT }}"
         - name: IRODS_USER_NAME
-          value: rods
+          value: {{ .Values.IRODS_USER_NAME }}
         - name: IRODS_ZONE_NAME
-          value: tempZone
+          value: {{ .Values.IRODS_ZONE_NAME }}
         - name: IRODS_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -36,7 +36,7 @@ spec:
           mountPath: /data
         - name: event-handler
           mountPath: /event_handler.py
-        args: ["worker", "-u", "redis://{{ .Release.Name }}-redis-ha.default.svc.cluster.local:6379/0", "restart", "path", "file"]
+        args: ["worker", "-u", "redis://{{ .Release.Name }}-redis-ha-master-svc:6379/0", "restart", "path", "file"]
       volumes:
       - name: data
         hostPath:
