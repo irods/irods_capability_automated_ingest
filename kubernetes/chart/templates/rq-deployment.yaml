@@ -36,7 +36,7 @@ spec:
           mountPath: /data
         - name: event-handler
           mountPath: /event_handler.py
-        args: ["worker", "-u", "redis://{{ .Release.Name }}-redis-ha-master-svc:6379/0", "restart", "path", "file"]
+        args: ["worker", "-u", "redis://{{ .Release.Name }}-redis-master:6379/0", "restart", "path", "file"]
       volumes:
       - name: data
         hostPath:

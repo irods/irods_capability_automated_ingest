@@ -17,6 +17,6 @@ spec:
       containers:
       - name: irods-rq-scheduler
         image: irods_rq-scheduler:0.1.0
-        args: ["-i","1","--host", "{{ .Release.Name }}-redis-ha-master-svc.default.svc.cluster.local"]
+        args: ["-i","1","--host", "{{ .Release.Name }}-redis-master"]
 
 
