@@ -181,9 +181,19 @@ docker run --rm --link some-redis:redis --env-file icommands.env -v /tmp/host/da
 ```
 ### Advanced: kubernetes
 
+This does not assume that your iRODS installation is in kubernetes.
+
 #### install minikube and helm
 
 #### mount host dirs
+
+This is where you data and event handler. In this setup, we assume that your event handler is in `/tmp/host/event_handler.py` and you data is under `/tmp/host/data`. We will mount `/tmp/host/data` into `/host/data` in minikube which will mount `/host/data` into `/data` in containers, 
+
+`/tmp/host/data` -> minikube `/host/data` -> container `/data`.
+
+and similarly, 
+
+`/tmp/host/event_handler.py` -> minikube `/host/event_handler.py` -> container `/event_handler.py`. You setup may differ.
 
 ```
 mkdir /tmp/host
@@ -208,9 +218,16 @@ minikube mount /tmp/host:/host
 ```
 
 #### build local docker images (optional)
+If you want to use local docker images, you can build the docker images into minikube as follows:
 
+`fish`
 ```
 eval (minikube docker-env)
+```
+
+`bash`
+```
+eval $(minikube docker-env)
 ```
 
 ```
@@ -228,13 +245,14 @@ cd <repo>/docker/rq-scheduler
 docker build . -t irods_rq-scheduler:0.1.0
 ```
 
-#### update irods password
-Set the following to `irods` in `<repo>/kubernetes/chart/templates/irods-secret.yaml`
+#### update irods configurations
+
+For password, you can set the output of following command as the value of the `irods` key in `<repo>/kubernetes/chart/templates/irods-secret.yaml`:
 ```
 echo -n "rods" | base64
 ```
 
-Set other configurations in `<repo>/kubernetes/chart/values.yaml`
+Set other configurations in `<repo>/kubernetes/chart/values.yaml`.
 
 #### install chart
 
@@ -243,10 +261,13 @@ cd <repo>/kubernetes/chart
 helm dependency update
 ```
 
+We call our release `icai`.
 ```
 cd <repo>/kubernetes
 helm install ./chart --set redis.usePassword=false --name icai
 ```
+
+The `redis_host` will be `<release name>-redis-master`.
 
 #### scale rq workers
 ```
