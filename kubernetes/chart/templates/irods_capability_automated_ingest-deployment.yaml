@@ -17,6 +17,8 @@ spec:
       containers:
       - name: irods-capability-automated-ingest
         image: irods_capability_automated_ingest:0.1.0
+        ports:
+        - containerPort: 5000
         env:
         - name: redis_host
           value: {{ .Release.Name }}-redis-master
@@ -27,8 +29,8 @@ spec:
         volumeMounts:
         - name: event-handler
           mountPath: /event_handler
-        command: ["flask", "run"]
-        args: []
+        command: ["flask"]
+        args: ["run", "--host=0.0.0.0"]
       volumes:
       - name: event-handler
         hostPath:
