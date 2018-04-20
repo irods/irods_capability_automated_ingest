@@ -248,7 +248,7 @@ helm dependency update
 
 ```
 cd <repo>/kubernetes
-helm install ./chart
+helm install ./chart --set redis.usePassword=false --name icai
 ```
 
 ##### scale rq workers
@@ -258,15 +258,15 @@ kubectl scale deployment.apps/rq-deployment --replicas=<n>
 
 ##### submit job
 ```
-kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- start /data /tempZone/home/rods/data -i <interval> --event_handler=event_handler --job_name=<job name> --redis_host icai-redis-ha-master-svc
+kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- start /data /tempZone/home/rods/data -i <interval> --event_handler=event_handler --job_name=<job name> --redis_host icai-redis-master
 ```
 
 ##### list job
 ```
-kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- list --redis_host icai-redis-ha-master-svc
+kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- list --redis_host icai-redis-master
 ```
 
 ##### delete job
 ```
-kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- stop <job name> --redis_host icai-redis-ha-master-svc
+kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- stop <job name> --redis_host icai-redis-master
 ```
