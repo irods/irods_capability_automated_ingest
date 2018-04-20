@@ -187,20 +187,20 @@ This does not assume that your iRODS installation is in kubernetes.
 
 #### mount host dirs
 
-This is where you data and event handler. In this setup, we assume that your event handler is in `/tmp/host/event_handler.py` and you data is under `/tmp/host/data`. We will mount `/tmp/host/data` into `/host/data` in minikube which will mount `/host/data` into `/data` in containers, 
+This is where you data and event handler. In this setup, we assume that your event handler is under `/tmp/host/event_handler` and you data is under `/tmp/host/data`. We will mount `/tmp/host/data` into `/host/data` in minikube which will mount `/host/data` into `/data` in containers, 
 
 `/tmp/host/data` -> minikube `/host/data` -> container `/data`.
 
 and similarly, 
 
-`/tmp/host/event_handler.py` -> minikube `/host/event_handler.py` -> container `/event_handler.py`. You setup may differ.
+`/tmp/host/event_handler.py` -> minikube `/host/event_handler` -> container `/event_handler`. You setup may differ.
 
 ```
-mkdir /tmp/host
+mkdir /tmp/host/event_handler
 mkdir /tmp/host/data
 ```
 
-`/tmp/host/event_handler.py`
+`/tmp/host/event_handler/event_handler.py`
 ```
 from irods_capability_automated_ingest.core import Core
 from irods_capability_automated_ingest.utils import Operation
@@ -295,6 +295,7 @@ curl -XDELETE "localhost:8000/job/<job name>"
 ```
 
 #### accessing by command line
+
 ##### submit job
 ```
 kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- start /data /tempZone/home/rods/data -i <interval> --event_handler=event_handler --job_name=<job name> --redis_host icai-redis-master
