@@ -227,7 +227,7 @@ docker build . -t irods_rq:0.1.0
 ```
 
 ```
-cd <repo>/docker/re-scheduler
+cd <repo>/docker/rq-scheduler
 docker build . -t irods_rq-scheduler:0.1.0
 ```
 
