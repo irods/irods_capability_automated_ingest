@@ -151,7 +151,6 @@ def list_synchronization(logging_config):
     # for job_instance in list_of_job_instances:
     #     job_id = job_instance.id
     #     print(job_id)
-    for job_id in r.lrange("periodic",0,-1):
-        print(job_id.decode("utf-8"))
+    return map(lambda job_id : job_id.decode("utf-8"), r.lrange("periodic",0,-1))
     
     

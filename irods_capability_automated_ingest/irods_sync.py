@@ -36,7 +36,9 @@ def handle_stop(args):
     stop_synchronization(args.job_name, get_config(args))
 
 def handle_list(args):
-    list_synchronization(get_config(args))
+    jobs = list_synchronization(get_config(args))
+    for job_id in jobs:
+        print(job_id)
 
 def main():
     uuid = str(uuid1())
