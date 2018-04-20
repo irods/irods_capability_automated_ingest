@@ -274,17 +274,38 @@ The `redis_host` will be `<release name>-redis-master`.
 kubectl scale deployment.apps/rq-deployment --replicas=<n>
 ```
 
-#### submit job
+#### accessing by rest api
+```
+kubectl port-forward svc/icai-irods-capability-automated-ingest-service 8000:80
+```
+
+##### submit job
+```
+curl -XPUT "localhost:8000/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+```
+
+##### list job
+```
+curl -XGET "localhost:8000/job"
+```
+
+##### delete job
+```
+curl -XDELETE "localhost:8000/job/<job name>"
+```
+
+#### accessing by command line
+##### submit job
 ```
 kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- start /data /tempZone/home/rods/data -i <interval> --event_handler=event_handler --job_name=<job name> --redis_host icai-redis-master
 ```
 
-#### list job
+##### list job
 ```
 kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- list --redis_host icai-redis-master
 ```
 
-#### delete job
+##### delete job
 ```
 kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- stop <job name> --redis_host icai-redis-master
 ```
