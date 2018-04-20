@@ -135,7 +135,7 @@ def stop_synchronization(job_name, logging_config):
     scheduler = Scheduler(connection=r)
     
     if job_name.encode("utf-8") not in r.lrange("periodic", 0, -1):
-        logger.error("job not exists", job_name.encode("utf-8"), r.lrange("periodic",0,-1))
+        logger.error("job not exists")
         return
 
     while scheduler.cancel(job_name) == 0:
