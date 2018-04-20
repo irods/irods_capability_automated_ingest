@@ -275,23 +275,34 @@ kubectl scale deployment.apps/rq-deployment --replicas=<n>
 ```
 
 #### accessing by rest api
+
+Lookup the url by
+
 ```
-kubectl port-forward svc/icai-irods-capability-automated-ingest-service 8000:80
+minikube service --url icai-irods-capability-automated-ingest-service
+```
+
+It should show
+```
+<url>
 ```
 
 ##### submit job
 ```
-curl -XPUT "localhost:8000/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+curl -XPUT "<url>/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
 ```
 
+```
+curl -XPUT "<url>/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+```
 ##### list job
 ```
-curl -XGET "localhost:8000/job"
+curl -XGET "<url>/job"
 ```
 
 ##### delete job
 ```
-curl -XDELETE "localhost:8000/job/<job name>"
+curl -XDELETE "<url>/job/<job name>"
 ```
 
 #### accessing by command line
