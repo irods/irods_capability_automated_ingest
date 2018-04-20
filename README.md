@@ -154,7 +154,7 @@ class event_handler(Core):
 
     @staticmethod
     def target_path(session, target, path, **options):
-        return "/tmp" + path
+        return "/tmp/host" + path
 
 ```
 
@@ -172,7 +172,7 @@ docker run --rm --name some-redis -d redis:4.0.8
 ```
 
 ```
-docker run --rm --link some-redis:redis -v /tmp/host/mount.py:/mount.py irods_rq-scheduler:0.1.0 worker -u redis://redis:6379/0 restart path file
+docker run --rm --link some-redis:redis -v /tmp/host/mount.py:/mount.py -v /tmp/host/data:/data irods_rq-scheduler:0.1.0 worker -u redis://redis:6379/0 restart path file
 ```
 
 ```
@@ -186,9 +186,25 @@ docker run --rm --link some-redis:redis --env-file icommands.env -v /tmp/host/da
 
 ##### install minikube and helm
 
-https://continuous.lu/2017/04/28/minikube-and-helm-kubernetes-package-manager/
-
 ##### mount host dirs
+
+```
+mkdir /tmp/host
+mkdir /tmp/host/data
+```
+
+`/tmp/host/event_handler.py`
+```
+from irods_capability_automated_ingest.core import Core
+from irods_capability_automated_ingest.utils import Operation
+
+class event_handler(Core):
+
+    @staticmethod
+    def target_path(session, target, path, **options):
+        return "/tmp/host" + path
+
+```
 
 ```
 minikube mount /tmp/host:/host
@@ -201,14 +217,56 @@ eval (minikube docker-env)
 ```
 
 ```
+cd <repo>/docker
 docker build . -t irods_capability_automated_ingest:0.1.0
 ```
 
 ```
+cd <repo>/docker/rq
 docker build . -t irods_rq:0.1.0
 ```
 
 ```
+cd <repo>/docker/re-scheduler
 docker build . -t irods_rq-scheduler:0.1.0
 ```
 
+##### update irods password
+Set the following to `irods` in `<repo>/kubernetes/chart/templates/irods-secret.yaml`
+```
+echo -n "rods" | base64
+```
+
+Set other configurations in `<repo>/kubernetes/chart/values.yaml`
+
+##### install chart
+
+```
+cd <repo>/kubernetes/chart
+helm dependency update
+```
+
+```
+cd <repo>/kubernetes
+helm install ./chart
+```
+
+##### scale rq workers
+```
+kubectl scale deployment.apps/rq-deployment --replicas=<n>
+```
+
+##### submit job
+```
+kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- start /data /tempZone/home/rods/data -i <interval> --event_handler=event_handler --job_name=<job name> --redis_host icai-redis-ha-master-svc
+```
+
+##### list job
+```
+kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- list --redis_host icai-redis-ha-master-svc
+```
+
+### delete job
+```
+kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- stop <job name> --redis_host icai-redis-ha-master-svc
+```
