@@ -123,7 +123,7 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
             queue_name = restart_q_name,
             id = job_name
         )
-        r.rpush("periodic", job_name)
+        r.rpush("periodic", job_name.encode("utf-8"))
     else:
         restart_q = Queue(restart_q_name, connection=r)
         restart_q.enqueue(restart, path_q_name, file_q_name, target, root_abs, root_abs, hdlr, logging_config, job_id=job_name)
@@ -134,8 +134,8 @@ def stop_synchronization(job_name, logging_config):
     r = get_redis(logging_config)
     scheduler = Scheduler(connection=r)
     
-    if job_name not in r.lrange("periodic", 0, -1):
-        logger.error("job not exists")
+    if job_name.encode("utf-8") not in r.lrange("periodic", 0, -1):
+        logger.error("job not exists", job_name.encode("utf-8"), r.lrange("periodic",0,-1))
         return
 
     while scheduler.cancel(job_name) == 0:
