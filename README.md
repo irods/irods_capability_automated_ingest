@@ -305,7 +305,7 @@ curl -XGET "<url>/job"
 curl -XDELETE "<url>/job/<job name>"
 ```
 
-#### accessing by command line
+#### accessing by command line (not recommended)
 
 ##### submit job
 ```
