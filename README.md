@@ -266,7 +266,7 @@ kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --resta
 kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- list --redis_host icai-redis-ha-master-svc
 ```
 
-### delete job
+##### delete job
 ```
 kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- stop <job name> --redis_host icai-redis-ha-master-svc
 ```
