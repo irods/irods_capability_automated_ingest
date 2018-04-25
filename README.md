@@ -253,7 +253,7 @@ docker build . -t irods_rq-scheduler:0.1.0
 
 #### update irods configurations
 
-Set configurations in `<repo>/kubernetes/chart/values.yaml`.
+Set configurations in `<repo>/kubernetes/chart/values.yaml` or `--set` command line argument.
 
 #### install chart
 
