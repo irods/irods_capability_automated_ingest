@@ -4,7 +4,7 @@ metadata:
   name: {{ .Release.Name }}-irods-capability-automated-ingest-service
 spec:
   selector:
-    app: irods-capability-automated-ingest
+    app: {{ .Release.Name }}-irods-capability-automated-ingest
   ports:
   - protocol: TCP
     port: 5000

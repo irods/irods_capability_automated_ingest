@@ -185,6 +185,12 @@ This does not assume that your iRODS installation is in kubernetes.
 
 #### install minikube and helm
 
+### enable ingress on minikube
+
+```
+minikube addons enable ingress
+```
+
 #### mount host dirs
 
 This is where you data and event handler. In this setup, we assume that your event handler is under `/tmp/host/event_handler` and you data is under `/tmp/host/data`. We will mount `/tmp/host/data` into `/host/data` in minikube which will mount `/host/data` into `/data` in containers, 
@@ -193,7 +199,7 @@ This is where you data and event handler. In this setup, we assume that your eve
 
 and similarly, 
 
-`/tmp/host/event_handler` -> minikube `/host/event_handler` -> container `/event_handler`. You setup may differ.
+`/tmp/host/event_handler` -> minikube `/host/event_handler` -> container `/event_handler`. Your setup may differ.
 
 ```
 mkdir /tmp/host/event_handler
@@ -274,35 +280,47 @@ The `redis_host` will be `<release name>-redis-master`.
 kubectl scale deployment.apps/rq-deployment --replicas=<n>
 ```
 
-#### accessing by rest api
-
-Lookup the url by
-
-```
-minikube service --url icai-irods-capability-automated-ingest-service
-```
-
-It should show
-```
-<url>
-```
-
 ##### submit job
+`fish`
 ```
-curl -XPUT "<url>/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+curl -XPUT "http://"(minikube ip)"/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
 ```
 
+`bash`
 ```
-curl -XPUT "<url>/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+curl -XPUT "http://$(minikube ip)/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
 ```
+
+`fish`
+```
+curl -XPUT "http://"(minikube ip)"/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+```
+
+`bash`
+```
+curl -XPUT "http://$(minikube ip)/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+```
+
 ##### list job
+`fish`
 ```
-curl -XGET "<url>/job"
+curl -XGET "http://"(minikube ip)"/job"
+```
+
+`bash`
+```
+curl -XGET "http://$(minikube ip)/job"
 ```
 
 ##### delete job
+`fish`
 ```
-curl -XDELETE "<url>/job/<job name>"
+curl -XDELETE "http://"(minikube ip)"/job/<job name>"
+```
+
+`bash`
+```
+curl -XDELETE "http://$(minikube ip)/job/<job name>"
 ```
 
 #### accessing by command line (not recommended)
