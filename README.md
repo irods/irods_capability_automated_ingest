@@ -318,7 +318,7 @@ curl -XDELETE "http://"(minikube ip)"/job/<job name>"
 curl -XDELETE "http://$(minikube ip)/job/<job name>"
 ```
 
-#### accessing by command line (not recommended)
+#### access by command line (not recommended)
 
 ##### submit job
 ```
