@@ -268,12 +268,12 @@ cd <repo>/kubernetes
 helm install ./chart --set redis.usePassword=false --name icai
 ```
 
-The `redis_host` will be `<release name>-redis-master`.
-
 #### scale rq workers
 ```
-kubectl scale deployment.apps/rq-deployment --replicas=<n>
+kubectl scale deployment.apps/icai-rq-deployment --replicas=<n>
 ```
+
+#### accessing by REST API (recommended)
 
 ##### submit job
 `fish`
