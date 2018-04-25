@@ -273,7 +273,7 @@ helm install ./chart --set redis.usePassword=false --name icai
 kubectl scale deployment.apps/icai-rq-deployment --replicas=<n>
 ```
 
-#### accessing by REST API (recommended)
+#### access by REST API (recommended)
 
 ##### submit job
 `fish`
