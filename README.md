@@ -253,12 +253,7 @@ docker build . -t irods_rq-scheduler:0.1.0
 
 #### update irods configurations
 
-For password, you can set the output of following command as the value of the `irods` key in `<repo>/kubernetes/chart/templates/irods-secret.yaml`:
-```
-echo -n "rods" | base64
-```
-
-Set other configurations in `<repo>/kubernetes/chart/values.yaml`.
+Set configurations in `<repo>/kubernetes/chart/values.yaml`.
 
 #### install chart
 
