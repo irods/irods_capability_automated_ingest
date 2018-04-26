@@ -34,18 +34,20 @@ def sync_path(path_q_name, file_q_name, target, root, path, hdlr, logging_config
     try:
         r = get_redis(logging_config)
         if isfile(path):
-            logger.info("enqueue file path " + path)
+            logger.info("enqueue file path", path = path)
             q = Queue(file_q_name, connection=r)
             q.enqueue(sync_file, target, root, path, hdlr, logging_config)
+            logger.info("succeeded", task="sync_path", path = path)
         else:
-            logger.info("walk dir " + path)
+            logger.info("walk dir", path = path)
             q = Queue(path_q_name, connection=r)
             for n in listdir(path):
                 q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n), hdlr, logging_config)
+            logger.info("succeeded_dir", task="sync_path", path = path)
     except OSError as err:
-        logger.warning("Warning: " + str(err))        
+        logger.warning("failed_OSError", err=err, task="sync_path", path = path)
     except Exception as err:
-        logger.error("Unexpected error: " + str(err))
+        logger.error("failed", err=err, task="sync_path", path = path)
         raise
 
 def sync_file(target, root, path, hdlr, logging_config):
@@ -59,19 +61,21 @@ def sync_file(target, root, path, hdlr, logging_config):
             mtime = getmtime(path)
             ctime = getctime(path)
             if sync_time == None or mtime >= sync_time:
-                logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", mtime = " + str(mtime) + ".")
+                logger.info("synchronizing file", path = path, t0 = sync_time, t = t, mtime = mtime)
                 sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, hdlr, True)
                 set_with_key(r, sync_time_key, path, str(t))
+                logger.info("succeeded", task="sync_file", path = path)
             elif ctime >= sync_time:
-                logger.info("synchronizing file. path = " + path + ", t0 = " + str(sync_time) + ", t = " + str(t) + ", ctime = " + str(ctime) + ".")
+                logger.info("synchronizing file", path = path, t0 = sync_time, t = t, ctime = ctime)
                 sync_irods.sync_metadata_from_file(join(target, relpath(path, start=root)), path, hdlr)
                 set_with_key(r, sync_time_key, path, str(t))
+                logger.info("succeeded_metadata_only", task="sync_file", path = path)
             else:
-                logger.info("file hasn't changed. path = " + path + ".")
+                logger.info("succeeded_file_has_not_changed", task="sync_file", path = path)
     except OSError as err:
-        logger.warning("Warning: " + str(err))        
+        logger.warning("failed_OSError", err=err, task="sync_file", path = path)
     except Exception as err:
-        logger.error("Unexpected error: " + str(err))
+        logger.error("failed", err=err, task="sync_file", path = path)
         raise
 
 def restart(path_q_name, file_q_name, target, root, path, hdlr, logging_config):

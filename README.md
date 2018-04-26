@@ -346,3 +346,22 @@ kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --resta
 ```
 kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- stop <job name> --redis_host icai-redis-master
 ```
+
+#### install logging tool
+
+```
+cd <repo>/kubernetes
+helm install ./elk --name icai-elk
+```
+
+look for service port
+```
+kubectl get svc icat-elk-kibana
+```
+
+forward port
+```
+kubectl port-forward svc/icat-elk-kibana 8000:443
+```
+
+open brower url `localhost:8000`
