@@ -354,6 +354,13 @@ cd <repo>/kubernetes
 helm install ./elk --name icai-elk
 ```
 
+Install chart with set `log_level` to `INFO`.
+```
+cd <repo>/kubernetes
+helm install ./chart --set redis.usePassword=false,log_level=INFO --name icai
+```
+
+
 look for service port
 ```
 kubectl get svc icat-elk-kibana
