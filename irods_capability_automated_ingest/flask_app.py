@@ -9,6 +9,15 @@ app = Flask(__name__)
 
 api = Api(app)
 
+def add_arguments(parser):
+    parser.add_argument('redis_host', type=str, default="localhost", help="redis host")
+    parser.add_argument('redis_port', type=int, default=6379, help="redis port")
+    parser.add_argument('redis_db', type=int, default=0, help="redis db")
+    parser.add_argument('log_filename', type=str, default=None, help="log filename")
+    parser.add_argument('log_when', type=str, default=None, help="log when")
+    parser.add_argument('log_interval', type=int, default=None, help="log interval")
+    parser.add_argument('log_level', type=str, default=None, help="log level")
+
 parser_start = reqparse.RequestParser()
 
 parser_start.add_argument('source', required=True, type=str, help='source directory')
@@ -18,6 +27,8 @@ parser_start.add_argument('file_queue', type=str, default="file", help='file que
 parser_start.add_argument('path_queue', type=str, default="path", help='path queue')
 parser_start.add_argument('restart_queue', type=str, default="restart", help='restart queue')
 parser_start.add_argument('event_handler', type=str, default=None, help='event handler')
+
+add_arguments(parser_start)
 
 def put(job_name):
     args = parser_start.parse_args(strict=True)
