@@ -357,7 +357,7 @@ helm install ./elk --name icai-elk
 Install chart with set `log_level` to `INFO`.
 ```
 cd <repo>/kubernetes
-helm install ./chart --set redis.usePassword=false,log_level=INFO --name icai
+helm install ./chart --set log_level=INFO --name icai
 ```
 
 
