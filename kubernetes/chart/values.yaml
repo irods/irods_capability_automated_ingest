@@ -9,4 +9,4 @@ IRODS_ZONE_NAME: tempZone
 IRODS_PASSWORD: rods
 event_handler: /host/event_handler
 data: /host/data
-log_level: INFO
+log_level: WARN
