@@ -19,13 +19,13 @@ spec:
         image: irods_rq:0.1.0
         env:
         - name: IRODS_HOST
-          value: {{ .Values.IRODS_HOST }}
+          value: {{ quote .Values.IRODS_HOST }}
         - name: IRODS_PORT
           value: "{{ .Values.IRODS_PORT }}"
         - name: IRODS_USER_NAME
-          value: {{ .Values.IRODS_USER_NAME }}
+          value: {{ quote .Values.IRODS_USER_NAME }}
         - name: IRODS_ZONE_NAME
-          value: {{ .Values.IRODS_ZONE_NAME }}
+          value: {{ quote .Values.IRODS_ZONE_NAME }}
         - name: IRODS_PASSWORD
           valueFrom:
             secretKeyRef:

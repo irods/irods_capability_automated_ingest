@@ -26,6 +26,8 @@ spec:
           value: irods_capability_automated_ingest.flask_app
         - name: PYTHONPATH
           value: /event_handler
+        - name: log_level
+          value: {{ quote .Values.log_level }}
         volumeMounts:
         - name: event-handler
           mountPath: /event_handler

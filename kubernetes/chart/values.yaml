@@ -7,5 +7,6 @@ IRODS_PORT: 1247
 IRODS_USER_NAME: rods
 IRODS_ZONE_NAME: tempZone
 IRODS_PASSWORD: rods
-event_handler : /host/event_handler
-data : /host/data
+event_handler: /host/event_handler
+data: /host/data
+log_level: INFO
