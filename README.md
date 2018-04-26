@@ -277,7 +277,7 @@ helm dependency update
 We call our release `icai`.
 ```
 cd <repo>/kubernetes
-helm install ./chart --set redis.usePassword=false --name icai
+helm install ./chart --name icai
 ```
 
 #### scale rq workers
