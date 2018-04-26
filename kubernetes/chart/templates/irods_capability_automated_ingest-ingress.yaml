@@ -1,0 +1,8 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-irods-capability-automated-ingest-ingress
+spec:
+  backend:
+    serviceName: {{ .Release.Name }}-irods-capability-automated-ingest-service
+    servicePort: 5000

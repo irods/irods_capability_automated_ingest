@@ -185,6 +185,12 @@ This does not assume that your iRODS installation is in kubernetes.
 
 #### install minikube and helm
 
+set memory to at least 8g and cpu to at least 4
+
+```
+minikube start --memory 8192 --cpus 4
+```
+
 ### enable ingress on minikube
 
 ```
@@ -221,6 +227,12 @@ class event_handler(Core):
 
 ```
 minikube mount /tmp/host:/host
+```
+
+#### enable incubator
+
+```
+helm repo add incubator https://kubernetes-charts-incubator.storage.googleapis.com/
 ```
 
 #### build local docker images (optional)

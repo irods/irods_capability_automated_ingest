@@ -1,0 +1,7 @@
+kibana:
+  env:
+    ELASTICSEARCH_URL: "http://elasticsearch-service:9200"
+fluentd-elasticsearch:
+  elasticsearch:
+    host: elasticsearch-service
+    port: 9200
