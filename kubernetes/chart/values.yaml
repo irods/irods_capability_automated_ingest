@@ -11,5 +11,7 @@ event_handler: /host/event_handler
 data: /host/data
 log_level: WARN
 redis:
-  master.persistence.enabled: false
+  master:
+    persistence:
+      enabled: false
   userPassword: false
