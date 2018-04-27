@@ -360,17 +360,42 @@ cd <repo>/kubernetes
 helm install ./chart --set log_level=INFO --name icai
 ```
 
+##### Grafana
 
 look for service port
 ```
-kubectl get svc icat-elk-kibana
+kubectl get svc icai-elk-grafana
 ```
 
 forward port
 ```
-kubectl port-forward svc/icat-elk-kibana 8000:443
+kubectl port-forward svc/icai-elk-grafana 8000:80
 ```
+
+If `--set grafana.adminPassword=""` system generates a random password, lookup admin password
+```
+kubectl get secret --namespace default icai-elk-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+```
+
+open brower url `localhost:8000`
+
+login with username `admin` and password `admin`
+click on `icai dashboard`
+
 
 ##### Kibana
 
+Uncomment kibana sections in the yaml files under the `<repo>/kubernetes/elk` directory
+
+look for service port
+```
+kubectl get svc icai-elk-kibana
+```
+
+forward port
+```
+kubectl port-forward svc/icai-elk-kibana 8000:443
+```
+
 open brower url `localhost:8000`
+

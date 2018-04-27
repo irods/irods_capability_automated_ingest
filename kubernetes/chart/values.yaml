@@ -14,4 +14,4 @@ redis:
   master:
     persistence:
       enabled: false
-  userPassword: false
+  usePassword: false

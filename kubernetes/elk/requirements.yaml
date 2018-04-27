@@ -2,6 +2,9 @@ dependencies:
   - name: fluentd-elasticsearch
     version: 0.2.1
     repository: "@incubator"
-  - name: kibana
-    version: 0.4.1
+#   - name: kibana
+#     version: 0.4.1
+#     repository: "@stable"
+  - name: grafana
+    version: 1.2.1
     repository: "@stable"
