@@ -106,7 +106,7 @@ rq info
 ```
 #### irods prc
 ```
-pip install python-irodsclient:0.8.0
+pip install python-irodsclient==0.8.0
 ```
 
 tested with python 3.4+
