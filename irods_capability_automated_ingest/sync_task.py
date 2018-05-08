@@ -62,12 +62,12 @@ def sync_file(target, root, path, hdlr, logging_config):
             ctime = getctime(path)
             if sync_time == None or mtime >= sync_time:
                 logger.info("synchronizing file", path = path, t0 = sync_time, t = t, mtime = mtime)
-                sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, hdlr, True)
+                sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, hdlr, logger, True)
                 set_with_key(r, sync_time_key, path, str(t))
                 logger.info("succeeded", task="sync_file", path = path)
             elif ctime >= sync_time:
                 logger.info("synchronizing file", path = path, t0 = sync_time, t = t, ctime = ctime)
-                sync_irods.sync_metadata_from_file(join(target, relpath(path, start=root)), path, hdlr)
+                sync_irods.sync_metadata_from_file(join(target, relpath(path, start=root)), path, hdlr, logger)
                 set_with_key(r, sync_time_key, path, str(t))
                 logger.info("succeeded_metadata_only", task="sync_file", path = path)
             else:

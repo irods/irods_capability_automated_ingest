@@ -7,8 +7,6 @@ from irods_capability_automated_ingest.sync_utils import size
 from irods_capability_automated_ingest import sync_logging
 from irods_capability_automated_ingest.utils import Operation
 
-logger = sync_logging.get_sync_logger()
-
 
 def call(hdlr_mod, hdlr, func, *args, **options):
     if hasattr(hdlr_mod, hdlr):
@@ -36,7 +34,7 @@ def child_of(session, child_resc_name, resc_name):
         return False
     
 
-def create_dirs(hdlr_mod, session, target, path, **options):
+def create_dirs(hdlr_mod, logger, session, target, path, **options):
     if target.startswith("/"):
         if not session.collections.exists(target):
             if target == "/":
@@ -66,7 +64,7 @@ def get_resource_name(hdlr_mod, session, target, path, **options):
         return None
 
 
-def register_file(hdlr_mod, session, target, path, **options):
+def register_file(hdlr_mod, logger, session, target, path, **options):
     target_path = get_target_path(hdlr_mod, session, target, path, **options)
     if target_path is None:
         target_path = path
@@ -88,9 +86,9 @@ def register_file(hdlr_mod, session, target, path, **options):
             data_obj_info["replNum"] = int(row[DataObject.replica_number])
 
     session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime}, **options)
-    logger.info("succeeded", task="register_file", path = path)
+    logger.info("succeeded", task="irods_register_file", path = path)
 
-def upload_file(hdlr_mod, session, target, path, **options):
+def upload_file(hdlr_mod, logger, session, target, path, **options):
     resc_name = get_resource_name(hdlr_mod, session, target, path, **options)
 
     if resc_name is not None:
@@ -98,10 +96,10 @@ def upload_file(hdlr_mod, session, target, path, **options):
 
     logger.info("uploading object " + target + ", options = " + str(options))
     session.data_objects.put(path, target, **options)
-    logger.info("succeeded", task="upload_file", path = path)
+    logger.info("succeeded", task="irods_upload_file", path = path)
 
 
-def sync_file(hdlr_mod, session, target, path, **options):
+def sync_file(hdlr_mod, logger, session, target, path, **options):
     logger.info("syncing object " + target + ", options = " + str(options))
 
     resc_name = get_resource_name(hdlr_mod, session, target, path, **options)
@@ -125,15 +123,15 @@ def sync_file(hdlr_mod, session, target, path, **options):
                     break
                 tfd.write(buf)
         tfd.close()
-        logger.info("succeeded", task="append_file", path=path)
+        logger.info("succeeded", task="irods_append_file", path=path)
 
     else:
         logger.info("uploading object " + target + ", options = " + str(options))
         session.data_objects.put(path, target, **options)
-        logger.info("succeeded", task="overwrite_file", path = path)
+        logger.info("succeeded", task="irods_update_file", path = path)
 
 
-def update_metadata(hdlr_mod, session, target, path, **options):
+def update_metadata(hdlr_mod, logger, session, target, path, **options):
     target_path = get_target_path(hdlr_mod, session, target, path, **options)
     if target_path is None:
         target_path = path
@@ -169,14 +167,14 @@ def update_metadata(hdlr_mod, session, target, path, **options):
     for outdated_repl_num in outdated_repl_nums:
         outdated_data_obj_info["replNum"] = outdated_repl_num
         session.data_objects.modDataObjMeta(outdated_data_obj_info, {"replStatus":0})
-    logger.info("succeeded", task="update_metadata", path = path)
+    logger.info("succeeded", task="irods_update_metadata", path = path)
 
 
-def sync_file_meta(hdlr_mod, session, target, path, **options):
+def sync_file_meta(hdlr_mod, logger, session, target, path, **options):
     pass
     
 
-def sync_data_from_file(target, path, hdlr, content, **options):
+def sync_data_from_file(target, path, hdlr, logger, content, **options):
     if hdlr is not None:
         hdlr_mod0 = importlib.import_module(hdlr)
         hdlr_mod = getattr(hdlr_mod0, "event_handler", None)
@@ -250,29 +248,29 @@ def sync_data_from_file(target, path, hdlr, content, **options):
                 createRepl = True
 
         if not exists:
-            create_dirs(hdlr_mod, session, dirname(target), dirname(path), **options)
+            create_dirs(hdlr_mod, logger, session, dirname(target), dirname(path), **options)
 
         put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
         sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]
 
         if not exists:
             if put:
-                call(hdlr_mod, "on_data_obj_create", upload_file, hdlr_mod, session, target, path, **options)
+                call(hdlr_mod, "on_data_obj_create", upload_file, hdlr_mod, logger, session, target, path, **options)
             else:
-                call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, session, target, path, **options)
+                call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, logger, session, target, path, **options)
         elif createRepl:
             options["regRepl"] = ""
 
-            call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, session, target, path, **options)
+            call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, logger, session, target, path, **options)
         elif content:
             if put:
                 if sync:
-                    call(hdlr_mod, "on_data_obj_modify", sync_file, hdlr_mod, session, target, path, **options)
+                    call(hdlr_mod, "on_data_obj_modify", sync_file, hdlr_mod, logger, session, target, path, **options)
             else:
-                call(hdlr_mod, "on_data_obj_modify", update_metadata, hdlr_mod, session, target, path, **options)
+                call(hdlr_mod, "on_data_obj_modify", update_metadata, hdlr_mod, logger, session, target, path, **options)
         else:
-            call(hdlr_mod, "on_data_obj_modify", sync_file_meta, hdlr_mod, session, target, path, **options)
+            call(hdlr_mod, "on_data_obj_modify", sync_file_meta, hdlr_mod, logger, session, target, path, **options)
 
 
-def sync_metadata_from_file(target, path, hdlr, **options):
-    sync_data_from_file(target, path, hdlr, False, **options)
+def sync_metadata_from_file(target, path, hdlr, logger, **options):
+    sync_data_from_file(target, path, hdlr, logger, False, **options)
