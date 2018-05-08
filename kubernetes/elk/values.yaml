@@ -55,7 +55,12 @@ grafana:
   "links": [],
   "panels": [
     {
-      "aliasColors": {},
+      "aliasColors": {
+        "sync file success":"#7eb26d",
+        "sync file failure":"#e7b638",
+        "sync path success":"#6ed0e0",
+        "sync path failure":"#ca7237"
+      },
       "bars": true,
       "dashLength": 10,
       "dashes": false,
@@ -227,8 +232,14 @@ grafana:
         }
       ]
     },{
-      "aliasColors": {},
-      "bars": false,
+      "aliasColors": {
+        "register file":"#a0ffa0",
+        "upload file":"#a0a0ff",
+        "append file":"#b0b0ff",
+        "update file":"#c0c0ff",
+        "update metadata":"#c0ffc0",
+      },
+      "bars": true,
       "dashLength": 10,
       "dashes": false,
       "datasource": "ES",
@@ -249,7 +260,7 @@ grafana:
         "total": false,
         "values": false
       },
-      "lines": true,
+      "lines": false,
       "linewidth": 1,
       "nullPointMode": "null",
       "percentage": false,
@@ -258,7 +269,7 @@ grafana:
       "renderer": "flot",
       "seriesOverrides": [],
       "spaceLength": 10,
-      "stack": false,
+      "stack": true,
       "steppedLine": false,
       "targets": [
         {
@@ -390,7 +401,7 @@ grafana:
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Panel Title",
+      "title": "irods actions",
       "tooltip": {
         "shared": true,
         "sort": 0,
