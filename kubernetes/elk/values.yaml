@@ -235,9 +235,9 @@ grafana:
       "aliasColors": {
         "register file":"#00ff00",
         "upload file":"#0000ff",
-        "append file":"#1010ff",
-        "update file":"#2020ff",
-        "update metadata":"#30ff30"
+        "append file":"#5050ff",
+        "update file":"#a0a0ff",
+        "update metadata":"#f0fff0"
       },
       "bars": true,
       "dashLength": 10,
@@ -279,7 +279,7 @@ grafana:
               "field": "@timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1m",
                 "min_doc_count": 0,
                 "trimEdges": 0
               },
@@ -304,7 +304,7 @@ grafana:
               "field": "@timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1m",
                 "min_doc_count": 0,
                 "trimEdges": 0
               },
@@ -329,7 +329,7 @@ grafana:
               "field": "@timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1m",
                 "min_doc_count": 0,
                 "trimEdges": 0
               },
@@ -354,7 +354,7 @@ grafana:
               "field": "@timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1m",
                 "min_doc_count": 0,
                 "trimEdges": 0
               },
@@ -379,7 +379,7 @@ grafana:
               "field": "@timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1m",
                 "min_doc_count": 0,
                 "trimEdges": 0
               },
