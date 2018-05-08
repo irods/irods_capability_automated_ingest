@@ -233,11 +233,11 @@ grafana:
       ]
     },{
       "aliasColors": {
-        "register file":"#a0ffa0",
-        "upload file":"#a0a0ff",
-        "append file":"#b0b0ff",
-        "update file":"#c0c0ff",
-        "update metadata":"#c0ffc0",
+        "register file":"#00ff00",
+        "upload file":"#0000ff",
+        "append file":"#1010ff",
+        "update file":"#2020ff",
+        "update metadata":"#10ff10",
       },
       "bars": true,
       "dashLength": 10,
