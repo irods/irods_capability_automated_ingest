@@ -349,6 +349,14 @@ kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --resta
 
 #### install logging tool
 
+set parameters for elasticsearch
+
+```
+minikube ssh 'echo "sysctl -w vm.max_map_count=262144" | sudo tee -a /var/lib/boot2docker/bootlocal.sh'
+minikube stop
+minikube start
+```
+
 ```
 cd <repo>/kubernetes
 helm install ./elk --name icai-elk
