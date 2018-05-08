@@ -237,7 +237,7 @@ grafana:
         "upload file":"#0000ff",
         "append file":"#1010ff",
         "update file":"#2020ff",
-        "update metadata":"#10ff10"
+        "update metadata":"#30ff30"
       },
       "bars": true,
       "dashLength": 10,
