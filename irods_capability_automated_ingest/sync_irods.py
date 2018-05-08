@@ -88,7 +88,7 @@ def register_file(hdlr_mod, session, target, path, **options):
             data_obj_info["replNum"] = int(row[DataObject.replica_number])
 
     session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime}, **options)
-
+    logger.info("succeeded", task="register_file", path = path)
 
 def upload_file(hdlr_mod, session, target, path, **options):
     resc_name = get_resource_name(hdlr_mod, session, target, path, **options)
@@ -98,6 +98,7 @@ def upload_file(hdlr_mod, session, target, path, **options):
 
     logger.info("uploading object " + target + ", options = " + str(options))
     session.data_objects.put(path, target, **options)
+    logger.info("succeeded", task="upload_file", path = path)
 
 
 def sync_file(hdlr_mod, session, target, path, **options):
@@ -124,10 +125,12 @@ def sync_file(hdlr_mod, session, target, path, **options):
                     break
                 tfd.write(buf)
         tfd.close()
-        
+        logger.info("succeeded", task="append_file", path=path)
+
     else:
         logger.info("uploading object " + target + ", options = " + str(options))
         session.data_objects.put(path, target, **options)
+        logger.info("succeeded", task="overwrite_file", path = path)
 
 
 def update_metadata(hdlr_mod, session, target, path, **options):
@@ -166,6 +169,7 @@ def update_metadata(hdlr_mod, session, target, path, **options):
     for outdated_repl_num in outdated_repl_nums:
         outdated_data_obj_info["replNum"] = outdated_repl_num
         session.data_objects.modDataObjMeta(outdated_data_obj_info, {"replStatus":0})
+    logger.info("succeeded", task="update_metadata", path = path)
 
 
 def sync_file_meta(hdlr_mod, session, target, path, **options):
