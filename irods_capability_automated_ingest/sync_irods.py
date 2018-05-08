@@ -8,7 +8,7 @@ from irods_capability_automated_ingest import sync_logging
 from irods_capability_automated_ingest.utils import Operation
 
 
-def call(hdlr_mod, hdlr, func, *args, **options):
+def call(hdlr_mod, hdlr, func, logger, *args, **options):
     if hasattr(hdlr_mod, hdlr):
         logger.debug("calling " + hdlr + " event handler: args = " + str(args) + ", options = " + str(options))
         getattr(hdlr_mod, hdlr)(func, *args, **options)
@@ -39,13 +39,13 @@ def create_dirs(hdlr_mod, logger, session, target, path, **options):
         if not session.collections.exists(target):
             if target == "/":
                 raise Exception("create_dirs: Cannot create root")
-            create_dirs(hdlr_mod, session, dirname(target), dirname(path), **options)
+            create_dirs(hdlr_mod, logger, session, dirname(target), dirname(path), **options)
 
             def ccfunc(hdlr_mod, session, target, path, **options):
                 logger.info("creating collection " + target)
                 session.collections.create(target)
 
-            call(hdlr_mod, "on_coll_create", ccfunc, hdlr_mod, session, target, path, **options)
+            call(hdlr_mod, "on_coll_create", ccfunc, logger, hdlr_mod, session, target, path, **options)
     else:
         raise Exception("create_dirs: relative path")
 
@@ -255,21 +255,21 @@ def sync_data_from_file(target, path, hdlr, logger, content, **options):
 
         if not exists:
             if put:
-                call(hdlr_mod, "on_data_obj_create", upload_file, hdlr_mod, logger, session, target, path, **options)
+                call(hdlr_mod, "on_data_obj_create", upload_file, logger, hdlr_mod, logger, session, target, path, **options)
             else:
-                call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, logger, session, target, path, **options)
+                call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, target, path, **options)
         elif createRepl:
             options["regRepl"] = ""
 
-            call(hdlr_mod, "on_data_obj_create", register_file, hdlr_mod, logger, session, target, path, **options)
+            call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, target, path, **options)
         elif content:
             if put:
                 if sync:
-                    call(hdlr_mod, "on_data_obj_modify", sync_file, hdlr_mod, logger, session, target, path, **options)
+                    call(hdlr_mod, "on_data_obj_modify", sync_file, logger, hdlr_mod, logger, session, target, path, **options)
             else:
-                call(hdlr_mod, "on_data_obj_modify", update_metadata, hdlr_mod, logger, session, target, path, **options)
+                call(hdlr_mod, "on_data_obj_modify", update_metadata, logger, hdlr_mod, logger, session, target, path, **options)
         else:
-            call(hdlr_mod, "on_data_obj_modify", sync_file_meta, hdlr_mod, logger, session, target, path, **options)
+            call(hdlr_mod, "on_data_obj_modify", sync_file_meta, logger, hdlr_mod, logger, session, target, path, **options)
 
 
 def sync_metadata_from_file(target, path, hdlr, logger, **options):
