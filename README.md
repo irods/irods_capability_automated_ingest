@@ -349,16 +349,29 @@ kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --resta
 
 #### install logging tool
 
+Install chart with set `log_level` to `INFO`.
+```
+helm del --purge icai
+```
+
+```
+cd <repo>/kubernetes
+helm install ./chart --set log_level=INFO --name icai
+```
+
+set parameters for elasticsearch
+
+```
+minikube ssh 'echo "sysctl -w vm.max_map_count=262144" | sudo tee -a /var/lib/boot2docker/bootlocal.sh'
+minikube stop
+minikube start
+```
+
 ```
 cd <repo>/kubernetes
 helm install ./elk --name icai-elk
 ```
 
-Install chart with set `log_level` to `INFO`.
-```
-cd <repo>/kubernetes
-helm install ./chart --set log_level=INFO --name icai
-```
 
 ##### Grafana
 
