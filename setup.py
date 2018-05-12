@@ -40,6 +40,7 @@ setup(
         'rq-scheduler>=0.8.2',
         'structlog>=18.1.0'
     ],
+    setup_requires=['setuptools>=38.6.0'],
     entry_points={
         'console_scripts': [
             'irods_capability_automated_ingest=irods_capability_automated_ingest.irods_sync:main'

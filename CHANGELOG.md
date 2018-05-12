@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [v0.1.0] - 2018-05-14
+## [v0.1.0] - 2018-05-11
 
 - Initial release
 - Python3 required
