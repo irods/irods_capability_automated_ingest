@@ -1,6 +1,18 @@
-# irods_rsync
+# iRODS Automated Ingest Framework
 
-## available `--event_handler` methods
+The automated ingest framework gives iRODS an enterprise solution that solves two major use cases: getting existing data under management and ingesting incoming data hitting a landing zone.
+
+Based on the Python iRODS Client and RedisQueue, this framework can scale up to match the demands of data coming off instruments, satellites, or parallel filesystems.
+
+The example diagrams below show a filesystem scanner and a landing zone.
+
+![Automated Ingest: Filesystem Scanner Diagram](capability_automated_ingest_filesystem_scanner.jpg)
+
+![Automated Ingest: Landing Zone Diagram](capability_automated_ingest_landing_zone.jpg)
+
+## Usage options
+
+### available `--event_handler` methods
 
 | method |  effect  | default |
 | ----   |   ----- |  ----- |  
@@ -390,7 +402,7 @@ If `--set grafana.adminPassword=""` system generates a random password, lookup a
 kubectl get secret --namespace default icai-elk-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 ```
 
-open brower url `localhost:8000`
+open browser url `localhost:8000`
 
 login with username `admin` and password `admin`
 click on `icai dashboard`
@@ -410,5 +422,5 @@ forward port
 kubectl port-forward svc/icai-elk-kibana 8000:443
 ```
 
-open brower url `localhost:8000`
+open browser url `localhost:8000`
 
