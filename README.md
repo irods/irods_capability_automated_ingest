@@ -27,6 +27,8 @@ The example diagrams below show a filesystem scanner and a landing zone.
 | to_resource | defines  target resource request of operation |  as provided by client environment |
 | operation | defines the mode of operation |  `Operation.REGISTER_SYNC` |
 
+Event handlers can use `logger` to write logs. See `structlog` for available logging methods and signatures.
+
 ### operation mode ###
 
 | operation |  new files  | updated files  |
@@ -37,8 +39,7 @@ The example diagrams below show a filesystem scanner and a landing zone.
 | `Operation.PUT_SYNC`  |   copies file to target vault, and registers in catalog | copies entire file again, and updates catalog |
 | `Operation.PUT_APPEND`  |   copies file to target vault, and registers in catalog | copies only appended part of file, and updates catalog |
 
-`--event_handler` usage examples can be found [in the examples directory](irods_capability_automated_ingest/examples).
-
+`--event_handler` usage examples can be found [in the examples directory](irods_capability_automated_ingest/examples). 
 
 ## Deployment
 
