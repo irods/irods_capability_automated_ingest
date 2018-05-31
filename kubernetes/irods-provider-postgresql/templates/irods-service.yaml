@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Release.Name }}-irods-service
+spec:
+  selector:
+    app: {{ .Release.Name }}-irods
+  ports:
+  - protocol: TCP
+    port: 1247
+    targetPort: 1247
+    name: data-plane
+  - protocol: TCP
+    port: 1248
+    targetPort: 1248
+    name: control-plane
+  type: ClusterIP

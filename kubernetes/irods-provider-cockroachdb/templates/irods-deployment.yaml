@@ -1,0 +1,106 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: ./kompose convert -c
+    kompose.version: 1.13.0 (84fa826)
+  creationTimestamp: null
+  labels:
+    app: {{ .Release.Name }}-irods
+  name: {{ .Release.Name }}-irods
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: {{ .Release.Name }}-irods
+    spec:
+      containers:
+      - env: &env1
+        - name: GID_IRODS
+          value: {{ quote .Values.GID_IRODS }}
+        - name: IRODS_CONTROL_PLANE_KEY
+          value: TEMPORARY__32byte_ctrl_plane_key
+        - name: IRODS_CONTROL_PLANE_PORT
+          value: "1248"
+        - name: IRODS_DATABASE_NAME
+          value: {{ .Values.cockroachdbDatabase }}
+        - name: IRODS_DATABASE_PASSWORD
+          value: {{ .Values.cockroachdbPassword }}
+        - name: IRODS_DATABASE_SERVER_HOSTNAME
+          value: {{ .Release.Name }}-cockroachdb
+        - name: IRODS_DATABASE_SERVER_PORT
+          value: "26257"
+        - name: IRODS_DATABASE_USER_NAME
+          value: {{ .Values.cockroachdbUser }}
+        - name: IRODS_DATABASE_USER_PASSWORD_SALT
+          value: tempsalt
+        - name: IRODS_HOST
+          value: {{ .Release.Name }}-irods-local-dev
+        - name: IRODS_PORT
+          value: "1247"
+        - name: IRODS_PORT_RANGE_BEGIN
+          value: "20000"
+        - name: IRODS_PORT_RANGE_END
+          value: "20199"
+        - name: IRODS_SCHEMA_VALIDATION
+          value: file:///var/lib/irods/configuration_schemas
+        - name: IRODS_SERVER_ADMINISTRATOR_PASSWORD
+          value: {{ .Values.IRODS_SERVER_ADMINISTRATOR_PASSWORD }}
+        - name: IRODS_SERVER_ADMINISTRATOR_USER_NAME
+          value: {{ .Values.IRODS_SERVER_ADMINISTRATOR_USER_NAME }}
+        - name: IRODS_SERVER_NEGOTIATION_KEY
+          value: TEMPORARY_32byte_negotiation_key
+        - name: IRODS_SERVER_ROLE
+          value: {{ quote .Values.IRODS_SERVER_ROLE }}
+        - name: IRODS_SERVER_ZONE_KEY
+          value: TEMPORARY_zone_key
+        - name: IRODS_SERVICE_ACCOUNT_GROUP
+          value: irods
+        - name: IRODS_SERVICE_ACCOUNT_NAME
+          value: irods
+        - name: IRODS_VAULT_DIRECTORY
+          value: /var/lib/irods/iRODS/Vault
+        - name: IRODS_ZONE_NAME
+          value: {{ .Values.IRODS_ZONE_NAME }}
+        - name: ODBC_DRIVER_FOR_POSTGRES
+          value: "2"
+        - name: UID_IRODS
+          value: {{ quote .Values.UID_IRODS }}
+        image: irods-provider-cockroachdb:4.3.0
+        name: {{ .Release.Name }}-irods
+        ports:
+        - containerPort: 1247
+        - containerPort: 1248
+        resources: {}
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: varlibirods
+          mountPath: /var/lib/irods
+        - name: etcirods
+          mountPath: /etc/irods
+      initContainers:
+      - env: *env1
+        name: init-irods
+        image: irods-provider-cockroachdb:4.3.0
+        args: ["init"]
+        volumeMounts:
+        - name: varlibirods
+          mountPath: /var/lib/irods
+        - name: etcirods
+          mountPath: /etc/irods
+      volumes:
+      - name: data
+        hostPath:
+          path: {{ .Values.data }}
+          type: Directory
+      - name: varlibirods
+        emptyDir: {}
+      - name: etcirods
+        emptyDir: {}
+      hostname: {{ .Release.Name }}-irods-local-dev
+      restartPolicy: Always
+status: {}

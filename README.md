@@ -204,7 +204,7 @@ set memory to at least 8g and cpu to at least 4
 minikube start --memory 8192 --cpus 4
 ```
 
-### enable ingress on minikube
+#### enable ingress on minikube
 
 ```
 minikube addons enable ingress
@@ -234,12 +234,12 @@ class event_handler(Core):
 
     @staticmethod
     def target_path(session, target, path, **options):
-        return "/tmp/host" + path
+        return path
 
 ```
 
 ```
-minikube mount /tmp/host:/host
+minikube mount /tmp/host:/host --gid 998 --uid 998 --9p-version=9p2000.L
 ```
 
 #### enable incubator
@@ -262,6 +262,16 @@ eval $(minikube docker-env)
 ```
 
 ```
+cd <repo>/docker/irods-postgresql
+docker build . -t irods-provider-postgresql:4.2.2
+```
+
+```
+cd <repo>/docker/irods-cockroachdb
+docker build . -t irods-provider-cockroachdb:4.3.0
+```
+
+```
 cd <repo>/docker
 docker build . -t irods_capability_automated_ingest:0.1.0
 ```
@@ -274,6 +284,37 @@ docker build . -t irods_rq:0.1.0
 ```
 cd <repo>/docker/rq-scheduler
 docker build . -t irods_rq-scheduler:0.1.0
+```
+
+#### install irods
+
+##### `postgresql`
+```
+cd <repo>/kubernetes/irods-provider-postgresql
+helm dependency update
+```
+
+```
+cd <repo>/kubernetes
+helm install ./irods-provider-postgresql --name irods
+```
+
+##### `cockroachdb`
+```
+cd <repo>/kubernetes/irods-provider-cockroachdb
+helm dependency update
+```
+
+```
+cd <repo>/kubernetes
+helm install ./irods-provider-cockroachdb --name irods
+```
+
+when reinstalling, run
+
+```
+kubectl delete --all pv
+kubectl delete --all pvc 
 ```
 
 #### update irods configurations

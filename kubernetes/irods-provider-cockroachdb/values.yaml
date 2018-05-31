@@ -1,0 +1,17 @@
+# Default values for irods.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+cockroachdbUser: irods
+cockroachdbPassword: testpassword
+cockroachdbDatabase: ICAT
+cockroachdb:
+  Replicas: 1
+
+IRODS_SERVER_ADMINISTRATOR_PASSWORD: rods
+IRODS_SERVER_ADMINISTRATOR_USER_NAME: rods
+IRODS_ZONE_NAME: tempZone
+IRODS_SERVER_ROLE: 1
+GID_IRODS: 998
+UID_IRODS: 998
+data: /host/data
