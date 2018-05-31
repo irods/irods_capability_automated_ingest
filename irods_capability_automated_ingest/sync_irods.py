@@ -32,7 +32,7 @@ def child_of(session, child_resc_name, resc_name):
                 return True
             child_resc_name = parent_resc_name
         return False
-    
+
 
 def create_dirs(hdlr_mod, logger, session, target, path, **options):
     if target.startswith("/"):
@@ -172,7 +172,7 @@ def update_metadata(hdlr_mod, logger, session, target, path, **options):
 
 def sync_file_meta(hdlr_mod, logger, session, target, path, **options):
     pass
-    
+
 
 def sync_data_from_file(target, path, hdlr, logger, content, **options):
     if hdlr is not None:

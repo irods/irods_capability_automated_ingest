@@ -35,18 +35,18 @@ class Jobs(Resource):
     def put(self):
         job_name = str(uuid1())
         return put(job_name)
-        
+
 class Job(Resource):
     def put(self, job_name):
         return put(job_name)
-    
+
     def delete(self, job_name):
         try:
             stop_synchronization(job_name, get_config())
             return "", 204
         except Exception as e:
             return str(e), 400
-        
+
 
 api.add_resource(Jobs, "/job")
 api.add_resource(Job, "/job/<job_name>")

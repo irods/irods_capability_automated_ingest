@@ -15,7 +15,7 @@ The example diagrams below show a filesystem scanner and a landing zone.
 ### available `--event_handler` methods
 
 | method |  effect  | default |
-| ----   |   ----- |  ----- |  
+| ----   |   ----- |  ----- |
 | pre_data_obj_create   |   user-defined python  |  none |
 | post_data_obj_create   | user-defined python  |  none |
 | pre_data_obj_modify     |   user-defined python   |  none |
@@ -39,7 +39,7 @@ Event handlers can use `logger` to write logs. See `structlog` for available log
 | `Operation.PUT_SYNC`  |   copies file to target vault, and registers in catalog | copies entire file again, and updates catalog |
 | `Operation.PUT_APPEND`  |   copies file to target vault, and registers in catalog | copies only appended part of file, and updates catalog |
 
-`--event_handler` usage examples can be found [in the examples directory](irods_capability_automated_ingest/examples). 
+`--event_handler` usage examples can be found [in the examples directory](irods_capability_automated_ingest/examples).
 
 ## Deployment
 
@@ -76,7 +76,7 @@ source rodssync/bin/activate
 
 #### clone repo
 
-#### rq 
+#### rq
  * rq
  * rq-scheduler
  * python-redis-lock
@@ -212,11 +212,11 @@ minikube addons enable ingress
 
 #### mount host dirs
 
-This is where you data and event handler. In this setup, we assume that your event handler is under `/tmp/host/event_handler` and you data is under `/tmp/host/data`. We will mount `/tmp/host/data` into `/host/data` in minikube which will mount `/host/data` into `/data` in containers, 
+This is where you data and event handler. In this setup, we assume that your event handler is under `/tmp/host/event_handler` and you data is under `/tmp/host/data`. We will mount `/tmp/host/data` into `/host/data` in minikube which will mount `/host/data` into `/data` in containers,
 
 `/tmp/host/data` -> minikube `/host/data` -> container `/data`.
 
-and similarly, 
+and similarly,
 
 `/tmp/host/event_handler` -> minikube `/host/event_handler` -> container `/event_handler`. Your setup may differ.
 

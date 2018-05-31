@@ -90,7 +90,7 @@ def restart(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
 
         job_id = get_current_job().id
         def all_not_busy(ws):
-            return all(w.get_state() != WorkerStatus.BUSY or w.get_current_job_id() == job_id for w in ws)            
+            return all(w.get_state() != WorkerStatus.BUSY or w.get_current_job_id() == job_id for w in ws)
 
         # this doesn't guarantee that there is only one tree walk, but it prevents tree walk when the file queue is not empty
         if path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
@@ -100,7 +100,7 @@ def restart(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
             logger.info("queue not empty or worker busy")
 
     except OSError as err:
-        logger.warning("Warning: " + str(err))        
+        logger.warning("Warning: " + str(err))
     except Exception as err:
         logger.error("Unexpected error: " + str(err))
         raise
@@ -112,7 +112,7 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
 
     r = get_redis(logging_config)
     scheduler = Scheduler(connection=r)
-    
+
     if job_name.encode("utf-8") in r.lrange("periodic", 0, -1):
         logger.error("job exists")
         raise Exception("job exists")
@@ -130,20 +130,20 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
     else:
         restart_q = Queue(restart_q_name, connection=r)
         restart_q.enqueue(restart, path_q_name, file_q_name, target, root_abs, root_abs, hdlr, logging_config, job_id=job_name)
-        
+
 def stop_synchronization(job_name, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
 
     r = get_redis(logging_config)
     scheduler = Scheduler(connection=r)
-    
+
     if job_name.encode("utf-8") not in r.lrange("periodic", 0, -1):
         logger.error("job not exists")
         raise Exception("job not exists")
 
     while scheduler.cancel(job_name) == 0:
         time.sleep(.1)
-        
+
     r.lrem("periodic", 1, job_name)
 
 def list_synchronization(logging_config):
@@ -155,5 +155,5 @@ def list_synchronization(logging_config):
     #     job_id = job_instance.id
     #     print(job_id)
     return map(lambda job_id : job_id.decode("utf-8"), r.lrange("periodic",0,-1))
-    
-    
+
+

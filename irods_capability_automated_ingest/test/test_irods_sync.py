@@ -92,7 +92,7 @@ def start_workers(n):
     workers = map(lambda x: Popen(["rq", "worker", "--burst", "restart", "path", "file"]), range(n))
 
     return workers
-    
+
 
 def start_scheduler(n):
     scheduler = Popen(["rqscheduler", "-i", "1"])
@@ -180,7 +180,7 @@ def delete_resources(session, hierarchy, root = None):
 def irmtrash():
     proc = Popen(["irmtrash"])
     proc.wait()
-    
+
 
 def delete_collection(coll):
     with iRODSSession(irods_env_file=env_file) as session:
@@ -224,7 +224,7 @@ class Test_irods_sync(TestCase):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL])
         proc.wait()
         self.do_register2()
-                
+
     def do_register(self, eh, resc_name = ["demoResc"]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
         proc.wait()
@@ -241,10 +241,10 @@ class Test_irods_sync(TestCase):
                 rpath = A_COLL + "/" + i
                 self.assertTrue(session.data_objects.exists(rpath))
                 a1 = read_file(path)
-                
+
                 a2 = read_data_object(session, rpath)
                 self.assertEqual(a1, a2)
-                
+
                 obj = session.data_objects.get(rpath)
                 self.assertEqual(obj.replicas[0].path, realpath(path))
                 self.assertIn(obj.replicas[0].resource_name, resc_name)
@@ -258,7 +258,7 @@ class Test_irods_sync(TestCase):
     def do_put(self, eh, resc_names = ["demoResc"], resc_roots = ["/var/lib/irods/Vault"]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
         proc.wait()
-        
+
         workers = start_workers(1)
         wait(workers)
 
@@ -281,10 +281,10 @@ class Test_irods_sync(TestCase):
     def do_register_as_replica_no_assertions(self, eh):
         clear_redis()
         recreate_files()
-        
+
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
         proc.wait()
-        
+
         workers = start_workers(1)
         wait(workers)
 
@@ -326,7 +326,7 @@ class Test_irods_sync(TestCase):
                 mtime2 = modify_time(session, rpath)
                 self.assertEqual(s1, s2)
                 self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
-                
+
     def do_update_metadata(self, eh, resc_name = ["demoResc"]):
         ctime_files()
         self.do_register(eh, resc_name = resc_name)
@@ -346,7 +346,7 @@ class Test_irods_sync(TestCase):
 
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
         proc.wait()
-        
+
         workers = start_workers(1)
         wait(workers)
 
@@ -355,7 +355,7 @@ class Test_irods_sync(TestCase):
                 path = join(A, i)
                 rpath = A_COLL + "/" + i
                 a1 = read_file(path)
-                
+
                 a2 = read_data_object(session, rpath)
                 self.assertNotEqual(a1, a2)
 
@@ -377,7 +377,7 @@ class Test_irods_sync(TestCase):
 
     def test_no_event_handler(self):
         self.do_no_event_handler()
-        
+
     # register
 
     def test_register(self):
@@ -398,7 +398,7 @@ class Test_irods_sync(TestCase):
     def test_update(self):
         self.do_register("irods_capability_automated_ingest.examples.register")
         self.do_update("irods_capability_automated_ingest.examples.register")
-        
+
     def test_update_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_with_resc_name", resc_name = [REGISTER_RESC2A])
         self.do_update("irods_capability_automated_ingest.examples.register_with_resc_name", resc_name = [REGISTER_RESC2A])
