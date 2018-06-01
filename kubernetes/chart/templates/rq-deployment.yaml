@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: irods-rq
-        image: irods_rq:0.1.0
+        image: {{ .Values.docker.repo }}/irods_rq:0.1.0
         env:
         - name: IRODS_HOST
           value: {{ quote .Values.IRODS_HOST }}

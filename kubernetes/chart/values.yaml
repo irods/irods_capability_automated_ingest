@@ -10,6 +10,8 @@ IRODS_PASSWORD: rods
 event_handler: /host/event_handler
 data: /host/data
 log_level: WARN
+docker:
+  repo: zooh
 redis:
   master:
     persistence:

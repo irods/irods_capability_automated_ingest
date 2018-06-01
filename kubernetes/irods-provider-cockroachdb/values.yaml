@@ -8,6 +8,9 @@ cockroachdbDatabase: ICAT
 cockroachdb:
   Replicas: 1
 
+docker:
+  repo: zooh
+
 IRODS_SERVER_ADMINISTRATOR_PASSWORD: rods
 IRODS_SERVER_ADMINISTRATOR_USER_NAME: rods
 IRODS_ZONE_NAME: tempZone

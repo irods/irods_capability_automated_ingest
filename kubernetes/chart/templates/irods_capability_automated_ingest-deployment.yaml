@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: irods-capability-automated-ingest
-        image: irods_capability_automated_ingest:0.1.0
+        image: {{ .Values.docker.repo }}/irods_capability_automated_ingest:0.1.0
         ports:
         - containerPort: 5000
         env:

@@ -85,7 +85,7 @@ spec:
       initContainers:
       - env: *env1
         name: init-irods
-        image: irods-provider-cockroachdb:4.3.0
+        image: {{ .Values.docker.repo }}/irods-provider-cockroachdb:4.3.0
         args: ["init"]
         volumeMounts:
         - name: varlibirods
