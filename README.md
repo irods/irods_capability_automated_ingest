@@ -196,7 +196,10 @@ docker run --rm --link some-redis:redis --env-file icommands.env -v /tmp/host/da
 
 This does not assume that your iRODS installation is in kubernetes.
 
-For `kubeadm` and host path, install https://github.com/torchbox/k8s-hostpath-provisioner
+=======
+#### `kubeadm`
+
+Use `Glusterfs` and `Heketi`
 
 #### install minikube and helm
 
