@@ -35,6 +35,6 @@ spec:
         args: ["run", "--host=0.0.0.0"]
       volumes:
       - name: event-handler
-        hostPath:
-          path: {{ .Values.event_handler }}
-          type: Directory
+      	persistentVolumeClaim:
+	  claimName: {{ .Values.event_handler }}
+	  

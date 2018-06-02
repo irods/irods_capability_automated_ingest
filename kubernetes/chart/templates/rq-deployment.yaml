@@ -41,10 +41,9 @@ spec:
         args: ["worker", "-u", "redis://{{ .Release.Name }}-redis-master:6379/0", "restart", "path", "file"]
       volumes:
       - name: data
-        hostPath:
-          path: {{ .Values.data }}
-          type: Directory
+        persistentVolumeClaim:
+	  claimName: {{ .Values.data }}
       - name: event-handler
-        hostPath:
-          path: {{ .Values.event_handler }}
-          type: Directory
+        persistentVolumeClaim:
+	  claimName: {{ .Values.event_handler }}
+

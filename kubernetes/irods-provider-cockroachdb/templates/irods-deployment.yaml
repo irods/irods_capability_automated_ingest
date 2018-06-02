@@ -94,9 +94,8 @@ spec:
           mountPath: /etc/irods
       volumes:
       - name: data
-        hostPath:
-          path: {{ .Values.data }}
-          type: Directory
+      	persistentVolumeClaim:
+	  claimName: {{ .Values.data }}
       - name: varlibirods
         emptyDir: {}
       - name: etcirods
