@@ -199,7 +199,11 @@ This does not assume that your iRODS installation is in kubernetes.
 =======
 #### `kubeadm`
 
-Use `Glusterfs` and `Heketi`
+setup `Glusterfs` and `Heketi`
+
+create storage class
+
+create a persistent volume claim `data`
 
 #### install minikube and helm
 
@@ -349,22 +353,22 @@ kubectl scale deployment.apps/icai-rq-deployment --replicas=<n>
 ##### submit job
 `fish`
 ```
-curl -XPUT "http://"(minikube ip)"/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+curl -XPUT "http://"(minikube ip)"/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>" -H "Content-Type: application/x-python" --data-binary "@event_handler.py"
 ```
 
 `bash`
 ```
-curl -XPUT "http://$(minikube ip)/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+curl -XPUT "http://$(minikube ip)/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>" -H "Content-Type: application/x-python" --data-binary "@event_handler.py"
 ```
 
 `fish`
 ```
-curl -XPUT "http://"(minikube ip)"/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+curl -XPUT "http://"(minikube ip)"/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>" -H "Content-Type: application/x-python" --data-binary "@event_handler.py"
 ```
 
 `bash`
 ```
-curl -XPUT "http://$(minikube ip)/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>&event_handler=event_handler"
+curl -XPUT "http://$(minikube ip)/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>" -H "Content-Type: application/x-python" --data-binary "@event_handler.py"
 ```
 
 ##### list job
