@@ -1,6 +1,7 @@
 from rq import Queue, Worker, get_current_job
 from rq.worker import WorkerStatus
 from os import listdir
+import os
 from os.path import isfile, join, getmtime, realpath, relpath, getctime
 from datetime import datetime
 from rq_scheduler import Scheduler
@@ -8,12 +9,16 @@ import redis_lock
 from irods_capability_automated_ingest import sync_logging, sync_irods
 from irods_capability_automated_ingest.sync_utils import get_redis
 import time
+from uuid import uuid1
 
 def sync_time_key(path):
     return "sync_time:/"+path
 
 def type_key(path):
     return "type:/"+path
+
+def cleanup_key(job_id):
+    return "cleanup:/"+job_id
 
 def get_with_key(r, key, path, typefunc):
     sync_time_bs = r.get(key(path))
@@ -78,7 +83,21 @@ def sync_file(target, root, path, hdlr, logging_config):
         logger.error("failed", err=err, task="sync_file", path = path)
         raise
 
-def restart(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
+def cleanup(r, job_name):
+    hdlr = get_with_key(r, cleanup_key, job_name, lambda x: x)
+    if hdlr is not None:
+        os.remove(hdlr.decode("utf-8"))
+        reset_with_key(r, cleanup_key, job_name)
+
+    if periodic(r, job_name):
+        r.lrem("periodic", 1, job_name)
+        
+
+def periodic(r, job_name):
+    periodic = r.lrange("periodic", 0, -1)
+    return job_name not in periodic
+        
+def restart(path_q_name, file_q_name, target, root, path, job_name, hdlr, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
     try:
         logger.info("***************** restart *****************")
@@ -93,7 +112,7 @@ def restart(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
             return all(w.get_state() != WorkerStatus.BUSY or w.get_current_job_id() == job_id for w in ws)
 
         # this doesn't guarantee that there is only one tree walk, but it prevents tree walk when the file queue is not empty
-        if path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
+        if periodic(r, job_name) and path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
             logger.info("queue empty and worker not busy")
             path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path, hdlr, logging_config)
         else:
@@ -105,7 +124,7 @@ def restart(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
         logger.error("Unexpected error: " + str(err))
         raise
 
-def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root, interval, job_name, hdlr, logging_config):
+def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root, interval, job_name, hdlr, hdlr_path, hdlr_data, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
 
     root_abs = realpath(root)
@@ -117,11 +136,18 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
         logger.error("job exists")
         raise Exception("job exists")
 
+    if hdlr is None:
+        hdlr = "event_handler" + uuid1().hex
+        hdlr2 = hdlr_path + "/" + hdlr + ".py"
+        with open(hdlr2, "w") as f:
+            f.write(hdlr_data)
+        set_with_key(r, cleanup_key, job_name, hdlr2.encode("utf-8"))
+
     if interval is not None:
         scheduler.schedule(
             scheduled_time = datetime.utcnow(),
             func = restart,
-            args = [path_q_name, file_q_name, target, root_abs, root_abs, hdlr, logging_config],
+            args = [path_q_name, file_q_name, target, root_abs, root_abs, job_name, hdlr, logging_config],
             interval = interval,
             queue_name = restart_q_name,
             id = job_name
@@ -129,7 +155,7 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
         r.rpush("periodic", job_name.encode("utf-8"))
     else:
         restart_q = Queue(restart_q_name, connection=r)
-        restart_q.enqueue(restart, path_q_name, file_q_name, target, root_abs, root_abs, hdlr, logging_config, job_id=job_name)
+        restart_q.enqueue(restart, path_q_name, file_q_name, target, root_abs, root_abs, job_name, hdlr, logging_config, job_id=job_name)
 
 def stop_synchronization(job_name, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
@@ -144,8 +170,8 @@ def stop_synchronization(job_name, logging_config):
     while scheduler.cancel(job_name) == 0:
         time.sleep(.1)
 
-    r.lrem("periodic", 1, job_name)
-
+    cleanup(r, job_name)
+    
 def list_synchronization(logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
     r = get_redis(logging_config)

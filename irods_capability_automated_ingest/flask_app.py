@@ -1,9 +1,12 @@
 from irods_capability_automated_ingest.sync_task import start_synchronization, stop_synchronization, list_synchronization
 from uuid import uuid1
-from flask import Flask
+from flask import Flask, request
+import flask
 from flask_restful import reqparse, Resource, Api
+import click
 
 import os
+import traceback
 
 app = Flask(__name__)
 
@@ -19,12 +22,15 @@ parser_start.add_argument('path_queue', type=str, default="path", help='path que
 parser_start.add_argument('restart_queue', type=str, default="restart", help='restart queue')
 parser_start.add_argument('event_handler', type=str, default=None, help='event handler')
 
-def put(job_name):
+def put(job_name, data):
+    event_handler_path = app.config.get("event_handler_path")
+            
     args = parser_start.parse_args(strict=True)
     try:
-        start_synchronization(args["restart_queue"], args["path_queue"], args["file_queue"], args["target"], args["source"], args["interval"], job_name, args["event_handler"], get_config())
+        start_synchronization(args["restart_queue"], args["path_queue"], args["file_queue"], args["target"], args["source"], args["interval"], job_name, args["event_handler"], event_handler_path, data.decode("utf-8"), get_config())
         return job_name, 201
     except Exception as e:
+        traceback.print_exc()
         return str(e), 400
 
 class Jobs(Resource):
@@ -34,11 +40,11 @@ class Jobs(Resource):
 
     def put(self):
         job_name = str(uuid1())
-        return put(job_name)
+        return put(job_name, request.data)
 
 class Job(Resource):
     def put(self, job_name):
-        return put(job_name)
+        return put(job_name, request.data)
 
     def delete(self, job_name):
         try:
@@ -67,5 +73,21 @@ def get_config():
         }
     }
 
-if __name__ == "__main__":
-    app.run()
+
+DEFAULT_EVENT_HANDLER_PATH = "/tmp"
+
+
+builtin_run_command = flask.cli.run_command
+
+
+@app.cli.command('run_app', help=builtin_run_command.help, short_help=builtin_run_command.short_help)
+@click.option("--event_handler_path", default=DEFAULT_EVENT_HANDLER_PATH)
+@click.pass_context
+def run_app(ctx, event_handler_path, **kwargs):
+    app.config["event_handler_path"] = event_handler_path
+    ctx.params.pop("event_handler_path", None)
+    ctx.forward(builtin_run_command)
+
+run_app.params[:0] = builtin_run_command.params
+
+

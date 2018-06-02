@@ -45,5 +45,5 @@ spec:
 	  claimName: {{ .Values.data }}
       - name: event-handler
         persistentVolumeClaim:
-	  claimName: {{ .Values.event_handler }}
+	  claimName: {{ .Release.Name }}-{{ .Values.event_handler }}
 
