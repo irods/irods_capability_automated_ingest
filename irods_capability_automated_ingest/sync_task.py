@@ -34,20 +34,22 @@ def set_with_key(r, key, path, sync_time):
 def reset_with_key(r, key, path):
     r.delete(key(path))
 
-def sync_path(path_q_name, file_q_name, target, root, path, hdlr, logging_config):
+def sync_path(path_q_name, file_q_name, target, root, path, hdlr, logging_config, depends_on):
     logger = sync_logging.create_sync_logger(logging_config)
     try:
         r = get_redis(logging_config)
         if isfile(path):
             logger.info("enqueue file path", path = path)
             q = Queue(file_q_name, connection=r)
-            q.enqueue(sync_file, target, root, path, hdlr, logging_config, meta={"append_json": get_current_job().meta["append_json"]})
+            q.enqueue(sync_file, target, root, path, hdlr, logging_config, meta={"append_json": get_current_job().meta["append_json"]}, depends_on=depends_on)
             logger.info("succeeded", task="sync_path", path = path)
         else:
             logger.info("walk dir", path = path)
             q = Queue(path_q_name, connection=r)
+            job_id = q.enqueue(sync_dir, target, root, path, hdlr, logging_config,
+                      meta={"append_json": get_current_job().meta["append_json"]}, depends_on=depends_on).id
             for n in listdir(path):
-                q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n), hdlr, logging_config, meta={"append_json": get_current_job().meta["append_json"]})
+                q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n), hdlr, logging_config, job_id, meta={"append_json": get_current_job().meta["append_json"]})
             logger.info("succeeded_dir", task="sync_path", path = path)
     except OSError as err:
         logger.warning("failed_OSError", err=err, task="sync_path", path = path)
@@ -83,6 +85,36 @@ def sync_file(target, root, path, hdlr, logging_config):
         logger.error("failed", err=err, task="sync_file", path = path)
         raise
 
+
+def sync_dir(target, root, path, hdlr, logging_config):
+    logger = sync_logging.create_sync_logger(logging_config)
+    try:
+        logger.info("synchronizing dir. path = " + path)
+        r = get_redis(logging_config)
+        with redis_lock.Lock(r, path):
+            t = datetime.now().timestamp()
+            sync_time = get_with_key(r, sync_time_key, path, float)
+            mtime = getmtime(path)
+            ctime = getctime(path)
+            if sync_time == None or mtime >= sync_time:
+                logger.info("synchronizing dir", path = path, t0 = sync_time, t = t, mtime = mtime)
+                sync_irods.sync_data_from_dir(join(target, relpath(path, start=root)), path, hdlr, logger, True)
+                set_with_key(r, sync_time_key, path, str(t))
+                logger.info("succeeded", task="sync_dir", path = path)
+            elif ctime >= sync_time:
+                logger.info("synchronizing dir", path = path, t0 = sync_time, t = t, ctime = ctime)
+                sync_irods.sync_metadata_from_dir(join(target, relpath(path, start=root)), path, hdlr, logger)
+                set_with_key(r, sync_time_key, path, str(t))
+                logger.info("succeeded_metadata_only", task="sync_dir", path = path)
+            else:
+                logger.info("succeeded_file_has_not_changed", task="sync_file", path = path)
+    except OSError as err:
+        logger.warning("failed_OSError", err=err, task="sync_file", path = path)
+    except Exception as err:
+        logger.error("failed", err=err, task="sync_file", path = path)
+        raise
+
+
 def cleanup(r, job_name):
     hdlr = get_with_key(r, cleanup_key, job_name, lambda x: x)
     if hdlr is not None:
@@ -115,7 +147,7 @@ def restart(path_q_name, file_q_name, target, root, path, job_name, hdlr, loggin
         if periodic(r, job_name) and path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
             logger.info("queue empty and worker not busy")
 
-            path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path, hdlr, logging_config, meta={"append_json": get_current_job().meta["append_json"]})
+            path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path, hdlr, logging_config, None, meta={"append_json": get_current_job().meta["append_json"]})
         else:
             logger.info("queue not empty or worker busy")
 

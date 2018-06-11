@@ -50,6 +50,11 @@ def create_dirs(hdlr_mod, logger, session, target, path, **options):
         raise Exception("create_dirs: relative path")
 
 
+def create_dir(hdlr_mod, logger, session, target, path, **options):
+    logger.info("creating collection " + target)
+    session.collections.create(target)
+
+
 def get_target_path(hdlr_mod, session, target, path, **options):
     if hasattr(hdlr_mod, "target_path"):
         return hdlr_mod.target_path(session, target, path, **options)
@@ -178,13 +183,11 @@ def sync_file_meta(hdlr_mod, logger, session, target, path, **options):
     pass
 
 
-def sync_data_from_file(target, path, hdlr, logger, content, **options):
-    if hdlr is not None:
-        hdlr_mod0 = importlib.import_module(hdlr)
-        hdlr_mod = getattr(hdlr_mod0, "event_handler", None)
-    else:
-        hdlr_mod = None
+def sync_dir_meta(hdlr_mod, logger, session, target, path, **options):
+    pass
 
+
+def irods_session(hdlr_mod, target, path, **options):
     env_irods_host = os.environ.get("IRODS_HOST")
     env_irods_port = os.environ.get("IRODS_PORT")
     env_irods_user_name = os.environ.get("IRODS_USER_NAME")
@@ -215,7 +218,17 @@ def sync_data_from_file(target, path, hdlr, logger, content, **options):
         kwargs["client_user"] = client_user
         kwargs["client_zone"] = client_zone
 
-    sess_ctx = iRODSSession(**kwargs)
+    return iRODSSession(**kwargs)
+
+
+def sync_data_from_file(target, path, hdlr, logger, content, **options):
+    if hdlr is not None:
+        hdlr_mod0 = importlib.import_module(hdlr)
+        hdlr_mod = getattr(hdlr_mod0, "event_handler", None)
+    else:
+        hdlr_mod = None
+
+    sess_ctx = irods_session(hdlr_mod, target, path, **options)
 
     with sess_ctx as session:
 
@@ -284,3 +297,37 @@ def sync_data_from_file(target, path, hdlr, logger, content, **options):
 
 def sync_metadata_from_file(target, path, hdlr, logger, **options):
     sync_data_from_file(target, path, hdlr, logger, False, **options)
+
+
+def sync_data_from_dir(target, path, hdlr, logger, content, **options):
+    if hdlr is not None:
+        hdlr_mod0 = importlib.import_module(hdlr)
+        hdlr_mod = getattr(hdlr_mod0, "event_handler", None)
+    else:
+        hdlr_mod = None
+
+    sess_ctx = irods_session(hdlr_mod, target, path, **options)
+
+    with sess_ctx as session:
+
+        exists = session.collections.exists(target)
+
+        if hasattr(hdlr_mod, "operation"):
+            op = hdlr_mod.operation(session, target, path, **options)
+        else:
+            op = Operation.REGISTER_SYNC
+
+        if op == Operation.NO_OP:
+            if not exists:
+                call(hdlr_mod, "on_collection_create", no_op, logger, hdlr_mod, logger, session, target, path, **options)
+            else:
+                call(hdlr_mod, "on_collection_modify", no_op, logger, hdlr_mod, logger, session, target, path, **options)
+        else:
+            if not exists:
+                call(hdlr_mod, "on_collection_create", create_dir, logger, hdlr_mod, logger, session, target, path, **options)
+            else:
+                call(hdlr_mod, "on_collection_modify", sync_dir_meta, logger, hdlr_mod, logger, session, target, path, **options)
+
+
+def sync_metadata_from_dir(target, path, hdlr, logger, **options):
+    sync_data_from_dir(target, path, hdlr, logger, False, **options)

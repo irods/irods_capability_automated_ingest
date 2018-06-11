@@ -2,6 +2,7 @@ import unittest
 import os
 import os.path
 import stat
+import glob
 from unittest import TestCase
 from redis import StrictRedis
 from subprocess import Popen
@@ -9,7 +10,7 @@ from signal import SIGINT
 from os import makedirs, listdir
 from rq import Queue
 from shutil import rmtree
-from os.path import join, realpath, getmtime, getsize, dirname, basename
+from os.path import join, realpath, getmtime, getsize, dirname, basename, relpath, isfile
 from irods.session import iRODSSession
 from irods.models import Collection, DataObject
 from tempfile import NamedTemporaryFile
@@ -111,15 +112,25 @@ def interrupt(scheduler):
 
 
 def create_files():
-    makedirs(A)
+    create_files2(0)
+
+
+def create_files2(depth):
+    a = join(A, *list(map(lambda i : "a" + str(i), range(depth))))
+    makedirs(a)
     for i in range(NFILES):
-        with open(join(A,str(i)), "w") as f:
+        with open(join(a,str(i)), "w") as f:
             f.write("i" * i)
 
 
 def recreate_files():
+    recreate_files2(0)
+
+
+def recreate_files2(depth):
+    a = join(A, *list(map(lambda i : "a" + str(i), range(depth))))
     for i in range(NFILES):
-        with open(join(A,str(i)), "w") as f:
+        with open(join(a,str(i)), "w") as f:
             f.write("i" * (i * 2 + 1))
 
 
@@ -254,6 +265,35 @@ class Test_irods_sync(TestCase):
                 mtime2 = modify_time(session, rpath)
                 self.assertEqual(s1, s2)
                 self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
+
+    def do_register_par(self, eh, resc_name = ["demoResc"]):
+        create_files2(10)
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc.wait()
+        workers = start_workers(10)
+        wait(workers)
+
+        with iRODSSession(irods_env_file=env_file) as session:
+            self.assertTrue(session.collections.exists(A_COLL))
+            for i in glob.glob(A+"/**/*", recursive=True):
+                if isfile(i):
+                    path = i
+                    rpath = A_COLL + "/" + relpath(i, A)
+                    self.assertTrue(session.data_objects.exists(rpath))
+                    a1 = read_file(path)
+
+                    a2 = read_data_object(session, rpath)
+                    self.assertEqual(a1, a2)
+
+                    obj = session.data_objects.get(rpath)
+                    self.assertEqual(obj.replicas[0].path, realpath(path))
+                    self.assertIn(obj.replicas[0].resource_name, resc_name)
+                    s1 = getsize(path)
+                    mtime1 = int(getmtime(path))
+                    s2 = size(session, rpath)
+                    mtime2 = modify_time(session, rpath)
+                    self.assertEqual(s1, s2)
+                    self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
     def do_put(self, eh, resc_names = ["demoResc"], resc_roots = ["/var/lib/irods/Vault"]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
@@ -613,9 +653,14 @@ class Test_irods_sync(TestCase):
         self.do_no_op("irods_capability_automated_ingest.examples.no_op")
 
 
-    # meta
+    # append_json
     def test_append_json(self):
         self.do_append_json("irods_capability_automated_ingest.examples.append_json")
+
+
+    # create dir
+    def test_create_dir(self):
+        self.do_register_par("irods_capability_automated_ingest.examples.register")
 
 
 if __name__ == '__main__':
