@@ -81,7 +81,12 @@ source rodssync/bin/activate
  * rq-scheduler
  * python-redis-lock
 ```
-pip install rq python-redis-lock rq-scheduler
+pip install rq python-redis-lock # rq-scheduler
+```
+
+before the follow pr for adding metadata support for `rq-scheduler` is merged:
+```
+pip install git+git://github.com/as3445/rq-scheduler-bcfg.git@879d8d81d0d658c1233a0f6a4322a798f981e448
 ```
 
 make sure you are in the repo for the following commands

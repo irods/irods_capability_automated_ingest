@@ -368,6 +368,19 @@ class Test_irods_sync(TestCase):
         workers = start_workers(1)
         wait(workers)
 
+    def do_append_json(self, eh):
+        recreate_files()
+
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--append_json", "\"append_json\""])
+        proc.wait()
+
+        workers = start_workers(1)
+        wait(workers)
+
+        r = StrictRedis()
+        rq = Queue(connection=r, name="failed")
+        self.assertEqual(rq.count, 0)
+
     def do_put_to_child(self):
         with iRODSSession(irods_env_file=env_file) as session:
             session.resources.remove_child(REGISTER_RESC2, REGISTER_RESC2A)
@@ -598,6 +611,12 @@ class Test_irods_sync(TestCase):
     # no op
     def test_no_op(self):
         self.do_no_op("irods_capability_automated_ingest.examples.no_op")
+
+
+    # meta
+    def test_append_json(self):
+        self.do_append_json("irods_capability_automated_ingest.examples.append_json")
+
 
 if __name__ == '__main__':
         unittest.main()

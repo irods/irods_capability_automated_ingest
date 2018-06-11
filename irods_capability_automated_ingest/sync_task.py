@@ -41,13 +41,13 @@ def sync_path(path_q_name, file_q_name, target, root, path, hdlr, logging_config
         if isfile(path):
             logger.info("enqueue file path", path = path)
             q = Queue(file_q_name, connection=r)
-            q.enqueue(sync_file, target, root, path, hdlr, logging_config)
+            q.enqueue(sync_file, target, root, path, hdlr, logging_config, meta={"append_json": get_current_job().meta["append_json"]})
             logger.info("succeeded", task="sync_path", path = path)
         else:
             logger.info("walk dir", path = path)
             q = Queue(path_q_name, connection=r)
             for n in listdir(path):
-                q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n), hdlr, logging_config)
+                q.enqueue(sync_path, path_q_name, file_q_name, target, root, join(path, n), hdlr, logging_config, meta={"append_json": get_current_job().meta["append_json"]})
             logger.info("succeeded_dir", task="sync_path", path = path)
     except OSError as err:
         logger.warning("failed_OSError", err=err, task="sync_path", path = path)
@@ -114,7 +114,8 @@ def restart(path_q_name, file_q_name, target, root, path, job_name, hdlr, loggin
         # this doesn't guarantee that there is only one tree walk, but it prevents tree walk when the file queue is not empty
         if periodic(r, job_name) and path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
             logger.info("queue empty and worker not busy")
-            path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path, hdlr, logging_config)
+
+            path_q.enqueue(sync_path, path_q_name, file_q_name, target, root, path, hdlr, logging_config, meta={"append_json": get_current_job().meta["append_json"]})
         else:
             logger.info("queue not empty or worker busy")
 
@@ -124,7 +125,7 @@ def restart(path_q_name, file_q_name, target, root, path, job_name, hdlr, loggin
         logger.error("Unexpected error: " + str(err))
         raise
 
-def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root, interval, job_name, hdlr, hdlr_path, hdlr_data, logging_config):
+def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root, interval, job_name, append_json, hdlr, hdlr_path, hdlr_data, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)
 
     root_abs = realpath(root)
@@ -145,17 +146,18 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
 
     if interval is not None:
         scheduler.schedule(
-            scheduled_time = datetime.utcnow(),
-            func = restart,
-            args = [path_q_name, file_q_name, target, root_abs, root_abs, job_name, hdlr, logging_config],
-            interval = interval,
-            queue_name = restart_q_name,
-            id = job_name
+            scheduled_time=datetime.utcnow(),
+            func=restart,
+            args=[path_q_name, file_q_name, target, root_abs, root_abs, job_name, hdlr, logging_config],
+            interval=interval,
+            queue_name=restart_q_name,
+            id=job_name,
+            meta={"append_json": append_json}
         )
         r.rpush("periodic", job_name.encode("utf-8"))
     else:
         restart_q = Queue(restart_q_name, connection=r)
-        restart_q.enqueue(restart, path_q_name, file_q_name, target, root_abs, root_abs, job_name, hdlr, logging_config, job_id=job_name)
+        restart_q.enqueue(restart, path_q_name, file_q_name, target, root_abs, root_abs, job_name, hdlr, logging_config, job_id=job_name, meta={"append_json": append_json})
 
 def stop_synchronization(job_name, logging_config):
     logger = sync_logging.create_sync_logger(logging_config)

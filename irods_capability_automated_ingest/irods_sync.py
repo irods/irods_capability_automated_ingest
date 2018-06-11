@@ -1,6 +1,7 @@
 from irods_capability_automated_ingest.sync_task import start_synchronization, stop_synchronization, list_synchronization
 import argparse
 from uuid import uuid1
+import json
 
 def get_config(args):
     return {
@@ -30,7 +31,7 @@ def add_arguments(parser):
 
 
 def handle_start(args):
-    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, args.job_name, args.event_handler, None, None, get_config(args))
+    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, args.job_name, args.append_json, args.event_handler, None, None, get_config(args))
 
 def handle_stop(args):
     stop_synchronization(args.job_name, get_config(args))
@@ -55,6 +56,7 @@ def main():
     parser_start.add_argument('--restart_queue', action="store", metavar='RESTART QUEUE', type=str, default="restart", help='restart queue')
     parser_start.add_argument('--event_handler', action="store", metavar='EVENT HANDLER', type=str, default=None, help='event handler')
     parser_start.add_argument('--job_name', action="store", metavar='JOB NAME', type=str, default=uuid, help='job name')
+    parser_start.add_argument('--append_json', action="store", metavar='APPEND JSON', type=json.loads, default=None, help='append json')
     add_arguments(parser_start)
 
 
