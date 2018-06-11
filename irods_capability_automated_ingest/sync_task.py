@@ -136,7 +136,7 @@ def start_synchronization(restart_q_name, path_q_name, file_q_name, target, root
         logger.error("job exists")
         raise Exception("job exists")
 
-    if hdlr is None:
+    if hdlr is None and hdlr_path is not None and hdlr_data is not None:
         hdlr = "event_handler" + uuid1().hex
         hdlr2 = hdlr_path + "/" + hdlr + ".py"
         with open(hdlr2, "w") as f:

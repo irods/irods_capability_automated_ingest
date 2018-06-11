@@ -99,6 +99,10 @@ def upload_file(hdlr_mod, logger, session, target, path, **options):
     logger.info("succeeded", task="irods_upload_file", path = path)
 
 
+def no_op(hdlr_mod, logger, session, target, path, **options):
+    pass
+
+
 def sync_file(hdlr_mod, logger, session, target, path, **options):
     logger.info("syncing object " + target + ", options = " + str(options))
 
@@ -227,49 +231,55 @@ def sync_data_from_file(target, path, hdlr, logger, content, **options):
         else:
             op = Operation.REGISTER_SYNC
 
-        createRepl = False
-        if exists and op == Operation.REGISTER_AS_REPLICA_SYNC:
-            if hasattr(hdlr_mod, "to_resource"):
-                resc_name = hdlr_mod.to_resource(session, target, path, **options)
+        if op == Operation.NO_OP:
+            if not exists:
+                call(hdlr_mod, "on_data_obj_create", no_op, logger, hdlr_mod, logger, session, target, path, **options)
             else:
-                raise Exception("no resource name defined")
-
-            found = False
-            foundPath = False
-            for replica in session.data_objects.get(target).replicas:
-                if child_of(session, replica.resource_name, resc_name):
-                    found = True
-                    if replica.path == path:
-                        foundPath = True
-            if found:
-                if not foundPath:
-                    raise Exception("there is at least one replica under resource but all replicas have wrong paths")
-            else:
-                createRepl = True
-
-        if not exists:
-            create_dirs(hdlr_mod, logger, session, dirname(target), dirname(path), **options)
-
-        put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
-        sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]
-
-        if not exists:
-            if put:
-                call(hdlr_mod, "on_data_obj_create", upload_file, logger, hdlr_mod, logger, session, target, path, **options)
-            else:
-                call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, target, path, **options)
-        elif createRepl:
-            options["regRepl"] = ""
-
-            call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, target, path, **options)
-        elif content:
-            if put:
-                if sync:
-                    call(hdlr_mod, "on_data_obj_modify", sync_file, logger, hdlr_mod, logger, session, target, path, **options)
-            else:
-                call(hdlr_mod, "on_data_obj_modify", update_metadata, logger, hdlr_mod, logger, session, target, path, **options)
+                call(hdlr_mod, "on_data_obj_modify", no_op, logger, hdlr_mod, logger, session, target, path, **options)
         else:
-            call(hdlr_mod, "on_data_obj_modify", sync_file_meta, logger, hdlr_mod, logger, session, target, path, **options)
+            createRepl = False
+            if exists and op == Operation.REGISTER_AS_REPLICA_SYNC:
+                if hasattr(hdlr_mod, "to_resource"):
+                    resc_name = hdlr_mod.to_resource(session, target, path, **options)
+                else:
+                    raise Exception("no resource name defined")
+
+                found = False
+                foundPath = False
+                for replica in session.data_objects.get(target).replicas:
+                    if child_of(session, replica.resource_name, resc_name):
+                        found = True
+                        if replica.path == path:
+                            foundPath = True
+                if found:
+                    if not foundPath:
+                        raise Exception("there is at least one replica under resource but all replicas have wrong paths")
+                else:
+                    createRepl = True
+
+            if not exists:
+                create_dirs(hdlr_mod, logger, session, dirname(target), dirname(path), **options)
+
+            put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
+            sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]
+
+            if not exists:
+                if put:
+                    call(hdlr_mod, "on_data_obj_create", upload_file, logger, hdlr_mod, logger, session, target, path, **options)
+                else:
+                    call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, target, path, **options)
+            elif createRepl:
+                options["regRepl"] = ""
+
+                call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, target, path, **options)
+            elif content:
+                if put:
+                    if sync:
+                        call(hdlr_mod, "on_data_obj_modify", sync_file, logger, hdlr_mod, logger, session, target, path, **options)
+                else:
+                    call(hdlr_mod, "on_data_obj_modify", update_metadata, logger, hdlr_mod, logger, session, target, path, **options)
+            else:
+                call(hdlr_mod, "on_data_obj_modify", sync_file_meta, logger, hdlr_mod, logger, session, target, path, **options)
 
 
 def sync_metadata_from_file(target, path, hdlr, logger, **options):

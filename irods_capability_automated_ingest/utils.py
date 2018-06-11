@@ -6,4 +6,5 @@ class Operation(Enum):
     PUT = 2
     PUT_SYNC = 3
     PUT_APPEND = 4
+    NO_OP = 5
 

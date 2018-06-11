@@ -30,7 +30,7 @@ def add_arguments(parser):
 
 
 def handle_start(args):
-    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, args.job_name, args.event_handler, get_config(args))
+    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, args.job_name, args.event_handler, None, None, get_config(args))
 
 def handle_stop(args):
     stop_synchronization(args.job_name, get_config(args))

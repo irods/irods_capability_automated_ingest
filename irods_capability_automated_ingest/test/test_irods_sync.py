@@ -359,6 +359,15 @@ class Test_irods_sync(TestCase):
                 a2 = read_data_object(session, rpath)
                 self.assertNotEqual(a1, a2)
 
+    def do_no_op(self, eh):
+        recreate_files()
+
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc.wait()
+
+        workers = start_workers(1)
+        wait(workers)
+
     def do_put_to_child(self):
         with iRODSSession(irods_env_file=env_file) as session:
             session.resources.remove_child(REGISTER_RESC2, REGISTER_RESC2A)
@@ -586,6 +595,9 @@ class Test_irods_sync(TestCase):
         self.do_put("irods_capability_automated_ingest.examples.append_non_leaf_non_root_with_resc_name", resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
                     resc_roots=[REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
 
+    # no op
+    def test_no_op(self):
+        self.do_no_op("irods_capability_automated_ingest.examples.no_op")
 
 if __name__ == '__main__':
         unittest.main()
