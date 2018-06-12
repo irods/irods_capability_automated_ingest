@@ -31,15 +31,29 @@ def add_arguments(parser):
 
 
 def handle_start(args):
-    start_synchronization(args.restart_queue, args.path_queue, args.file_queue, args.target, args.root, args.interval, args.job_name, args.append_json, args.event_handler, None, None, get_config(args))
+    start_synchronization({
+        "restart_queue": args.restart_queue,
+        "path_queue": args.path_queue,
+        "file_queue": args.file_queue,
+        "target": args.target,
+        "root": args.root,
+        "interval": args.interval,
+        "job_name": args.job_name,
+        "append_json": args.append_json,
+        "event_handler": args.event_handler,
+        "config": get_config(args)
+    })
+
 
 def handle_stop(args):
     stop_synchronization(args.job_name, get_config(args))
+
 
 def handle_list(args):
     jobs = list_synchronization(get_config(args))
     for job_id in jobs:
         print(job_id)
+
 
 def main():
     uuid = str(uuid1())

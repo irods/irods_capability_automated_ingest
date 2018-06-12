@@ -89,8 +89,8 @@ def clear_redis():
     r.flushdb()
 
 
-def start_workers(n):
-    workers = map(lambda x: Popen(["rq", "worker", "--burst", "restart", "path", "file"]), range(n))
+def start_workers(n, args=[]):
+    workers = map(lambda x: Popen(["rq", "worker", "--burst", "restart", "path", "file"] + args), range(n))
 
     return workers
 
@@ -294,6 +294,26 @@ class Test_irods_sync(TestCase):
                     mtime2 = modify_time(session, rpath)
                     self.assertEqual(s1, s2)
                     self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
+
+    def do_retry(self, eh, resc_name = ["demoResc"]):
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc.wait()
+        workers = start_workers(1, ["--exception-handler", "rq.handlers.move_to_failed_queue", "--exception-handler", "irods_capability_automated_ingest.sync_utils.retry_handler"])
+        wait(workers)
+
+        r = StrictRedis()
+        rq = Queue(connection=r, name="failed")
+        self.assertEqual(rq.count, 0)
+
+    def do_no_retry(self, eh, resc_name = ["demoResc"]):
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc.wait()
+        workers = start_workers(1, ["--exception-handler", "rq.handlers.move_to_failed_queue", "--exception-handler", "irods_capability_automated_ingest.sync_utils.retry_handler"])
+        wait(workers)
+
+        r = StrictRedis()
+        rq = Queue(connection=r, name="failed")
+        self.assertEqual(rq.count, NFILES)
 
     def do_put(self, eh, resc_names = ["demoResc"], resc_roots = ["/var/lib/irods/Vault"]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
@@ -662,6 +682,12 @@ class Test_irods_sync(TestCase):
     def test_create_dir(self):
         self.do_register_par("irods_capability_automated_ingest.examples.register")
 
+    # retry
+    def test_no_retry(self):
+        self.do_no_retry("irods_capability_automated_ingest.examples.no_retry")
+
+    def test_retry(self):
+        self.do_retry("irods_capability_automated_ingest.examples.retry")
 
 if __name__ == '__main__':
         unittest.main()

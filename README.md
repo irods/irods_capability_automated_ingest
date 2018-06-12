@@ -22,10 +22,13 @@ The example diagrams below show a filesystem scanner and a landing zone.
 | post_data_obj_modify     | user-defined python  |  none |
 | pre_coll_create    |   user-defined python |  none |
 | post_coll_create    |  user-defined python   |  none |
+| pre_coll_modify    |   user-defined python |  none |
+| post_coll_modify    |  user-defined python   |  none |
 | as_user |   takes action as this iRODS user |  authenticated user |
 | target_path | set mount path on the irods server which can be different from client mount path | client mount path |
 | to_resource | defines  target resource request of operation |  as provided by client environment |
 | operation | defines the mode of operation |  `Operation.REGISTER_SYNC` |
+| max_retries | defines max retries | 0
 
 Event handlers can use `logger` to write logs. See `structlog` for available logging methods and signatures.
 
@@ -38,6 +41,7 @@ Event handlers can use `logger` to write logs. See `structlog` for available log
 | `Operation.PUT`  |   copies file to target vault, and registers in catalog | no action |
 | `Operation.PUT_SYNC`  |   copies file to target vault, and registers in catalog | copies entire file again, and updates catalog |
 | `Operation.PUT_APPEND`  |   copies file to target vault, and registers in catalog | copies only appended part of file, and updates catalog |
+| `Operation.NO_OP` | no action | no action
 
 `--event_handler` usage examples can be found [in the examples directory](irods_capability_automated_ingest/examples).
 
@@ -140,10 +144,12 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 
 #### start
 ```
-python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ]
+python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ]
 ```
 
 If `-i` is not present, then only sync once
+
+The `--append_json` is stored in `job.meta["append_json"]`
 
 
 #### list restarting jobs
@@ -240,7 +246,7 @@ mkdir /tmp/host/data
 ```
 
 `/tmp/host/event_handler/event_handler.py`
-```
+```python
 from irods_capability_automated_ingest.core import Core
 from irods_capability_automated_ingest.utils import Operation
 
@@ -339,7 +345,6 @@ Set configurations in `<repo>/kubernetes/chart/values.yaml` or `--set` command l
 
 ```
 cd <repo>/kubernetes/chart
-helm dependency update
 ```
 
 We call our release `icai`.
@@ -356,24 +361,46 @@ kubectl scale deployment.apps/icai-rq-deployment --replicas=<n>
 #### access by REST API (recommended)
 
 ##### submit job
+`submit.yaml`
+```yaml
+root: /data
+target: /tempZone/home/rods/data
+interval: <interval>
+append_json: <yaml>
+event_handler: <event_handler>
+file_queue: <file_queue>
+path_queue: <path_queue>
+restart_queue: <restart_queue>
+event_handler_data: |
+    from irods_capability_automated_ingest.core import Core
+    from irods_capability_automated_ingest.utils import Operation
+
+    class event_handler(Core):
+
+        @staticmethod
+        def target_path(session, target, path, **options):
+            return path
+
+```
+
 `fish`
 ```
-curl -XPUT "http://"(minikube ip)"/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>" -H "Content-Type: application/x-python" --data-binary "@event_handler.py"
+curl -XPUT "http://"(minikube ip)"/job/<job name> -H "Content-Type: application/x-yaml" --data-binary=`submit.yaml`
 ```
 
 `bash`
 ```
-curl -XPUT "http://$(minikube ip)/job/<job name>?source=/data&target=/tempZone/home/rods/data&interval=<interval>" -H "Content-Type: application/x-python" --data-binary "@event_handler.py"
+curl -XPUT "http://$(minikube ip)/job/<job name>" -H "Content-Type: application/x-yaml" --data-binary "@submit.yaml"
 ```
 
 `fish`
 ```
-curl -XPUT "http://"(minikube ip)"/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>" -H "Content-Type: application/x-python" --data-binary "@event_handler.py"
+curl -XPUT "http://"(minikube ip)"/job" -H "Content-Type: application/x-yaml" --data-binary "@submit.yaml"
 ```
 
 `bash`
 ```
-curl -XPUT "http://$(minikube ip)/job?source=/data&target=/tempZone/home/rods/data&interval=<interval>" -H "Content-Type: application/x-python" --data-binary "@event_handler.py"
+curl -XPUT "http://$(minikube ip)/job" -H "Content-Type: application/x-yaml" --data-binary "@submit.yaml"
 ```
 
 ##### list job

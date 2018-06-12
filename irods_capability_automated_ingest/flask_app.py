@@ -7,6 +7,7 @@ import click
 
 import os
 import traceback
+import yaml
 
 app = Flask(__name__)
 
@@ -14,24 +15,25 @@ api = Api(app)
 
 parser_start = reqparse.RequestParser()
 
-parser_start.add_argument('source', required=True, type=str, help='source directory')
-parser_start.add_argument('target', required=True, type=str, help='target collection')
-parser_start.add_argument('interval', type=int, default=None, help='restart interval (in seconds)')
-parser_start.add_argument('file_queue', type=str, default="file", help='file queue')
-parser_start.add_argument('path_queue', type=str, default="path", help='path queue')
-parser_start.add_argument('restart_queue', type=str, default="restart", help='restart queue')
-parser_start.add_argument('event_handler', type=str, default=None, help='event handler')
 
 def put(job_name, data):
-    event_handler_path = app.config.get("event_handler_path")
-            
-    args = parser_start.parse_args(strict=True)
+    data2 = yaml.load(data.decode("utf-8"))
+
+    data2["event_handler_path"] = app.config.get("event_handler_path")
+    data2.setdefault('max_retries', 0)
+    data2.setdefault('file_queue', "file")
+    data2.setdefault('path_queue', "path")
+    data2.setdefault('restart_queue', "restart")
+    data2["job_name"] = job_name
+    data2["config"] = get_config()
+
     try:
-        start_synchronization(args["restart_queue"], args["path_queue"], args["file_queue"], args["target"], args["source"], args["interval"], job_name, args["event_handler"], event_handler_path, data.decode("utf-8"), get_config())
+        start_synchronization(data2)
         return job_name, 201
     except Exception as e:
         traceback.print_exc()
         return str(e), 400
+
 
 class Jobs(Resource):
     def get(self):
@@ -41,6 +43,7 @@ class Jobs(Resource):
     def put(self):
         job_name = str(uuid1())
         return put(job_name, request.data)
+
 
 class Job(Resource):
     def put(self, job_name):

@@ -33,7 +33,7 @@ def child_of(session, child_resc_name, resc_name):
             child_resc_name = parent_resc_name
         return False
 
-
+'''
 def create_dirs(hdlr_mod, logger, session, target, path, **options):
     if target.startswith("/"):
         if not session.collections.exists(target):
@@ -48,6 +48,7 @@ def create_dirs(hdlr_mod, logger, session, target, path, **options):
             call(hdlr_mod, "on_coll_create", ccfunc, logger, hdlr_mod, session, target, path, **options)
     else:
         raise Exception("create_dirs: relative path")
+'''
 
 
 def create_dir(hdlr_mod, logger, session, target, path, **options):
@@ -269,9 +270,6 @@ def sync_data_from_file(target, path, hdlr, logger, content, **options):
                         raise Exception("there is at least one replica under resource but all replicas have wrong paths")
                 else:
                     createRepl = True
-
-            if not exists:
-                create_dirs(hdlr_mod, logger, session, dirname(target), dirname(path), **options)
 
             put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
             sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]

@@ -15,10 +15,10 @@ def timestamper(logger, log_method, event_dict):
     return event_dict
 
 def create_sync_logger(logging_config):
-    log_file = logging_config["log"].get("filename")
-    when = logging_config["log"].get("when")
-    interval = logging_config["log"].get("interval")
-    level = logging_config["log"].get("level")
+    log_file = logging_config.get("filename")
+    when = logging_config.get("when")
+    interval = logging_config.get("interval")
+    level = logging_config.get("level")
 
     logger = logging.getLogger(irods_sync_logger)
     if level is not None:
@@ -45,6 +45,17 @@ def create_sync_logger(logging_config):
     )
 
 
-
 def get_sync_logger():
-    return logging.getLogger(irods_sync_logger)
+    logger = logging.getLogger(irods_sync_logger)
+
+    return wrap_logger(
+        logger,
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            timestamper,
+            structlog.processors.JSONRenderer()
+        ]
+    )
+
