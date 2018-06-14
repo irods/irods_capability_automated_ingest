@@ -44,6 +44,7 @@ def sync_path():
     config = job.meta["config"]
     logging_config = config["log"]
     depends_on = job.meta.get("depends_on")
+    timeout = job.meta["timeout"]
 
     logger = sync_logging.create_sync_logger(logging_config)
 
@@ -55,7 +56,7 @@ def sync_path():
             meta = job.meta.copy()
             del meta["depends_on"]
             meta["task"] = "sync_file"
-            q.enqueue(sync_file, meta=meta, depends_on=depends_on)
+            q.enqueue(sync_file, meta=meta, depends_on=depends_on, timeout=timeout)
             logger.info("succeeded", task=task, path = path)
         else:
             logger.info("walk dir", path = path)
@@ -63,12 +64,12 @@ def sync_path():
             meta = job.meta.copy()
             del meta["depends_on"]
             meta["task"] = "sync_dir"
-            job_id = q.enqueue(sync_dir, meta=meta, depends_on=depends_on).id
+            job_id = q.enqueue(sync_dir, meta=meta, depends_on=depends_on, timeout=timeout).id
             for n in listdir(path):
                 meta = job.meta.copy()
                 meta["depends_on"] = job_id
                 meta["path"] = join(path, n)
-                q.enqueue(sync_path, meta=meta)
+                q.enqueue(sync_path, meta=meta, timeout=timeout)
             logger.info("succeeded_dir", task=task, path = path)
     except OSError as err:
         logger.warning("failed_OSError", err=err, task=task, path = path)
@@ -85,6 +86,7 @@ def sync_file():
     target = job.meta["target"]
     config = job.meta["config"]
     logging_config = config["log"]
+    all = job.meta["all"]
 
     logger = sync_logging.create_sync_logger(logging_config)
     try:
@@ -92,7 +94,10 @@ def sync_file():
         r = get_redis(config)
         with redis_lock.Lock(r, path):
             t = datetime.now().timestamp()
-            sync_time = get_with_key(r, sync_time_key, path, float)
+            if not all:
+                sync_time = get_with_key(r, sync_time_key, path, float)
+            else:
+                sync_time = None
             mtime = getmtime(path)
             ctime = getctime(path)
             if sync_time == None or mtime >= sync_time:
@@ -123,6 +128,7 @@ def sync_dir():
     target = job.meta["target"]
     config = job.meta["config"]
     logging_config = config["log"]
+    all = job.meta["all"]
 
     logger = sync_logging.create_sync_logger(logging_config)
     try:
@@ -130,12 +136,19 @@ def sync_dir():
         r = get_redis(config)
         with redis_lock.Lock(r, path):
             t = datetime.now().timestamp()
-            sync_time = get_with_key(r, sync_time_key, path, float)
+            if not all:
+                sync_time = get_with_key(r, sync_time_key, path, float)
+            else:
+                sync_time = None
             mtime = getmtime(path)
             ctime = getctime(path)
             if sync_time == None or mtime >= sync_time:
                 logger.info("synchronizing dir", path = path, t0 = sync_time, t = t, mtime = mtime)
-                sync_irods.sync_data_from_dir(join(target, relpath(path, start=root)), path, hdlr, logger, True)
+                if path == root:
+                    target2 = target
+                else:
+                    target2 = join(target, relpath(path, start=root))
+                sync_irods.sync_data_from_dir(target2, path, hdlr, logger, True)
                 set_with_key(r, sync_time_key, path, str(t))
                 logger.info("succeeded", task=task, path = path)
             elif ctime >= sync_time:
@@ -173,6 +186,7 @@ def restart():
     file_q_name = job.meta["file_queue"]
     config = job.meta["config"]
     logging_config = config["log"]
+    timeout = job.meta["timeout"]
 
     logger = sync_logging.create_sync_logger(logging_config)
     try:
@@ -194,7 +208,7 @@ def restart():
             meta = job.meta.copy()
             meta["depends_on"] = None
             meta["task"] = "sync_path"
-            path_q.enqueue(sync_path, meta=meta)
+            path_q.enqueue(sync_path, meta=meta, timeout=timeout)
         else:
             logger.info("queue not empty or worker busy")
 
@@ -215,6 +229,7 @@ def start_synchronization(data):
     event_handler_path = data.get("event_handler_path")
     interval = data["interval"]
     restart_queue = data["restart_queue"]
+    timeout = data["timeout"]
 
     logger = sync_logging.create_sync_logger(logging_config)
 
@@ -245,12 +260,13 @@ def start_synchronization(data):
             interval=interval,
             queue_name=restart_queue,
             id=job_name,
-            meta=data_copy
+            meta=data_copy,
+            timeout=timeout
         )
         r.rpush("periodic", job_name.encode("utf-8"))
     else:
         restart_q = Queue(restart_queue, connection=r)
-        restart_q.enqueue(restart, job_id=job_name, meta=data_copy)
+        restart_q.enqueue(restart, job_id=job_name, meta=data_copy, timeout=timeout)
 
 
 def stop_synchronization(job_name, config):

@@ -40,6 +40,8 @@ def handle_start(args):
         "interval": args.interval,
         "job_name": args.job_name,
         "append_json": args.append_json,
+        "timeout": args.timeout,
+        "all": args.all,
         "event_handler": args.event_handler,
         "config": get_config(args)
     })
@@ -71,6 +73,8 @@ def main():
     parser_start.add_argument('--event_handler', action="store", metavar='EVENT HANDLER', type=str, default=None, help='event handler')
     parser_start.add_argument('--job_name', action="store", metavar='JOB NAME', type=str, default=uuid, help='job name')
     parser_start.add_argument('--append_json', action="store", metavar='APPEND JSON', type=json.loads, default=None, help='append json')
+    parser_start.add_argument('--timeout', action="store", metavar='TIMEOUT', type=int, default=3600, help='timeout')
+    parser_start.add_argument('--all', action="store_true", default=False, help='all')
     add_arguments(parser_start)
 
 

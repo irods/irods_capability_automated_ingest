@@ -59,7 +59,7 @@ def retry_handler(job, exc_type, exc_value, traceback):
             # Requeue job and stop it from being moved into the failed queue
             logger.warn('retry', task=meta["task"], path=meta["path"], job_id=job.id, failures=meta["failures"], max_retries=max_retries)
             queue = Queue(job.origin, connection=r)
-            queue.enqueue(job.func, *job.args, meta=meta, depends_on=job.dependency)
+            queue.enqueue(job.func, *job.args, meta=meta, depends_on=job.dependency, timeout=meta["timeout"])
             return False
     except Exception as e:
         logger.error('retry', task=meta["task"], path=meta["path"], job_id=job.id, failures=meta["failures"], max_retries=max_retries, err=str(e))
