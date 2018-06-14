@@ -90,7 +90,7 @@ def clear_redis():
 
 
 def start_workers(n, args=[]):
-    workers = map(lambda x: Popen(["rq", "worker", "--burst", "restart", "path", "file"] + args), range(n))
+    workers = map(lambda x: Popen(["python", "-m", "irods_capability_automated_ingest.irods_worker", "--burst"] + args), range(n))
 
     return workers
 
@@ -298,7 +298,7 @@ class Test_irods_sync(TestCase):
     def do_retry(self, eh, resc_name = ["demoResc"]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
         proc.wait()
-        workers = start_workers(1, ["--exception-handler", "rq.handlers.move_to_failed_queue", "--exception-handler", "irods_capability_automated_ingest.sync_utils.retry_handler"])
+        workers = start_workers(1)
         wait(workers)
 
         r = StrictRedis()
@@ -308,7 +308,7 @@ class Test_irods_sync(TestCase):
     def do_no_retry(self, eh, resc_name = ["demoResc"]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
         proc.wait()
-        workers = start_workers(1, ["--exception-handler", "rq.handlers.move_to_failed_queue", "--exception-handler", "irods_capability_automated_ingest.sync_utils.retry_handler"])
+        workers = start_workers(1)
         wait(workers)
 
         r = StrictRedis()

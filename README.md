@@ -110,7 +110,7 @@ rq worker restart path file
 
 or
 ```
-for i in {1..<n>}; do rq worker restart path file & done
+for i in {1..<n>}; do python -m irods_capability_automated_ingest.worker & done
 ```
 
 
