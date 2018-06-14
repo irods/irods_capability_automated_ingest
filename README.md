@@ -143,13 +143,15 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 
 #### start
 ```
-python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ]
+python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --timeout <timeout> ]
+
 ```
 
 If `-i` is not present, then only sync once
 
 The `--append_json` is stored in `job.meta["append_json"]`
 
+Timeout seconds.
 
 #### list restarting jobs
 ```
@@ -366,10 +368,8 @@ root: /data
 target: /tempZone/home/rods/data
 interval: <interval>
 append_json: <yaml>
+timeout: <timeout>
 event_handler: <event_handler>
-file_queue: <file_queue>
-path_queue: <path_queue>
-restart_queue: <restart_queue>
 event_handler_data: |
     from irods_capability_automated_ingest.core import Core
     from irods_capability_automated_ingest.utils import Operation
