@@ -15,7 +15,8 @@ from irods.session import iRODSSession
 from irods.models import Collection, DataObject
 from tempfile import NamedTemporaryFile
 from datetime import datetime
-from irods_capability_automated_ingest.sync_utils import size
+from .sync_utils import size, app
+import time
 
 IRODS_MAJOR = 4
 IRODS_MINOR = 2
@@ -90,8 +91,8 @@ def clear_redis():
 
 
 def start_workers(n, args=[]):
-    workers = map(lambda x: Popen(["python", "-m", "irods_capability_automated_ingest.irods_worker", "--burst"] + args), range(n))
-
+    os.environ["CELERY_BROKER_URI"] = "redis://localhost/0"
+    workers = Popen(["celery", "-A", "irods_capability_automated_ingest.sync_task", "-c", n] + args)
     return workers
 
 
@@ -100,9 +101,14 @@ def start_scheduler(n):
     return scheduler
 
 
-def wait(workers):
-    for worker in workers:
-        worker.wait()
+def wait_for(workers):
+    r = StrictRedis()
+    while True:
+        if not done(r, "test_irods_sync"):
+            time.sleep(1)
+
+    workers.send_signal(SIGINT)
+    workers.wait()
 
 
 def interrupt(scheduler):
@@ -237,13 +243,13 @@ class Test_irods_sync(TestCase):
         self.do_register2()
 
     def do_register(self, eh, resc_name = ["demoResc"]):
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
         proc.wait()
         self.do_register2(resc_name = resc_name)
 
     def do_register2(self, resc_name = ["demoResc"]):
         workers = start_workers(1)
-        wait(workers)
+        wait_for(workers)
 
         with iRODSSession(irods_env_file=env_file) as session:
             self.assertTrue(session.collections.exists(A_COLL))
@@ -268,10 +274,10 @@ class Test_irods_sync(TestCase):
 
     def do_register_par(self, eh, resc_name = ["demoResc"]):
         create_files2(10)
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
         proc.wait()
         workers = start_workers(10)
-        wait(workers)
+        wait_for(workers)
 
         with iRODSSession(irods_env_file=env_file) as session:
             self.assertTrue(session.collections.exists(A_COLL))
@@ -296,31 +302,31 @@ class Test_irods_sync(TestCase):
                     self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
     def do_retry(self, eh, resc_name = ["demoResc"]):
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
         proc.wait()
         workers = start_workers(1)
-        wait(workers)
+        wait_for(workers)
 
         r = StrictRedis()
         rq = Queue(connection=r, name="failed")
         self.assertEqual(rq.count, 0)
 
     def do_no_retry(self, eh, resc_name = ["demoResc"]):
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
         proc.wait()
         workers = start_workers(1)
-        wait(workers)
+        wait_for(workers)
 
         r = StrictRedis()
         rq = Queue(connection=r, name="failed")
         self.assertEqual(rq.count, NFILES)
 
     def do_put(self, eh, resc_names = ["demoResc"], resc_roots = ["/var/lib/irods/Vault"]):
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
         proc.wait()
 
         workers = start_workers(1)
-        wait(workers)
+        wait_for(workers)
 
         with iRODSSession(irods_env_file=env_file) as session:
             self.assertTrue(session.collections.exists(A_COLL))
@@ -342,11 +348,11 @@ class Test_irods_sync(TestCase):
         clear_redis()
         recreate_files()
 
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
         proc.wait()
 
         workers = start_workers(1)
-        wait(workers)
+        wait_for(workers)
 
     def do_register_as_replica(self, eh, resc_names = ["demoResc"]):
         self.do_register_as_replica_no_assertions(eh)
@@ -404,11 +410,11 @@ class Test_irods_sync(TestCase):
     def do_no_sync(self, eh):
         recreate_files()
 
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
         proc.wait()
 
         workers = start_workers(1)
-        wait(workers)
+        wait_for(workers)
 
         with iRODSSession(irods_env_file=env_file) as session:
             for i in listdir(A):
@@ -422,20 +428,20 @@ class Test_irods_sync(TestCase):
     def do_no_op(self, eh):
         recreate_files()
 
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
         proc.wait()
 
         workers = start_workers(1)
-        wait(workers)
+        wait_for(workers)
 
     def do_append_json(self, eh):
         recreate_files()
 
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--append_json", "\"append_json\""])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--append_json", "\"append_json\"", "--job_name", "test_irods_sync"])
         proc.wait()
 
         workers = start_workers(1)
-        wait(workers)
+        wait_for(workers)
 
         r = StrictRedis()
         rq = Queue(connection=r, name="failed")

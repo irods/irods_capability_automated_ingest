@@ -36,8 +36,7 @@ setup(
         'python-irodsclient>=0.8.0',
         'python-redis-lock>=3.2.0',
         'redis>=2.10.6',
-        'rq>=0.10.0',
-        'rq-scheduler>=0.8.2',
+        'celery[redis]',
         'structlog>=18.1.0'
     ],
     setup_requires=['setuptools>=38.6.0'],

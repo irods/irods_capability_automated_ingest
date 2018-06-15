@@ -6,93 +6,120 @@ from os.path import isfile, join, getmtime, realpath, relpath, getctime
 from datetime import datetime
 from rq_scheduler import Scheduler
 import redis_lock
-from irods_capability_automated_ingest import sync_logging, sync_irods
-from irods_capability_automated_ingest.sync_utils import get_redis
+from . import sync_logging, sync_irods
+from .sync_utils import get_redis, app
 import time
 from uuid import uuid1
 
-def sync_time_key(path):
-    return "sync_time:/"+path
 
-def type_key(path):
-    return "type:/"+path
+class IrodsTask(app.Task):
 
-def cleanup_key(job_id):
-    return "cleanup:/"+job_id
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        logger = sync_logging.get_sync_logger()
+        meta = args[0]
+        logger.error('failed_task', task=meta["task"], path=meta["path"], task_id=task_id, exc=exc, einfo=einfo)
 
-def get_with_key(r, key, path, typefunc):
-    sync_time_bs = r.get(key(path))
-    if sync_time_bs == None:
-        sync_time = None
-    else:
-        sync_time = typefunc(sync_time_bs)
-    return sync_time
+    def on_retry(self, exc, task_id, args, kwargs, einfo):
+        logger = sync_logging.get_sync_logger()
+        meta = args[0]
+        logger.warn('retry_task', task=meta["task"], path=meta["path"], task_id=task_id, exc=exc, einfo=einfo)
 
-def set_with_key(r, key, path, sync_time):
-    r.set(key(path), sync_time)
+    def on_success(self, retval, task_id, args, kwargs):
+        logger = sync_logging.get_sync_logger()
+        meta = args[0]
+        logger.warn('succeeded_task', task=meta["task"], path=meta["path"], task_id=task_id, retval=retval)
 
-def reset_with_key(r, key, path):
-    r.delete(key(path))
+    def after_return(self, status, retval, task_id, args, kwargs, einfo):
+        meta = args[0]
+        config = meta["config"]
+        job_name = meta["job_name"]
+        r = get_redis(config)
+        logger.warn('decr_tasks', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
+        decr_with_key(r, tasks_key, job_name)
 
-def sync_path():
 
-    job = get_current_job()
-    task = job.meta["task"]
-    path = job.meta["path"]
-    path_q_name = job.meta["path_queue"]
-    file_q_name = job.meta["file_queue"]
-    config = job.meta["config"]
+def async(r, logger, task, meta, queue):
+    job_name = meta["job_name"]
+    logger.warn('incr', task=meta["task"], path=meta["path"], job_name=job_name)
+    incr_with_key(r, tasks_key, job_name)
+    task.s(meta).apply_async(queue=queue)
+
+
+def done(r, job_name):
+    ntasks = get_with_key(r, tasks_key, job_name, int)
+    return ntasks is None or ntasks == 0
+
+
+def cleanup(r, job_name):
+    hdlr = get_with_key(r, cleanup_key, job_name, lambda x: x)
+    if hdlr is not None:
+        os.remove(hdlr.decode("utf-8"))
+        reset_with_key(r, cleanup_key, job_name)
+
+    if periodic(r, job_name):
+        r.lrem("periodic", 1, job_name)
+
+
+def periodic(r, job_name):
+    periodic = r.lrange("periodic", 0, -1)
+    return job_name not in periodic
+
+
+@app.task(bind=True, base=IrodsTask)
+def sync_path(self, meta):
+
+    task = meta["task"]
+    path = meta["path"]
+    path_q_name = meta["path_queue"]
+    file_q_name = meta["file_queue"]
+    config = meta["config"]
     logging_config = config["log"]
-    depends_on = job.meta.get("depends_on")
-    timeout = job.meta["timeout"]
+    timeout = get_timeout(meta)
+    max_retries = get_max_retries(meta)
 
     logger = sync_logging.create_sync_logger(logging_config)
 
     try:
         r = get_redis(config)
         if isfile(path):
-            logger.info("enqueue file path", path = path)
-            q = Queue(file_q_name, connection=r)
-            meta = job.meta.copy()
-            del meta["depends_on"]
+            logger.info("enqueue file path", path=path)
+            meta = meta.copy()
             meta["task"] = "sync_file"
-            q.enqueue(sync_file, meta=meta, depends_on=depends_on, timeout=timeout)
-            logger.info("succeeded", task=task, path = path)
+            async(r, logger, sync_file, meta, file_q_name)
+            logger.info("succeeded", task=task, path=path)
         else:
-            logger.info("walk dir", path = path)
-            q = Queue(path_q_name, connection=r)
+            logger.info("walk dir", path=path)
             meta = job.meta.copy()
-            del meta["depends_on"]
             meta["task"] = "sync_dir"
-            job_id = q.enqueue(sync_dir, meta=meta, depends_on=depends_on, timeout=timeout).id
+            async(r, logger, sync_dir, meta, file_q_name)
             for n in listdir(path):
                 meta = job.meta.copy()
-                meta["depends_on"] = job_id
                 meta["path"] = join(path, n)
-                q.enqueue(sync_path, meta=meta, timeout=timeout)
-            logger.info("succeeded_dir", task=task, path = path)
+                async(r, logger, sync_path, meta, path_q_name)
+            logger.info("succeeded_dir", task=task, path=path)
     except OSError as err:
-        logger.warning("failed_OSError", err=err, task=task, path = path)
+        logger.warning("failed_OSError", err=err, task=task, path=path)
     except Exception as err:
-        logger.error("failed", err=err, task=task, path = path)
-        raise
+        logger.error("failed", err=err, task=task, path=path)
 
-def sync_file():
-    job = get_current_job()
-    hdlr = job.meta["event_handler"]
-    task = job.meta["task"]
-    path = job.meta["path"]
-    root = job.meta["root"]
-    target = job.meta["target"]
-    config = job.meta["config"]
+        raise self.retry(max_retries=max_retries, exc=err)
+
+
+@app.task(bind=True, base=IrodsTask)
+def sync_file(self, meta):
+    task = meta["task"]
+    path = meta["path"]
+    root = meta["root"]
+    target = meta["target"]
+    config = meta["config"]
     logging_config = config["log"]
-    all = job.meta["all"]
+    max_retries = get_max_retries(meta)
 
     logger = sync_logging.create_sync_logger(logging_config)
     try:
         logger.info("synchronizing file. path = " + path)
         r = get_redis(config)
-        with redis_lock.Lock(r, path):
+        with redis_lock.Lock(r, "sync_file:"+path):
             t = datetime.now().timestamp()
             if not all:
                 sync_time = get_with_key(r, sync_time_key, path, float)
@@ -100,35 +127,34 @@ def sync_file():
                 sync_time = None
             mtime = getmtime(path)
             ctime = getctime(path)
-            if sync_time == None or mtime >= sync_time:
-                logger.info("synchronizing file", path = path, t0 = sync_time, t = t, mtime = mtime)
+            if sync_time is None or mtime >= sync_time:
+                logger.info("synchronizing file", path=path, t0=sync_time, t=t, mtime=mtime)
                 sync_irods.sync_data_from_file(join(target, relpath(path, start=root)), path, hdlr, logger, True)
                 set_with_key(r, sync_time_key, path, str(t))
-                logger.info("succeeded", task=task, path = path)
+                logger.info("succeeded", task=task, path=path)
             elif ctime >= sync_time:
-                logger.info("synchronizing file", path = path, t0 = sync_time, t = t, ctime = ctime)
+                logger.info("synchronizing file", path=path, t0=sync_time, t=t, ctime=ctime)
                 sync_irods.sync_metadata_from_file(join(target, relpath(path, start=root)), path, hdlr, logger)
                 set_with_key(r, sync_time_key, path, str(t))
-                logger.info("succeeded_metadata_only", task=task, path = path)
+                logger.info("succeeded_metadata_only", task=task, path=path)
             else:
-                logger.info("succeeded_file_has_not_changed", task=task, path = path)
+                logger.info("succeeded_file_has_not_changed", task=task, path=path)
     except OSError as err:
-        logger.warning("failed_OSError", err=err, task=task, path = path)
+        logger.warning("failed_OSError", err=err, task=task, path=path)
     except Exception as err:
-        logger.error("failed", err=err, task=task, path = path)
-        raise
+        logger.error("failed", err=err, task=task, path=path)
+        raise self.retry(max_retries=max_retries, exc=err)
 
 
-def sync_dir():
-    job = get_current_job()
-    hdlr = job.meta["event_handler"]
-    task = job.meta["task"]
-    path = job.meta["path"]
-    root = job.meta["root"]
-    target = job.meta["target"]
-    config = job.meta["config"]
+@app.task(bind=True, base=IrodsTask)
+def sync_dir(self, meta):
+    task = meta["task"]
+    path = meta["path"]
+    root = meta["root"]
+    target = meta["target"]
+    config = meta["config"]
     logging_config = config["log"]
-    all = job.meta["all"]
+    max_retries = get_max_retries(meta)
 
     logger = sync_logging.create_sync_logger(logging_config)
     try:
@@ -142,73 +168,51 @@ def sync_dir():
                 sync_time = None
             mtime = getmtime(path)
             ctime = getctime(path)
-            if sync_time == None or mtime >= sync_time:
-                logger.info("synchronizing dir", path = path, t0 = sync_time, t = t, mtime = mtime)
+            if sync_time is None or mtime >= sync_time:
+                logger.info("synchronizing dir", path=path, t0=sync_time, t=t, mtime=mtime)
                 if path == root:
                     target2 = target
                 else:
                     target2 = join(target, relpath(path, start=root))
                 sync_irods.sync_data_from_dir(target2, path, hdlr, logger, True)
                 set_with_key(r, sync_time_key, path, str(t))
-                logger.info("succeeded", task=task, path = path)
+                logger.info("succeeded", task=task, path=path)
             elif ctime >= sync_time:
-                logger.info("synchronizing dir", path = path, t0 = sync_time, t = t, ctime = ctime)
+                logger.info("synchronizing dir", path=path, t0=sync_time, t=t, ctime=ctime)
                 sync_irods.sync_metadata_from_dir(join(target, relpath(path, start=root)), path, hdlr, logger)
                 set_with_key(r, sync_time_key, path, str(t))
-                logger.info("succeeded_metadata_only", task=task, path = path)
+                logger.info("succeeded_metadata_only", task=task, path=path)
             else:
-                logger.info("succeeded_file_has_not_changed", task=task, path = path)
+                logger.info("succeeded_file_has_not_changed", task=task, path=path)
     except OSError as err:
-        logger.warning("failed_OSError", err=err, task=task, path = path)
+        logger.warning("failed_OSError", err=err, task=task, path=path)
     except Exception as err:
-        logger.error("failed", err=err, task=task, path = path)
-        raise
+        logger.error("failed", err=err, task=task, path=path)
+        raise self.retry(max_retries=max_retries, exc=err)
 
 
-def cleanup(r, job_name):
-    hdlr = get_with_key(r, cleanup_key, job_name, lambda x: x)
-    if hdlr is not None:
-        os.remove(hdlr.decode("utf-8"))
-        reset_with_key(r, cleanup_key, job_name)
-
-    if periodic(r, job_name):
-        r.lrem("periodic", 1, job_name)
-        
-
-def periodic(r, job_name):
-    periodic = r.lrange("periodic", 0, -1)
-    return job_name not in periodic
-        
-def restart():
-    job = get_current_job()
-    job_name = job.meta["job_name"]
-    path_q_name = job.meta["path_queue"]
-    file_q_name = job.meta["file_queue"]
-    config = job.meta["config"]
+@app.task
+def restart(meta):
+    job_name = meta["job_name"]
+    path_q_name = meta["path_queue"]
+    file_q_name = meta["file_queue"]
+    config = meta["config"]
     logging_config = config["log"]
-    timeout = job.meta["timeout"]
+    timeout = meta["timeout"]
 
     logger = sync_logging.create_sync_logger(logging_config)
     try:
         logger.info("***************** restart *****************")
         r = get_redis(config)
-        path_q = Queue(path_q_name, connection=r)
-        file_q = Queue(file_q_name, connection=r)
         path_q_workers = Worker.all(queue=path_q)
         file_q_workers = Worker.all(queue=file_q)
 
-        job_id = get_current_job().id
-        def all_not_busy(ws):
-            return all(w.get_state() != WorkerStatus.BUSY or w.get_current_job_id() == job_id for w in ws)
-
-        # this doesn't guarantee that there is only one tree walk, but it prevents tree walk when the file queue is not empty
-        if periodic(r, job_name) and path_q.is_empty() and file_q.is_empty() and all_not_busy(path_q_workers) and all_not_busy(file_q_workers):
+        if periodic(r, job_name) and done(r, job_name):
             logger.info("queue empty and worker not busy")
 
             meta = job.meta.copy()
-            meta["depends_on"] = None
             meta["task"] = "sync_path"
-            path_q.enqueue(sync_path, meta=meta, timeout=timeout)
+            async(r, logger, sync_path, meta, path_q_name)
         else:
             logger.info("queue not empty or worker busy")
 
@@ -283,7 +287,8 @@ def stop_synchronization(job_name, config):
         time.sleep(.1)
 
     cleanup(r, job_name)
-    
+
+
 def list_synchronization(config):
     logger = sync_logging.create_sync_logger(config["log"])
     r = get_redis(config)

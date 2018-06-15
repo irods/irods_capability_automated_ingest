@@ -1,4 +1,4 @@
-from irods_capability_automated_ingest.sync_task import start_synchronization, stop_synchronization, list_synchronization
+from .sync_task import start_synchronization, stop_synchronization, list_synchronization
 import argparse
 from uuid import uuid1
 import json
