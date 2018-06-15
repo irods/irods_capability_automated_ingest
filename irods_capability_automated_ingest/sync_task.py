@@ -1,14 +1,10 @@
-from rq import Queue, Worker, get_current_job
-from rq.worker import WorkerStatus
 from os import listdir
 import os
 from os.path import isfile, join, getmtime, realpath, relpath, getctime
 from datetime import datetime
-from rq_scheduler import Scheduler
 import redis_lock
 from . import sync_logging, sync_irods
-from .sync_utils import get_redis, app
-import time
+from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout
 from uuid import uuid1
 
 
@@ -30,17 +26,18 @@ class IrodsTask(app.Task):
         logger.warn('succeeded_task', task=meta["task"], path=meta["path"], task_id=task_id, retval=retval)
 
     def after_return(self, status, retval, task_id, args, kwargs, einfo):
+        logger = sync_logging.get_sync_logger()
         meta = args[0]
         config = meta["config"]
         job_name = meta["job_name"]
         r = get_redis(config)
-        logger.warn('decr_tasks', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
+        logger.warn('decr_job_name', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
         decr_with_key(r, tasks_key, job_name)
 
 
 def async(r, logger, task, meta, queue):
     job_name = meta["job_name"]
-    logger.warn('incr', task=meta["task"], path=meta["path"], job_name=job_name)
+    logger.warn('incr_job_name', task=meta["task"], path=meta["path"], job_name=job_name)
     incr_with_key(r, tasks_key, job_name)
     task.s(meta).apply_async(queue=queue)
 
@@ -74,10 +71,10 @@ def sync_path(self, meta):
     file_q_name = meta["file_queue"]
     config = meta["config"]
     logging_config = config["log"]
-    timeout = get_timeout(meta)
-    max_retries = get_max_retries(meta)
-
     logger = sync_logging.create_sync_logger(logging_config)
+    timeout = get_timeout(logger, meta)
+
+    max_retries = get_max_retries(logger, meta)
 
     try:
         r = get_redis(config)
@@ -89,11 +86,11 @@ def sync_path(self, meta):
             logger.info("succeeded", task=task, path=path)
         else:
             logger.info("walk dir", path=path)
-            meta = job.meta.copy()
+            meta = meta.copy()
             meta["task"] = "sync_dir"
             async(r, logger, sync_dir, meta, file_q_name)
             for n in listdir(path):
-                meta = job.meta.copy()
+                meta = meta.copy()
                 meta["path"] = join(path, n)
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
@@ -107,15 +104,17 @@ def sync_path(self, meta):
 
 @app.task(bind=True, base=IrodsTask)
 def sync_file(self, meta):
+    hdlr = meta["event_handler"]
     task = meta["task"]
     path = meta["path"]
     root = meta["root"]
     target = meta["target"]
     config = meta["config"]
     logging_config = config["log"]
-    max_retries = get_max_retries(meta)
-
     logger = sync_logging.create_sync_logger(logging_config)
+
+    max_retries = get_max_retries(logger, meta)
+
     try:
         logger.info("synchronizing file. path = " + path)
         r = get_redis(config)
@@ -148,15 +147,17 @@ def sync_file(self, meta):
 
 @app.task(bind=True, base=IrodsTask)
 def sync_dir(self, meta):
+    hdlr = meta["event_handler"]
     task = meta["task"]
     path = meta["path"]
     root = meta["root"]
     target = meta["target"]
     config = meta["config"]
     logging_config = config["log"]
-    max_retries = get_max_retries(meta)
-
     logger = sync_logging.create_sync_logger(logging_config)
+
+    max_retries = get_max_retries(logger, meta)
+
     try:
         logger.info("synchronizing dir. path = " + path)
         r = get_redis(config)
@@ -195,26 +196,30 @@ def sync_dir(self, meta):
 def restart(meta):
     job_name = meta["job_name"]
     path_q_name = meta["path_queue"]
-    file_q_name = meta["file_queue"]
+    restart_queue = meta["restart_queue"]
+    interval = meta["interval"]
     config = meta["config"]
     logging_config = config["log"]
-    timeout = meta["timeout"]
-
     logger = sync_logging.create_sync_logger(logging_config)
+
+    timeout = get_timeout(logger, meta)
+
     try:
         logger.info("***************** restart *****************")
         r = get_redis(config)
-        path_q_workers = Worker.all(queue=path_q)
-        file_q_workers = Worker.all(queue=file_q)
 
-        if periodic(r, job_name) and done(r, job_name):
-            logger.info("queue empty and worker not busy")
+        if periodic(r, job_name):
+            if done(r, job_name):
+                logger.info("queue empty and worker not busy")
 
-            meta = job.meta.copy()
-            meta["task"] = "sync_path"
-            async(r, logger, sync_path, meta, path_q_name)
+                meta = meta.copy()
+                meta["task"] = "sync_path"
+                async(r, logger, sync_path, meta, path_q_name)
+            else:
+                logger.info("queue not empty or worker busy")
+            restart.s(meta).apply_async(task_id=job_name, queue=restart_queue, countdown=interval)
         else:
-            logger.info("queue not empty or worker busy")
+            async(r, logger, sync_path, meta, path_q_name)
 
     except OSError as err:
         logger.warning("Warning: " + str(err))
@@ -243,7 +248,6 @@ def start_synchronization(data):
     data_copy["path"] = root_abs
 
     r = get_redis(config)
-    scheduler = Scheduler(connection=r)
 
     if job_name.encode("utf-8") in r.lrange("periodic", 0, -1):
         logger.error("job exists")
@@ -257,34 +261,21 @@ def start_synchronization(data):
         set_with_key(r, cleanup_key, job_name, hdlr2.encode("utf-8"))
 
     if interval is not None:
-        scheduler.schedule(
-            scheduled_time=datetime.utcnow(),
-            func=restart,
-            args=[],
-            interval=interval,
-            queue_name=restart_queue,
-            id=job_name,
-            meta=data_copy,
-            timeout=timeout
-        )
         r.rpush("periodic", job_name.encode("utf-8"))
-    else:
-        restart_q = Queue(restart_queue, connection=r)
-        restart_q.enqueue(restart, job_id=job_name, meta=data_copy, timeout=timeout)
+
+    restart.s(data_copy).apply_async(queue=restart_queue, task_id=job_name)
 
 
 def stop_synchronization(job_name, config):
     logger = sync_logging.create_sync_logger(config["log"])
 
     r = get_redis(config)
-    scheduler = Scheduler(connection=r)
 
     if job_name.encode("utf-8") not in r.lrange("periodic", 0, -1):
         logger.error("job not exists")
         raise Exception("job not exists")
 
-    while scheduler.cancel(job_name) == 0:
-        time.sleep(.1)
+    app.control.revoke(job_name)
 
     cleanup(r, job_name)
 
@@ -298,5 +289,3 @@ def list_synchronization(config):
     #     job_id = job_instance.id
     #     print(job_id)
     return map(lambda job_id : job_id.decode("utf-8"), r.lrange("periodic",0,-1))
-
-

@@ -2,12 +2,12 @@ from os.path import dirname, basename
 from irods.models import Collection, DataObject
 from redis import StrictRedis
 from celery import Celery
-import time
+import importlib
 
 app = Celery("icai")
 
 
-def size(session, path, replica_num = None, resc_name = None):
+def size(session, path, replica_num=None, resc_name=None):
     args = [Collection.name == dirname(path), DataObject.name == basename(path)]
 
     if replica_num is not None:
@@ -43,7 +43,7 @@ def tasks_key(job_name):
 
 def get_with_key(r, key, path, typefunc):
     sync_time_bs = r.get(key(path))
-    if sync_time_bs == None:
+    if sync_time_bs is None:
         sync_time = None
     else:
         sync_time = typefunc(sync_time_bs)
@@ -96,5 +96,3 @@ def get_timeout(logger, meta):
         timeout = 3600
 
     return timeout
-
-
