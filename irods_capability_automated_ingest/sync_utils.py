@@ -2,7 +2,7 @@ from os.path import dirname, basename
 from irods.models import Collection, DataObject
 from redis import StrictRedis
 from irods_capability_automated_ingest import sync_logging
-from rq import Queue
+from rq import Queue, requeue_job
 from rq.handlers import move_to_failed_queue
 import importlib
 
@@ -46,10 +46,10 @@ def retry_handler(job, exc_type, exc_value, traceback):
         else:
             max_retries = 0
 
-        meta = job.meta.copy()
-
+        meta = job.meta
         meta.setdefault('failures', 0)
         meta['failures'] += 1
+        job.save_meta()
 
         if meta['failures'] > max_retries:
             # Too many failures
@@ -58,8 +58,7 @@ def retry_handler(job, exc_type, exc_value, traceback):
         else:
             # Requeue job and stop it from being moved into the failed queue
             logger.warn('retry', task=meta["task"], path=meta["path"], job_id=job.id, failures=meta["failures"], max_retries=max_retries)
-            queue = Queue(job.origin, connection=r)
-            queue.enqueue(job.func, *job.args, meta=meta, depends_on=job.dependency, timeout=meta["timeout"])
+            requeue_job(job.id)
             return False
     except Exception as e:
         logger.error('retry', task=meta["task"], path=meta["path"], job_id=job.id, failures=meta["failures"], max_retries=max_retries, err=str(e))

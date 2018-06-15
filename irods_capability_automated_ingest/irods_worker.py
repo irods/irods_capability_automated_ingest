@@ -24,5 +24,5 @@ c = Connection(r)
 with Connection(r):
     qs = [args.file_queue, args.path_queue, args.restart_queue]
 
-    w = Worker(qs, exception_handlers=[move_to_failed_queue, retry_handler])
+    w = Worker(qs, exception_handlers=[retry_handler, move_to_failed_queue])
     w.work(burst=args.burst)
