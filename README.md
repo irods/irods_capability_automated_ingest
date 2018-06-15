@@ -144,7 +144,6 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 #### start
 ```
 python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --timeout <timeout> ] [ --all ]
-
 ```
 
 If `-i` is not present, then only sync once
@@ -371,6 +370,7 @@ target: /tempZone/home/rods/data
 interval: <interval>
 append_json: <yaml>
 timeout: <timeout>
+all: <all>
 event_handler: <event_handler>
 event_handler_data: |
     from irods_capability_automated_ingest.core import Core
