@@ -209,7 +209,6 @@ docker run --rm --link some-redis:redis --env-file icommands.env -v /tmp/host/da
 
 This does not assume that your iRODS installation is in kubernetes.
 
-=======
 #### `kubeadm`
 
 setup `Glusterfs` and `Heketi`
