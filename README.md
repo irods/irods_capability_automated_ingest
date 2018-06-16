@@ -29,6 +29,7 @@ The example diagrams below show a filesystem scanner and a landing zone.
 | to_resource | defines  target resource request of operation |  as provided by client environment |
 | operation | defines the mode of operation |  `Operation.REGISTER_SYNC` |
 | max_retries | defines max retries | 0
+| timeout | defines timeout | 3600
 
 Event handlers can use `logger` to write logs. See `structlog` for available logging methods and signatures.
 
@@ -80,17 +81,11 @@ source rodssync/bin/activate
 
 #### clone repo
 
-#### rq
- * rq
- * rq-scheduler
+#### celery
+ * celery
  * python-redis-lock
 ```
-pip install rq python-redis-lock # rq-scheduler
-```
-
-before the follow pr for adding metadata support for `rq-scheduler` is merged:
-```
-pip install git+git://github.com/as3445/rq-scheduler-bcfg.git@879d8d81d0d658c1233a0f6a4322a798f981e448
+pip install celery[redis] python-redis-lock
 ```
 
 make sure you are in the repo for the following commands
@@ -98,21 +93,19 @@ make sure you are in the repo for the following commands
 cd <repo dir>
 ```
 
-start rqscheduler
+start celery worker(s)
+
+`fish`
 ```
-rqscheduler -i 1
+set -lx CELERY_BROKER_URL "redis://localhost/0"
+celery worker -A irods_capability_automated_ingest.sync_task -c <n>
 ```
 
-start rq worker(s)
+`bash`
 ```
-rq worker restart path file
+export CELERY_BROKER_URL="redis://localhost/0"
+celery worker -A irods_capability_automated_ingest.sync_task -c <n>
 ```
-
-or
-```
-for i in {1..<n>}; do python -m irods_capability_automated_ingest.irods_worker & done
-```
-
 
 #### job monitoring
 ```
@@ -143,14 +136,12 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 
 #### start
 ```
-python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --timeout <timeout> ] [ --all ]
+python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --all ]
 ```
 
 If `-i` is not present, then only sync once
 
 The `--append_json` is stored in `job.meta["append_json"]`
-
-Timeout seconds.
 
 The `--all` ignores cached last sync time.
 
