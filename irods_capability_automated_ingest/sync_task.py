@@ -59,7 +59,7 @@ def cleanup(r, job_name):
 
 def periodic(r, job_name):
     periodic = r.lrange("periodic", 0, -1)
-    return job_name not in periodic
+    return job_name.encode("utf-8") in periodic
 
 
 @app.task(bind=True, base=IrodsTask)
@@ -200,6 +200,9 @@ def restart(meta):
     interval = meta["interval"]
     config = meta["config"]
     logging_config = config["log"]
+    if interval is not None:
+        restart.s(meta).apply_async(task_id=job_name, queue=restart_queue, countdown=interval)
+
     logger = sync_logging.create_sync_logger(logging_config)
 
     timeout = get_timeout(logger, meta)
@@ -208,7 +211,7 @@ def restart(meta):
         logger.info("***************** restart *****************")
         r = get_redis(config)
 
-        if periodic(r, job_name):
+        if interval is not None:
             if done(r, job_name):
                 logger.info("queue empty and worker not busy")
 
@@ -217,7 +220,6 @@ def restart(meta):
                 async(r, logger, sync_path, meta, path_q_name)
             else:
                 logger.info("queue not empty or worker busy")
-            restart.s(meta).apply_async(task_id=job_name, queue=restart_queue, countdown=interval)
         else:
             async(r, logger, sync_path, meta, path_q_name)
 
@@ -248,22 +250,23 @@ def start_synchronization(data):
     data_copy["path"] = root_abs
 
     r = get_redis(config)
+    with redis_lock.Lock(r, "lock:periodic"):
+        if interval is not None and periodic(r, job_name):
+            logger.error("job exists")
+            raise Exception("job exists")
 
-    if job_name.encode("utf-8") in r.lrange("periodic", 0, -1):
-        logger.error("job exists")
-        raise Exception("job exists")
+        if event_handler is None and event_handler_path is not None and event_handler_data is not None:
+            event_handler = "event_handler" + uuid1().hex
+            hdlr2 = event_handler_path + "/" + event_handler + ".py"
+            with open(hdlr2, "w") as f:
+                f.write(event_handler_data)
+            set_with_key(r, cleanup_key, job_name, hdlr2.encode("utf-8"))
 
-    if event_handler is None and event_handler_path is not None and event_handler_data is not None:
-        event_handler = "event_handler" + uuid1().hex
-        hdlr2 = event_handler_path + "/" + event_handler + ".py"
-        with open(hdlr2, "w") as f:
-            f.write(event_handler_data)
-        set_with_key(r, cleanup_key, job_name, hdlr2.encode("utf-8"))
-
-    if interval is not None:
-        r.rpush("periodic", job_name.encode("utf-8"))
-
-    restart.s(data_copy).apply_async(queue=restart_queue, task_id=job_name)
+        if interval is not None:
+            r.rpush("periodic", job_name.encode("utf-8"))
+            restart.s(data_copy).apply_async(queue=restart_queue, task_id=job_name)
+        else:
+            restart.s(data_copy).apply_async(queue=restart_queue)
 
 
 def stop_synchronization(job_name, config):
@@ -271,21 +274,17 @@ def stop_synchronization(job_name, config):
 
     r = get_redis(config)
 
-    if job_name.encode("utf-8") not in r.lrange("periodic", 0, -1):
-        logger.error("job not exists")
-        raise Exception("job not exists")
+    with redis_lock.Lock(r, "lock:periodic"):
+        if not periodic(r, job_name):
+            logger.error("job not exists")
+            raise Exception("job not exists")
 
-    app.control.revoke(job_name)
+        app.control.revoke(job_name)
 
-    cleanup(r, job_name)
+        cleanup(r, job_name)
 
 
 def list_synchronization(config):
-    logger = sync_logging.create_sync_logger(config["log"])
     r = get_redis(config)
-    # scheduler = Scheduler(connection=r)
-    # list_of_job_instances = scheduler.get_jobs()
-    # for job_instance in list_of_job_instances:
-    #     job_id = job_instance.id
-    #     print(job_id)
-    return map(lambda job_id : job_id.decode("utf-8"), r.lrange("periodic",0,-1))
+    with redis_lock.Lock(r, "lock:periodic"):
+        return map(lambda job_id: job_id.decode("utf-8"), r.lrange("periodic", 0, -1))

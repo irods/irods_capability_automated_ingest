@@ -15,7 +15,8 @@ from irods.session import iRODSSession
 from irods.models import Collection, DataObject
 from tempfile import NamedTemporaryFile
 from datetime import datetime
-from .sync_utils import size, app
+from ..sync_utils import size
+from ..sync_task import done
 import time
 
 IRODS_MAJOR = 4
