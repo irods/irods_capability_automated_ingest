@@ -8,14 +8,13 @@ from redis import StrictRedis
 from subprocess import Popen
 from signal import SIGINT
 from os import makedirs, listdir
-from rq import Queue
 from shutil import rmtree
 from os.path import join, realpath, getmtime, getsize, dirname, basename, relpath, isfile
 from irods.session import iRODSSession
 from irods.models import Collection, DataObject
 from tempfile import NamedTemporaryFile
 from datetime import datetime
-from ..sync_utils import size
+from ..sync_utils import size, get_with_key, app, failures_key, retries_key
 from ..sync_task import done
 import time
 
@@ -93,7 +92,8 @@ def clear_redis():
 
 def start_workers(n, args=[]):
     os.environ["CELERY_BROKER_URI"] = "redis://localhost/0"
-    workers = Popen(["celery", "-A", "irods_capability_automated_ingest.sync_task", "-c", n] + args)
+    print("start " + str(n) + " worker(s)")
+    workers = Popen(["celery", "-A", "irods_capability_automated_ingest.sync_task", "worker", "-c", str(n), "-l", "info", "-Q", "restart,path,file"] + args)
     return workers
 
 
@@ -102,11 +102,24 @@ def start_scheduler(n):
     return scheduler
 
 
+TIMEOUT = 60
 def wait_for(workers):
     r = StrictRedis()
-    while True:
-        if not done(r, "test_irods_sync"):
+    t0 = time.time()
+    while time.time() - t0 < TIMEOUT:
+        restart = r.llen("restart")
+        i = app.control.inspect()
+        act = i.active()
+        if act is None:
+            active = 0
+        else:
+            active = sum(map(len, act.values()))
+        d = done(r, "test_irods_sync")
+        print ("restart = " + str(restart) + ", active = " + str(active) + ", done = " + str(d) + ", t0 = " + str(t0) + ", t = " + str(time.time()))
+        if restart != 0 or active != 0 or not d:
             time.sleep(1)
+        else:
+            break
 
     workers.send_signal(SIGINT)
     workers.wait()
@@ -239,12 +252,12 @@ class Test_irods_sync(TestCase):
             delete_resources(session, HIERARCHY1)
 
     def do_no_event_handler(self):
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--log_level", "INFO"])
         proc.wait()
         self.do_register2()
 
     def do_register(self, eh, resc_name = ["demoResc"]):
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
         self.do_register2(resc_name = resc_name)
 
@@ -275,7 +288,7 @@ class Test_irods_sync(TestCase):
 
     def do_register_par(self, eh, resc_name = ["demoResc"]):
         create_files2(10)
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
         workers = start_workers(10)
         wait_for(workers)
@@ -303,27 +316,26 @@ class Test_irods_sync(TestCase):
                     self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
     def do_retry(self, eh, resc_name = ["demoResc"]):
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
         workers = start_workers(1)
         wait_for(workers)
 
         r = StrictRedis()
-        rq = Queue(connection=r, name="failed")
-        self.assertEqual(rq.count, 0)
+
+        self.do_assert_failed_queue("no failures", count=None)
+        self.do_assert_retry_queue()
 
     def do_no_retry(self, eh, resc_name = ["demoResc"]):
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
         workers = start_workers(1)
         wait_for(workers)
 
-        r = StrictRedis()
-        rq = Queue(connection=r, name="failed")
-        self.assertEqual(rq.count, NFILES)
+        self.do_assert_failed_queue("no failures")
 
     def do_put(self, eh, resc_names = ["demoResc"], resc_roots = ["/var/lib/irods/Vault"]):
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
 
         workers = start_workers(1)
@@ -349,7 +361,7 @@ class Test_irods_sync(TestCase):
         clear_redis()
         recreate_files()
 
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
 
         workers = start_workers(1)
@@ -411,7 +423,7 @@ class Test_irods_sync(TestCase):
     def do_no_sync(self, eh):
         recreate_files()
 
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
 
         workers = start_workers(1)
@@ -429,7 +441,7 @@ class Test_irods_sync(TestCase):
     def do_no_op(self, eh):
         recreate_files()
 
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync"])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
 
         workers = start_workers(1)
@@ -438,15 +450,14 @@ class Test_irods_sync(TestCase):
     def do_append_json(self, eh):
         recreate_files()
 
-        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--append_json", "\"append_json\"", "--job_name", "test_irods_sync"])
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--append_json", "\"append_json\"", "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
 
         workers = start_workers(1)
         wait_for(workers)
 
         r = StrictRedis()
-        rq = Queue(connection=r, name="failed")
-        self.assertEqual(rq.count, 0)
+        self.do_assert_failed_queue(count=None)
 
     def do_put_to_child(self):
         with iRODSSession(irods_env_file=env_file) as session:
@@ -455,70 +466,102 @@ class Test_irods_sync(TestCase):
         with iRODSSession(irods_env_file=env_file) as session:
             session.resources.add_child(REGISTER_RESC2, REGISTER_RESC2A)
 
-    def do_assert_failed_queue(self, errmsg):
+    def do_assert_failed_queue(self, error_message=None, count=NFILES):
         r = StrictRedis()
-        rq = Queue(connection=r, name="failed")
-        self.assertEqual(rq.count, NFILES)
-        for job in rq.jobs:
-            self.assertIn(errmsg, job.exc_info)
+        self.assertEqual(get_with_key(r, failures_key, "test_irods_sync", int), count)
+#         for job in rq.jobs:
+#             self.assertIn(errmsg, job.exc_info)
+
+    def do_assert_retry_queue(self, error_message=None, count=NFILES):
+        r = StrictRedis()
+        self.assertEqual(get_with_key(r, retries_key, "test_irods_sync", int), count)
+
+#         for job in rq.jobs:
+#             self.assertIn(errmsg, job.exc_info)
 
     # no event handler
 
     def test_no_event_handler(self):
         self.do_no_event_handler()
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # register
 
     def test_register(self):
         self.do_register("irods_capability_automated_ingest.examples.register")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_register_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_with_resc_name", resc_name = [REGISTER_RESC2A])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_register_root_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_root_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_register_non_leaf_non_root_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_non_leaf_non_root_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # update
 
     def test_update(self):
         self.do_register("irods_capability_automated_ingest.examples.register")
         self.do_update("irods_capability_automated_ingest.examples.register")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_update_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_with_resc_name", resc_name = [REGISTER_RESC2A])
         self.do_update("irods_capability_automated_ingest.examples.register_with_resc_name", resc_name = [REGISTER_RESC2A])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_update_root_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_root_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_update("irods_capability_automated_ingest.examples.register_root_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_update_non_leaf_non_root_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_non_root_non_leaf_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_update("irods_capability_automated_ingest.examples.register_non_root_non_leaf_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # update metadata
 
     def test_update_metadata(self):
         self.do_register("irods_capability_automated_ingest.examples.register")
         self.do_update_metadata("irods_capability_automated_ingest.examples.register")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_update_metadata_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_with_resc_name", resc_name=[REGISTER_RESC2A])
         self.do_update_metadata("irods_capability_automated_ingest.examples.register_with_resc_name", resc_name=[REGISTER_RESC2A])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_update_metadata_root_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_root_with_resc_name", resc_name=[REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_update_metadata("irods_capability_automated_ingest.examples.register_root_with_resc_name", resc_name=[REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_update_metadata_non_leaf_non_root_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.register_non_leaf_non_root_with_resc_name", resc_name=[REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_update_metadata("irods_capability_automated_ingest.examples.register_non_leaf_non_root_with_resc_name", resc_name=[REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # replica
 
@@ -526,16 +569,22 @@ class Test_irods_sync(TestCase):
     def test_register_as_replica_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.put")
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_with_resc_name", resc_names = [REGISTER_RESC2A])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_register_as_replica_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.put")
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_register_as_replica_non_leaf_non_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.put")
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_non_leaf_non_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # update with two replicas
 
@@ -544,18 +593,24 @@ class Test_irods_sync(TestCase):
         self.do_put("irods_capability_automated_ingest.examples.put")
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_with_resc_name", resc_names = [REGISTER_RESC2A])
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_with_resc_name", resc_names = [REGISTER_RESC2A])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_update_root_with_resc_name_with_two_replicas(self):
         self.do_put("irods_capability_automated_ingest.examples.put")
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_update_non_leaf_non_root_with_resc_name_with_two_replicas(self):
         self.do_put("irods_capability_automated_ingest.examples.put")
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_non_leaf_non_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_register_as_replica("irods_capability_automated_ingest.examples.replica_non_leaf_non_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # replica with another replica in hier
 
@@ -579,49 +634,71 @@ class Test_irods_sync(TestCase):
 
     def test_register_with_as_replica_event_handler_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.replica_with_resc_name", resc_name = [REGISTER_RESC2A])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_register_with_as_replica_event_handler_root_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.replica_root_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_register_with_as_replica_event_handler_non_leaf_non_root_with_resc_name(self):
         self.do_register("irods_capability_automated_ingest.examples.replica_non_leaf_non_root_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # put
 
     def test_put(self):
         self.do_put("irods_capability_automated_ingest.examples.put")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_put_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.put_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC2A])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_put_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.put_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_put_non_leaf_non_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.put_non_leaf_non_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # no sync
 
     def test_no_sync(self):
         self.do_put("irods_capability_automated_ingest.examples.put")
         self.do_no_sync("irods_capability_automated_ingest.examples.put")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_no_sync_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.put_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC2A])
         self.do_no_sync("irods_capability_automated_ingest.examples.put_with_resc_name")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_no_sync_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.put_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
         self.do_no_sync("irods_capability_automated_ingest.examples.put_with_resc_name")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_no_sync_non_leaf_non_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.put_non_leaf_non_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
         self.do_no_sync("irods_capability_automated_ingest.examples.put_with_resc_name")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # sync
 
@@ -629,23 +706,31 @@ class Test_irods_sync(TestCase):
         self.do_put("irods_capability_automated_ingest.examples.sync")
         recreate_files()
         self.do_put("irods_capability_automated_ingest.examples.sync")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_sync_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.sync_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC_PATH2A])
         recreate_files()
         self.do_put("irods_capability_automated_ingest.examples.sync_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC_PATH2A])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_sync_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.sync_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
         recreate_files()
         self.do_put("irods_capability_automated_ingest.examples.sync_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_sync_non_leaf_non_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.sync_non_leaf_non_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
         recreate_files()
         self.do_put("irods_capability_automated_ingest.examples.sync_non_leaf_non_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # append
 
@@ -653,12 +738,16 @@ class Test_irods_sync(TestCase):
         self.do_put("irods_capability_automated_ingest.examples.append")
         recreate_files()
         self.do_put("irods_capability_automated_ingest.examples.append")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_append_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.append_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC_PATH2A])
         recreate_files()
         self.do_put("irods_capability_automated_ingest.examples.append_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC_PATH2A])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     def test_append_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.append_root_with_resc_name", resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
@@ -666,6 +755,8 @@ class Test_irods_sync(TestCase):
         recreate_files()
         self.do_put("irods_capability_automated_ingest.examples.append_root_with_resc_name", resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
                     resc_roots=[REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_append_non_leaf_non_root_with_resc_name(self):
@@ -674,10 +765,14 @@ class Test_irods_sync(TestCase):
         recreate_files()
         self.do_put("irods_capability_automated_ingest.examples.append_non_leaf_non_root_with_resc_name", resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
                     resc_roots=[REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # no op
     def test_no_op(self):
         self.do_no_op("irods_capability_automated_ingest.examples.no_op")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
 
     # append_json
@@ -688,6 +783,8 @@ class Test_irods_sync(TestCase):
     # create dir
     def test_create_dir(self):
         self.do_register_par("irods_capability_automated_ingest.examples.register")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
     # retry
     def test_no_retry(self):

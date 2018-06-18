@@ -4,10 +4,10 @@ from irods_capability_automated_ingest.utils import Operation
 class event_handler(Core):
 
     @staticmethod
-    def to_resource(session, target, path, **options):
+    def to_resource(session, meta, **options):
         return "regiResc2a"
 
     @staticmethod
-    def operation(session, target, path, **options):
+    def operation(session, meta, **options):
         return Operation.PUT_SYNC
 

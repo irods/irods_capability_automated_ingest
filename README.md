@@ -105,14 +105,8 @@ rqscheduler -i 1
 
 start rq worker(s)
 ```
-rq worker restart path file
+celery -A irods_capability_automated_ingest.sync_task worker -l info -Q restart,path,file -c <n> 
 ```
-
-or
-```
-for i in {1..<n>}; do python -m irods_capability_automated_ingest.irods_worker & done
-```
-
 
 #### job monitoring
 ```
@@ -176,7 +170,7 @@ from irods_capability_automated_ingest.utils import Operation
 class event_handler(Core):
 
     @staticmethod
-    def target_path(session, target, path, **options):
+    def target_path(session, meta, **options):
         return "/tmp/host" + path
 
 ```
@@ -254,7 +248,7 @@ from irods_capability_automated_ingest.utils import Operation
 class event_handler(Core):
 
     @staticmethod
-    def target_path(session, target, path, **options):
+    def target_path(session, meta, **options):
         return path
 
 ```
@@ -378,7 +372,7 @@ event_handler_data: |
     class event_handler(Core):
 
         @staticmethod
-        def target_path(session, target, path, **options):
+        def target_path(session, meta, **options):
             return path
 
 ```

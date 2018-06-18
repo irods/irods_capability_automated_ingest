@@ -41,6 +41,14 @@ def tasks_key(job_name):
     return "tasks:/"+job_name
 
 
+def failures_key(job_name):
+    return "failures:/"+job_name
+
+
+def retries_key(job_name):
+    return "retries:/"+job_name
+
+
 def get_with_key(r, key, path, typefunc):
     sync_time_bs = r.get(key(path))
     if sync_time_bs is None:
@@ -59,11 +67,12 @@ def reset_with_key(r, key, path):
 
 
 def incr_with_key(r, key, path):
-    r.set(key(path))
+    r.incr(key(path))
 
 
 def decr_with_key(r, key, path):
-    r.delete(key(path))
+    if r.decr(key(path)) == 0:
+        reset_with_key(r, key, path)
 
 
 def get_hdlr_mod(meta):
@@ -80,7 +89,7 @@ def get_max_retries(logger, meta):
     hdlr_mod = get_hdlr_mod(meta)
 
     if hasattr(hdlr_mod, "max_retries"):
-        max_retries = hdlr_mod.max_retries(hdlr_mod, logger, meta["target"], meta["path"])
+        max_retries = hdlr_mod.max_retries(hdlr_mod, logger, meta)
     else:
         max_retries = 0
 
@@ -91,8 +100,20 @@ def get_timeout(logger, meta):
     hdlr_mod = get_hdlr_mod(meta)
 
     if hasattr(hdlr_mod, "timeout"):
-        timeout = hdlr_mod.timeout(hdlr_mod, logger, meta["target"], meta["path"])
+        timeout = hdlr_mod.timeout(hdlr_mod, logger, meta)
     else:
         timeout = 3600
 
     return timeout
+
+def get_delay(logger, meta, retries):
+    hdlr_mod = get_hdlr_mod(meta)
+
+    if hasattr(hdlr_mod, "delay"):
+        delay = hdlr_mod.delay(hdlr_mod, logger, meta, retries)
+    else:
+        delay = 0
+
+    return delay
+
+
