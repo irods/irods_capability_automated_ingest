@@ -98,13 +98,15 @@ start celery worker(s)
 `fish`
 ```
 set -lx CELERY_BROKER_URL "redis://localhost/0"
-celery worker -A irods_capability_automated_ingest.sync_task -c <n>
 ```
 
 `bash`
 ```
-export CELERY_BROKER_URL="redis://localhost/0"
 celery worker -A irods_capability_automated_ingest.sync_task -c <n>
+```
+
+```
+celery -A irods_capability_automated_ingest.sync_task worker -l info -Q restart,path,file -c <n> 
 ```
 
 #### job monitoring
@@ -167,7 +169,7 @@ from irods_capability_automated_ingest.utils import Operation
 class event_handler(Core):
 
     @staticmethod
-    def target_path(session, target, path, **options):
+    def target_path(session, meta, **options):
         return "/tmp/host" + path
 
 ```
@@ -245,7 +247,7 @@ from irods_capability_automated_ingest.utils import Operation
 class event_handler(Core):
 
     @staticmethod
-    def target_path(session, target, path, **options):
+    def target_path(session, meta, **options):
         return path
 
 ```
@@ -369,7 +371,7 @@ event_handler_data: |
     class event_handler(Core):
 
         @staticmethod
-        def target_path(session, target, path, **options):
+        def target_path(session, meta, **options):
             return path
 
 ```

@@ -1,10 +1,10 @@
-import sys
 import structlog
 import logging
 import logging.handlers
 from structlog import wrap_logger
 import datetime
 import time
+from celery.utils.log import get_task_logger
 
 irods_sync_logger = "irods_sync"
 
@@ -20,7 +20,7 @@ def create_sync_logger(logging_config):
     interval = logging_config.get("interval")
     level = logging_config.get("level")
 
-    logger = logging.getLogger(irods_sync_logger)
+    logger = get_task_logger(irods_sync_logger)
     if level is not None:
         logger.setLevel(logging.getLevelName(level))
 
@@ -29,9 +29,9 @@ def create_sync_logger(logging_config):
             handler = logging.handlers.TimedRotatingFileHandler(log_file, when=when, interval=interval)
         else:
             handler = logging.FileHandler(log_file)
-    else:
-        handler = logging.StreamHandler(sys.stdout)
-    logger.addHandler(handler)
+    # else:
+    #     handler = logging.StreamHandler(sys.stdout)
+        logger.addHandler(handler)
 
     return wrap_logger(
         logger,
@@ -46,7 +46,7 @@ def create_sync_logger(logging_config):
 
 
 def get_sync_logger():
-    logger = logging.getLogger(irods_sync_logger)
+    logger = get_task_logger(irods_sync_logger)
 
     return wrap_logger(
         logger,
