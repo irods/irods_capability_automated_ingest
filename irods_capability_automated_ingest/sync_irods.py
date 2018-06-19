@@ -178,7 +178,6 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
                     repl_num = row[DataObject.replica_number]
                     data_obj_info["replNum"] = repl_num
                     continue
-            outdated_repl_nums.append(row[DataObject.replica_number])
 
     if not found:
         logger.error("updating object: wrong resource or path, target = " + target + ", path = " + path + ", target_path = " + target_path + ", options = " + str(options))
@@ -186,11 +185,6 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
 
     session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime, "replStatus":1}, **options)
 
-    outdated_data_obj_info = {"objPath": target}
-
-    for outdated_repl_num in outdated_repl_nums:
-        outdated_data_obj_info["replNum"] = outdated_repl_num
-        session.data_objects.modDataObjMeta(outdated_data_obj_info, {"replStatus":0})
     logger.info("succeeded", task="irods_update_metadata", path = path)
 
 

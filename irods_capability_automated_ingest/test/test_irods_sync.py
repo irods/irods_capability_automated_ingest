@@ -28,6 +28,8 @@ A_REMOTE = "a_remote"
 A_COLL = "/tempZone/home/rods/" + A_REMOTE
 
 NFILES = 10
+NWORKERS = 10
+TIMEOUT = 60
 
 REGISTER_RESC = "regiResc"
 REGISTER_RESC_PATH = "/var/lib/irods/Vault2"
@@ -102,11 +104,10 @@ def start_scheduler(n):
     return scheduler
 
 
-TIMEOUT = 60
 def wait_for(workers):
     r = StrictRedis()
     t0 = time.time()
-    while time.time() - t0 < TIMEOUT:
+    while TIMEOUT is None or time.time() - t0 < TIMEOUT:
         restart = r.llen("restart")
         i = app.control.inspect()
         act = i.active()
@@ -131,31 +132,31 @@ def interrupt(scheduler):
     scheduler.wait()
 
 
-def create_files():
-    create_files2(0)
+def create_files(nfiles):
+    create_files2(0, nfiles)
 
 
-def create_files2(depth):
+def create_files2(depth, nfiles):
     a = join(A, *list(map(lambda i : "a" + str(i), range(depth))))
     makedirs(a)
-    for i in range(NFILES):
+    for i in range(nfiles):
         with open(join(a,str(i)), "w") as f:
-            f.write("i" * i)
+            f.write("i" + str(i))
 
 
-def recreate_files():
-    recreate_files2(0)
+def recreate_files(nfiles):
+    recreate_files2(0, nfiles)
 
 
-def recreate_files2(depth):
+def recreate_files2(depth, nfiles):
     a = join(A, *list(map(lambda i : "a" + str(i), range(depth))))
-    for i in range(NFILES):
+    for i in range(nfiles):
         with open(join(a,str(i)), "w") as f:
-            f.write("i" * (i * 2 + 1))
+            f.write("i" + str(i * 2 + 1))
 
 
-def ctime_files():
-    for i in range(NFILES):
+def ctime_files(nfiles=NFILES):
+    for i in range(nfiles):
         os.chmod(join(A, str(i)), stat.S_IRUSR )
         os.chmod(join(A, str(i)), stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
@@ -238,7 +239,7 @@ except KeyError:
 class Test_irods_sync(TestCase):
     def setUp(self):
         clear_redis()
-        create_files()
+        create_files(NFILES)
         delete_collection_if_exists(A_COLL)
         with iRODSSession(irods_env_file=env_file) as session:
             create_resources(session, HIERARCHY1)
@@ -259,11 +260,15 @@ class Test_irods_sync(TestCase):
     def do_register(self, eh, resc_name = ["demoResc"]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
-        self.do_register2(resc_name = resc_name)
+        self.do_register2(resc_names=resc_name)
 
-    def do_register2(self, resc_name = ["demoResc"]):
+    def do_register2(self, resc_names=["demoResc"]):
         workers = start_workers(1)
         wait_for(workers)
+
+        self.do_assert_register(resc_names)
+
+    def do_assert_register(self, resc_names):
 
         with iRODSSession(irods_env_file=env_file) as session:
             self.assertTrue(session.collections.exists(A_COLL))
@@ -278,7 +283,7 @@ class Test_irods_sync(TestCase):
 
                 obj = session.data_objects.get(rpath)
                 self.assertEqual(obj.replicas[0].path, realpath(path))
-                self.assertIn(obj.replicas[0].resource_name, resc_name)
+                self.assertIn(obj.replicas[0].resource_name, resc_names)
                 s1 = getsize(path)
                 mtime1 = int(getmtime(path))
                 s2 = size(session, rpath)
@@ -286,11 +291,11 @@ class Test_irods_sync(TestCase):
                 self.assertEqual(s1, s2)
                 self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
-    def do_register_par(self, eh, resc_name = ["demoResc"]):
-        create_files2(10)
+    def do_register_dir_par(self, eh, resc_names=["demoResc"]):
+        create_files2(10, NFILES)
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
-        workers = start_workers(10)
+        workers = start_workers(NWORKERS)
         wait_for(workers)
 
         with iRODSSession(irods_env_file=env_file) as session:
@@ -307,13 +312,21 @@ class Test_irods_sync(TestCase):
 
                     obj = session.data_objects.get(rpath)
                     self.assertEqual(obj.replicas[0].path, realpath(path))
-                    self.assertIn(obj.replicas[0].resource_name, resc_name)
+                    self.assertIn(obj.replicas[0].resource_name, resc_names)
                     s1 = getsize(path)
                     mtime1 = int(getmtime(path))
                     s2 = size(session, rpath)
                     mtime2 = modify_time(session, rpath)
                     self.assertEqual(s1, s2)
                     self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
+
+    def do_register_par(self, eh, resc_names=["demoResc"]):
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
+        proc.wait()
+        workers = start_workers(NWORKERS)
+        wait_for(workers)
+
+        self.do_assert_register(resc_names)
 
     def do_retry(self, eh, resc_name = ["demoResc"]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
@@ -341,6 +354,21 @@ class Test_irods_sync(TestCase):
         workers = start_workers(1)
         wait_for(workers)
 
+        self.do_assert_put(resc_names, resc_roots)
+
+    def do_put_par(self, eh, resc_names=["demoResc"], resc_roots=["/var/lib/irods/Vault"]):
+        proc = Popen(
+            ["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync",
+             "--log_level", "INFO"])
+        proc.wait()
+
+        workers = start_workers(NWORKERS)
+        wait_for(workers)
+
+        self.do_assert_put(resc_names, resc_roots)
+
+    def do_assert_put(self, resc_names, resc_roots):
+
         with iRODSSession(irods_env_file=env_file) as session:
             self.assertTrue(session.collections.exists(A_COLL))
             for i in listdir(A):
@@ -359,7 +387,7 @@ class Test_irods_sync(TestCase):
 
     def do_register_as_replica_no_assertions(self, eh):
         clear_redis()
-        recreate_files()
+        recreate_files(NFILES)
 
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
@@ -393,7 +421,7 @@ class Test_irods_sync(TestCase):
                 # self.assertEqual(obj.replicas[1].status, "1")
 
     def do_update(self, eh, resc_name = ["demoResc"]):
-        recreate_files()
+        recreate_files(NFILES)
         self.do_register(eh, resc_name = resc_name)
         with iRODSSession(irods_env_file=env_file) as session:
             for i in listdir(A):
@@ -407,7 +435,7 @@ class Test_irods_sync(TestCase):
                 self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
     def do_update_metadata(self, eh, resc_name = ["demoResc"]):
-        ctime_files()
+        ctime_files(NFILES)
         self.do_register(eh, resc_name = resc_name)
         with iRODSSession(irods_env_file=env_file) as session:
             for i in listdir(A):
@@ -421,7 +449,7 @@ class Test_irods_sync(TestCase):
                 self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
     def do_no_sync(self, eh):
-        recreate_files()
+        recreate_files(NFILES)
 
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
@@ -439,7 +467,7 @@ class Test_irods_sync(TestCase):
                 self.assertNotEqual(a1, a2)
 
     def do_no_op(self, eh):
-        recreate_files()
+        recreate_files(NFILES)
 
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
@@ -448,7 +476,7 @@ class Test_irods_sync(TestCase):
         wait_for(workers)
 
     def do_append_json(self, eh):
-        recreate_files()
+        recreate_files(NFILES)
 
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--append_json", "\"append_json\"", "--job_name", "test_irods_sync", "--log_level", "INFO"])
         proc.wait()
@@ -704,7 +732,7 @@ class Test_irods_sync(TestCase):
 
     def test_sync(self):
         self.do_put("irods_capability_automated_ingest.examples.sync")
-        recreate_files()
+        recreate_files(NFILES)
         self.do_put("irods_capability_automated_ingest.examples.sync")
         self.do_assert_failed_queue(count=None)
         self.do_assert_retry_queue(count=None)
@@ -712,14 +740,14 @@ class Test_irods_sync(TestCase):
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_sync_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.sync_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC_PATH2A])
-        recreate_files()
+        recreate_files(NFILES)
         self.do_put("irods_capability_automated_ingest.examples.sync_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC_PATH2A])
         self.do_assert_failed_queue(count=None)
         self.do_assert_retry_queue(count=None)
 
     def test_sync_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.sync_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
-        recreate_files()
+        recreate_files(NFILES)
         self.do_put("irods_capability_automated_ingest.examples.sync_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
         self.do_assert_failed_queue(count=None)
         self.do_assert_retry_queue(count=None)
@@ -727,7 +755,7 @@ class Test_irods_sync(TestCase):
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_sync_non_leaf_non_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.sync_non_leaf_non_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
-        recreate_files()
+        recreate_files(NFILES)
         self.do_put("irods_capability_automated_ingest.examples.sync_non_leaf_non_root_with_resc_name", resc_names = [REGISTER_RESC2A, REGISTER_RESC2B], resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
         self.do_assert_failed_queue(count=None)
         self.do_assert_retry_queue(count=None)
@@ -736,7 +764,7 @@ class Test_irods_sync(TestCase):
 
     def test_append(self):
         self.do_put("irods_capability_automated_ingest.examples.append")
-        recreate_files()
+        recreate_files(NFILES)
         self.do_put("irods_capability_automated_ingest.examples.append")
         self.do_assert_failed_queue(count=None)
         self.do_assert_retry_queue(count=None)
@@ -744,7 +772,7 @@ class Test_irods_sync(TestCase):
     @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
     def test_append_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.append_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC_PATH2A])
-        recreate_files()
+        recreate_files(NFILES)
         self.do_put("irods_capability_automated_ingest.examples.append_with_resc_name", resc_names = [REGISTER_RESC2A], resc_roots = [REGISTER_RESC_PATH2A])
         self.do_assert_failed_queue(count=None)
         self.do_assert_retry_queue(count=None)
@@ -752,7 +780,7 @@ class Test_irods_sync(TestCase):
     def test_append_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.append_root_with_resc_name", resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
                     resc_roots=[REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
-        recreate_files()
+        recreate_files(NFILES)
         self.do_put("irods_capability_automated_ingest.examples.append_root_with_resc_name", resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
                     resc_roots=[REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
         self.do_assert_failed_queue(count=None)
@@ -762,7 +790,7 @@ class Test_irods_sync(TestCase):
     def test_append_non_leaf_non_root_with_resc_name(self):
         self.do_put("irods_capability_automated_ingest.examples.append_non_leaf_non_root_with_resc_name", resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
                     resc_roots=[REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
-        recreate_files()
+        recreate_files(NFILES)
         self.do_put("irods_capability_automated_ingest.examples.append_non_leaf_non_root_with_resc_name", resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
                     resc_roots=[REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
         self.do_assert_failed_queue(count=None)
@@ -782,7 +810,19 @@ class Test_irods_sync(TestCase):
 
     # create dir
     def test_create_dir(self):
+        self.do_register_dir_par("irods_capability_automated_ingest.examples.register")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
+
+    # register par
+    def test_register_par(self):
         self.do_register_par("irods_capability_automated_ingest.examples.register")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
+
+    # put par
+    def test_put_par(self):
+        self.do_put_par("irods_capability_automated_ingest.examples.put")
         self.do_assert_failed_queue(count=None)
         self.do_assert_retry_queue(count=None)
 

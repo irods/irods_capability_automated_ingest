@@ -1,4 +1,3 @@
-import sys
 import structlog
 import logging
 import logging.handlers
