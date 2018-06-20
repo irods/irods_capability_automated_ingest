@@ -183,7 +183,7 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
         logger.error("updating object: wrong resource or path, target = " + target + ", path = " + path + ", target_path = " + target_path + ", options = " + str(options))
         raise Exception("wrong resource or path")
 
-    session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime, "replStatus":1}, **options)
+    session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime, "allReplStatus":1}, **options)
 
     logger.info("succeeded", task="irods_update_metadata", path = path)
 
