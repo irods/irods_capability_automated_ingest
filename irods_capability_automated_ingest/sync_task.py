@@ -261,6 +261,8 @@ def restart(meta):
 
         reset_with_key(r, count_key, job_name)
         set_with_key(r, tasks_key, job_name, 0)
+        set_with_key(r, failures_key, job_name, 0)
+        set_with_key(r, retries_key, job_name, 0)
 
         if interval is not None:
             if done(r, job_name):
