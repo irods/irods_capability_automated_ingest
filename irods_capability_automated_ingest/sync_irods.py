@@ -236,7 +236,7 @@ def irods_session(hdlr_mod, meta, **options):
 
     sess = irods_session_map.get(key)
 
-    if sess is not None:
+    if sess is None:
         sess = iRODSSession(**kwargs)
         irods_session_map[key] = sess
 
@@ -253,73 +253,71 @@ def sync_data_from_file(meta, logger, content, **options):
     else:
         hdlr_mod = None
 
-    sess_ctx = irods_session(hdlr_mod, meta, **options)
+    session = irods_session(hdlr_mod, meta, **options)
 
-    with sess_ctx as session:
+    if session.data_objects.exists(target):
+        exists = True
+    elif session.collections.exists(target):
+        raise Exception("sync: cannot syncing file " + path + " to collection " + target)
+    else:
+        exists = False
 
-        if session.data_objects.exists(target):
-            exists = True
-        elif session.collections.exists(target):
-            raise Exception("sync: cannot syncing file " + path + " to collection " + target)
+    if hasattr(hdlr_mod, "operation"):
+        op = hdlr_mod.operation(session, meta, **options)
+    else:
+        op = Operation.REGISTER_SYNC
+
+    if op == Operation.NO_OP:
+        if not exists:
+            call(hdlr_mod, "on_data_obj_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
         else:
-            exists = False
-
-        if hasattr(hdlr_mod, "operation"):
-            op = hdlr_mod.operation(session, meta, **options)
-        else:
-            op = Operation.REGISTER_SYNC
-
-        if op == Operation.NO_OP:
-            if not exists:
-                call(hdlr_mod, "on_data_obj_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
+            call(hdlr_mod, "on_data_obj_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
+    else:
+        createRepl = False
+        if exists and op == Operation.REGISTER_AS_REPLICA_SYNC:
+            if hasattr(hdlr_mod, "to_resource"):
+                resc_name = hdlr_mod.to_resource(session, meta, **options)
             else:
-                call(hdlr_mod, "on_data_obj_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
-        else:
-            createRepl = False
-            if exists and op == Operation.REGISTER_AS_REPLICA_SYNC:
-                if hasattr(hdlr_mod, "to_resource"):
-                    resc_name = hdlr_mod.to_resource(session, meta, **options)
-                else:
-                    raise Exception("no resource name defined")
+                raise Exception("no resource name defined")
 
-                found = False
-                foundPath = False
-                for replica in session.data_objects.get(target).replicas:
-                    if child_of(session, replica.resource_name, resc_name):
-                        found = True
-                        if replica.path == path:
-                            foundPath = True
-                if found:
-                    if not foundPath:
-                        raise Exception("there is at least one replica under resource but all replicas have wrong paths")
-                else:
-                    createRepl = True
+            found = False
+            foundPath = False
+            for replica in session.data_objects.get(target).replicas:
+                if child_of(session, replica.resource_name, resc_name):
+                    found = True
+                    if replica.path == path:
+                        foundPath = True
+            if found:
+                if not foundPath:
+                    raise Exception("there is at least one replica under resource but all replicas have wrong paths")
+            else:
+                createRepl = True
 
-            put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
-            sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]
+        put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
+        sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]
 
-            if not exists:
-                meta2 = meta.copy()
-                meta2["target"] = dirname(target)
-                meta2["path"] = dirname(path)
-                create_dirs(hdlr_mod, logger, session, meta2, **options)
+        if not exists:
+            meta2 = meta.copy()
+            meta2["target"] = dirname(target)
+            meta2["path"] = dirname(path)
+            create_dirs(hdlr_mod, logger, session, meta2, **options)
 
-                if put:
-                    call(hdlr_mod, "on_data_obj_create", upload_file, logger, hdlr_mod, logger, session, meta, **options)
-                else:
-                    call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, meta, **options)
-            elif createRepl:
-                options["regRepl"] = ""
-
+            if put:
+                call(hdlr_mod, "on_data_obj_create", upload_file, logger, hdlr_mod, logger, session, meta, **options)
+            else:
                 call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, meta, **options)
-            elif content:
-                if put:
-                    if sync:
-                        call(hdlr_mod, "on_data_obj_modify", sync_file, logger, hdlr_mod, logger, session, meta, **options)
-                else:
-                    call(hdlr_mod, "on_data_obj_modify", update_metadata, logger, hdlr_mod, logger, session, meta, **options)
+        elif createRepl:
+            options["regRepl"] = ""
+
+            call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, meta, **options)
+        elif content:
+            if put:
+                if sync:
+                    call(hdlr_mod, "on_data_obj_modify", sync_file, logger, hdlr_mod, logger, session, meta, **options)
             else:
-                call(hdlr_mod, "on_data_obj_modify", sync_file_meta, logger, hdlr_mod, logger, session, meta, **options)
+                call(hdlr_mod, "on_data_obj_modify", update_metadata, logger, hdlr_mod, logger, session, meta, **options)
+        else:
+            call(hdlr_mod, "on_data_obj_modify", sync_file_meta, logger, hdlr_mod, logger, session, meta, **options)
 
 
 def sync_metadata_from_file(meta, logger, **options):
@@ -336,27 +334,25 @@ def sync_data_from_dir(meta, logger, content, **options):
     else:
         hdlr_mod = None
 
-    sess_ctx = irods_session(hdlr_mod, meta, **options)
+    session = irods_session(hdlr_mod, meta, **options)
 
-    with sess_ctx as session:
+    exists = session.collections.exists(target)
 
-        exists = session.collections.exists(target)
+    if hasattr(hdlr_mod, "operation"):
+        op = hdlr_mod.operation(session, meta, **options)
+    else:
+        op = Operation.REGISTER_SYNC
 
-        if hasattr(hdlr_mod, "operation"):
-            op = hdlr_mod.operation(session, meta, **options)
+    if op == Operation.NO_OP:
+        if not exists:
+            call(hdlr_mod, "on_collection_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
         else:
-            op = Operation.REGISTER_SYNC
-
-        if op == Operation.NO_OP:
-            if not exists:
-                call(hdlr_mod, "on_collection_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
-            else:
-                call(hdlr_mod, "on_collection_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
+            call(hdlr_mod, "on_collection_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
+    else:
+        if not exists:
+            create_dirs(hdlr_mod, logger, session, meta, **options)
         else:
-            if not exists:
-                create_dirs(hdlr_mod, logger, session, meta, **options)
-            else:
-                call(hdlr_mod, "on_collection_modify", sync_dir_meta, logger, hdlr_mod, logger, session, meta, **options)
+            call(hdlr_mod, "on_collection_modify", sync_dir_meta, logger, hdlr_mod, logger, session, meta, **options)
 
 
 def sync_metadata_from_dir(meta, logger, **options):
