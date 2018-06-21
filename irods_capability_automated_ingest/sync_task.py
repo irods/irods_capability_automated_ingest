@@ -12,35 +12,35 @@ import time
 class IrodsTask(app.Task):
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
-        logger = sync_logging.get_sync_logger()
         meta = args[0]
         config = meta["config"]
         job_name = meta["job_name"]
+        logger = sync_logging.get_sync_logger(config["log"])
         r = get_redis(config)
         logger.error('failed_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo)
         incr_with_key(r, failures_key, job_name)
 
     def on_retry(self, exc, task_id, args, kwargs, einfo):
-        logger = sync_logging.get_sync_logger()
         meta = args[0]
         config = meta["config"]
         job_name = meta["job_name"]
+        logger = sync_logging.get_sync_logger(config["log"])
         r = get_redis(config)
         logger.warn('retry_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo)
         incr_with_key(r, retries_key, job_name)
 
     def on_success(self, retval, task_id, args, kwargs):
-        logger = sync_logging.get_sync_logger()
         meta = args[0]
         config = meta["config"]
+        logger = sync_logging.get_sync_logger(config["log"])
         job_name = meta["job_name"]
         logger.info('succeeded_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
 
     def after_return(self, status, retval, task_id, args, kwargs, einfo):
-        logger = sync_logging.get_sync_logger()
         meta = args[0]
         config = meta["config"]
         job_name = meta["job_name"]
+        logger = sync_logging.get_sync_logger(config["log"])
         r = get_redis(config)
         logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
         decr_with_key(r, tasks_key, job_name)
@@ -55,7 +55,6 @@ def async(r, logger, task, meta, queue):
 
 def done(r, job_name):
     ntasks = get_with_key(r, tasks_key, job_name, int)
-    print("number of tasks remaining = " + str(ntasks))
     return ntasks is None or ntasks == 0
 
 
@@ -83,7 +82,7 @@ def sync_path(self, meta):
     file_q_name = meta["file_queue"]
     config = meta["config"]
     logging_config = config["log"]
-    logger = sync_logging.create_sync_logger(logging_config)
+    logger = sync_logging.get_sync_logger(logging_config)
     timeout = get_timeout(logger, meta)
 
     max_retries = get_max_retries(logger, meta)
@@ -123,7 +122,7 @@ def sync_file(self, meta):
     target = meta["target"]
     config = meta["config"]
     logging_config = config["log"]
-    logger = sync_logging.create_sync_logger(logging_config)
+    logger = sync_logging.get_sync_logger(logging_config)
 
     max_retries = get_max_retries(logger, meta)
 
@@ -178,7 +177,7 @@ def sync_dir(self, meta):
     target = meta["target"]
     config = meta["config"]
     logging_config = config["log"]
-    logger = sync_logging.create_sync_logger(logging_config)
+    logger = sync_logging.get_sync_logger(logging_config)
 
     max_retries = get_max_retries(logger, meta)
 
@@ -240,11 +239,10 @@ def restart(meta):
     interval = meta["interval"]
     config = meta["config"]
     logging_config = config["log"]
-    print(interval)
     if interval is not None:
         restart.s(meta).apply_async(task_id=job_name, queue=restart_queue, countdown=interval)
 
-    logger = sync_logging.create_sync_logger(logging_config)
+    logger = sync_logging.get_sync_logger(logging_config)
 
     timeout = get_timeout(logger, meta)
 
@@ -275,7 +273,6 @@ def restart(meta):
 
 def start_synchronization(data):
 
-    print("start synchronization")
     config = data["config"]
     logging_config = config["log"]
     root = data["root"]
@@ -287,7 +284,7 @@ def start_synchronization(data):
     restart_queue = data["restart_queue"]
     timeout = data["timeout"]
 
-    logger = sync_logging.create_sync_logger(logging_config)
+    logger = sync_logging.get_sync_logger(logging_config)
 
     data_copy = data.copy()
     root_abs = realpath(root)
@@ -311,12 +308,11 @@ def start_synchronization(data):
             r.rpush("periodic", job_name.encode("utf-8"))
             restart.s(data_copy).apply_async(queue=restart_queue, task_id=job_name)
         else:
-            print("restart")
             restart.s(data_copy).apply_async(queue=restart_queue)
 
 
 def stop_synchronization(job_name, config):
-    logger = sync_logging.create_sync_logger(config["log"])
+    logger = sync_logging.get_sync_logger(config["log"])
 
     r = get_redis(config)
 
