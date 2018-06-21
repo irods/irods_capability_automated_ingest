@@ -6,6 +6,7 @@ import importlib
 from .sync_utils import size, get_redis
 from .utils import Operation
 import redis_lock
+import json
 
 
 def call(hdlr_mod, hdlr, func, logger, *args, **options):
