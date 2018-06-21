@@ -53,8 +53,7 @@ def handle_stop(args):
 
 def handle_list(args):
     jobs = list_synchronization(get_config(args))
-    for job_id in jobs:
-        print(job_id)
+    print(json.dumps(jobs))
 
 
 def main():

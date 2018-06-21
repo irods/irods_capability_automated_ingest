@@ -29,6 +29,7 @@ The example diagrams below show a filesystem scanner and a landing zone.
 | to_resource | defines  target resource request of operation |  as provided by client environment |
 | operation | defines the mode of operation |  `Operation.REGISTER_SYNC` |
 | max_retries | defines max retries | 0
+| delay | | 
 
 Event handlers can use `logger` to write logs. See `structlog` for available logging methods and signatures.
 
@@ -137,7 +138,7 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 
 #### start
 ```
-python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --timeout <timeout> ] [ --all ]
+python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --timeout <timeout> ] [ --all ] [ --synchronous ]
 ```
 
 If `-i` is not present, then only sync once
@@ -158,6 +159,10 @@ python -m irods_capability_automated_ingest.irods_sync list
 python -m irods_capability_automated_ingest.irods_sync stop <job name>
 ```
 
+#### watch
+```
+python -m irods_capability_automated_ingest.irods_sync stop <job name>
+```
 
 ### Intermediate: dockerize, manually config
 

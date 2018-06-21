@@ -4,9 +4,12 @@ from os.path import isfile, join, getmtime, realpath, relpath, getctime
 from datetime import datetime
 import redis_lock
 from . import sync_logging, sync_irods
-from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay
+from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay, count_key
 from uuid import uuid1
 import time
+from tqdm import tqdm
+import sys
+import json
 
 
 class IrodsTask(app.Task):
@@ -43,14 +46,17 @@ class IrodsTask(app.Task):
         logger = sync_logging.get_sync_logger(config["log"])
         r = get_redis(config)
         logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
-        decr_with_key(r, tasks_key, job_name)
+        if decr_with_key(r, tasks_key, job_name) == 0:
+            cleanup(r, job_name)
 
 
 def async(r, logger, task, meta, queue):
     job_name = meta["job_name"]
     logger.info('incr_job_name', task=meta["task"], path=meta["path"], job_name=job_name)
     incr_with_key(r, tasks_key, job_name)
-    task.s(meta).apply_async(queue=queue,task_id=task.name+":"+meta["path"]+":"+meta["target"]+":"+str(time.time()))
+    task_id = task.name+":"+meta["path"]+":"+meta["target"]+":"+str(time.time())+":"+job_name
+    r.rpush(count_key(job_name), task_id)
+    task.s(meta).apply_async(queue=queue, task_id=task_id)
 
 
 def done(r, job_name):
@@ -59,13 +65,16 @@ def done(r, job_name):
 
 
 def cleanup(r, job_name):
-    hdlr = get_with_key(r, cleanup_key, job_name, lambda x: x)
-    if hdlr is not None:
-        os.remove(hdlr.decode("utf-8"))
-        reset_with_key(r, cleanup_key, job_name)
+    hdlr = get_with_key(r, cleanup_key, job_name, lambda bs: json.loads(bs.decode("utf-8")))
+    for f in hdlr:
+        os.remove(f)
 
     if periodic(r, job_name):
         r.lrem("periodic", 1, job_name)
+    else:
+        r.lrem("singlepass", 1, job_name)
+
+    reset_with_key(r, cleanup_key, job_name)
 
 
 def periodic(r, job_name):
@@ -250,6 +259,9 @@ def restart(meta):
         logger.info("***************** restart *****************")
         r = get_redis(config)
 
+        reset_with_key(r, count_key, job_name)
+        set_with_key(r, tasks_key, job_name, 0)
+
         if interval is not None:
             if done(r, job_name):
                 logger.info("queue empty and worker not busy")
@@ -277,12 +289,10 @@ def start_synchronization(data):
     logging_config = config["log"]
     root = data["root"]
     job_name = data["job_name"]
-    event_handler = data.get("event_handler")
-    event_handler_data = data.get("event_handler_data")
-    event_handler_path = data.get("event_handler_path")
     interval = data["interval"]
     restart_queue = data["restart_queue"]
     timeout = data["timeout"]
+    sychronous = data["synchronous"]
 
     logger = sync_logging.get_sync_logger(logging_config)
 
@@ -291,24 +301,68 @@ def start_synchronization(data):
     data_copy["root"] = root_abs
     data_copy["path"] = root_abs
 
-    r = get_redis(config)
-    with redis_lock.Lock(r, "lock:periodic"):
-        if interval is not None and periodic(r, job_name):
-            logger.error("job exists")
-            raise Exception("job exists")
+    def store_event_handler(data):
+        event_handler = data.get("event_handler")
+        event_handler_data = data.get("event_handler_data")
+        event_handler_path = data.get("event_handler_path")
 
         if event_handler is None and event_handler_path is not None and event_handler_data is not None:
             event_handler = "event_handler" + uuid1().hex
-            hdlr2 = event_handler_path + "/" + event_handler + ".py"
+            hdlr2 = event_handler_path + "/" + hdlr + ".py"
             with open(hdlr2, "w") as f:
                 f.write(event_handler_data)
-            set_with_key(r, cleanup_key, job_name, hdlr2.encode("utf-8"))
-
-        if interval is not None:
-            r.rpush("periodic", job_name.encode("utf-8"))
-            restart.s(data_copy).apply_async(queue=restart_queue, task_id=job_name)
+            cleanup_list = [hdlr2.encode("utf-8")]
+            data["event_handler"] = event_handler
         else:
+            cleanup_list = []
+        set_with_key(r, cleanup_key, job_name, json.dumps(cleanup_list))
+
+    r = get_redis(config)
+    with redis_lock.Lock(r, "lock:periodic"):
+        if get_with_key(r, cleanup_key, job_name, str) is not None:
+            logger.error("job exists")
+            raise Exception("job exists")
+
+        store_event_handler(data_copy)
+
+    if interval is not None:
+        r.rpush("periodic", job_name.encode("utf-8"))
+
+        restart.s(data_copy).apply_async(queue=restart_queue, task_id=job_name)
+    else:
+        r.rpush("singlepass", job_name.encode("utf-8"))
+        if not sychronous:
             restart.s(data_copy).apply_async(queue=restart_queue)
+        else:
+            restart.s(data_copy).apply()
+            monitor_synchronization(job_name, config)
+
+
+def monitor_synchronization(job_name, config):
+
+    logging_config = config["log"]
+
+    logger = sync_logging.get_sync_logger(logging_config)
+
+    r = get_redis(config)
+    if get_with_key(r, cleanup_key, job_name, str) is None:
+        logger.error("job not exists")
+        raise Exception("job not exists")
+
+    with tqdm(total=1) as pbar:
+        def update_pbar():
+            total2 = get_with_key(r, tasks_key, job_name, int)
+            total = r.llen(count_key(job_name))
+            percentage = (total - total2) / total
+            failures = get_with_key(r, failures_key, job_name, int)
+            retries = get_with_key(r, retries_key, job_name, int)
+
+            pbar.set_postfix(count=str(total), tasks=str(total2), failures=str(failures), retries=str(retries))
+            pbar.update(max(0, percentage - pbar.n))
+
+        while not done(r, job_name) or periodic(r, job_name):
+            update_pbar()
+            time.sleep(1)
 
 
 def stop_synchronization(job_name, config):
@@ -321,12 +375,9 @@ def stop_synchronization(job_name, config):
             logger.error("job not exists")
             raise Exception("job not exists")
 
-        app.control.revoke(job_name)
-
-        cleanup(r, job_name)
-
 
 def list_synchronization(config):
     r = get_redis(config)
     with redis_lock.Lock(r, "lock:periodic"):
-        return map(lambda job_id: job_id.decode("utf-8"), r.lrange("periodic", 0, -1))
+        return {"periodic":list(map(lambda job_id: job_id.decode("utf-8"), r.lrange("periodic", 0, -1))),
+                "singlepass":list(map(lambda job_id: job_id.decode("utf-8"), r.lrange("singlepass", 0, -1)))}

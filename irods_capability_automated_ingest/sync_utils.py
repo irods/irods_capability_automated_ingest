@@ -53,6 +53,10 @@ def tasks_key(job_name):
     return "tasks:/"+job_name
 
 
+def count_key(job_name):
+    return "count:/"+job_name
+
+
 def failures_key(job_name):
     return "failures:/"+job_name
 
@@ -83,8 +87,7 @@ def incr_with_key(r, key, path):
 
 
 def decr_with_key(r, key, path):
-    if r.decr(key(path)) == 0:
-        reset_with_key(r, key, path)
+    return r.decr(key(path))
 
 
 def get_hdlr_mod(meta):
