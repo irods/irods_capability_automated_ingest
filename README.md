@@ -82,16 +82,11 @@ source rodssync/bin/activate
 #### clone repo
 
 #### rq
- * rq
- * rq-scheduler
+ * celery[redis]
+ * progressbar2
  * python-redis-lock
 ```
-pip install rq python-redis-lock # rq-scheduler
-```
-
-before the follow pr for adding metadata support for `rq-scheduler` is merged:
-```
-pip install git+git://github.com/as3445/rq-scheduler-bcfg.git@879d8d81d0d658c1233a0f6a4322a798f981e448
+pip install celery[redis] progressbar2 python-redis-lock
 ```
 
 make sure you are in the repo for the following commands
@@ -99,14 +94,22 @@ make sure you are in the repo for the following commands
 cd <repo dir>
 ```
 
-start rqscheduler
+start celery worker(s)
+
+`fish`
 ```
-rqscheduler -i 1
+set -xl CELERY_BROKER_URL <redis>
+set -xl PYTHONPATH (pwd)
 ```
 
-start rq worker(s)
+`bash`
 ```
-celery -A irods_capability_automated_ingest.sync_task worker -l info -Q restart,path,file -c <n> 
+export CELERY_BROKER_URL=<redis>
+export PYTHONPATH=`pwd`
+```
+
+```
+celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart,path,file -c <n> 
 ```
 
 #### job monitoring
@@ -149,7 +152,9 @@ Timeout seconds.
 
 The `--all` ignores cached last sync time.
 
-#### list restarting jobs
+The `--synchronous` will block until job is done and show progress bar
+
+#### list jobs
 ```
 python -m irods_capability_automated_ingest.irods_sync list
 ```
@@ -161,7 +166,7 @@ python -m irods_capability_automated_ingest.irods_sync stop <job name>
 
 #### watch
 ```
-python -m irods_capability_automated_ingest.irods_sync stop <job name>
+python -m irods_capability_automated_ingest.irods_sync watch <job name>
 ```
 
 ### Intermediate: dockerize, manually config

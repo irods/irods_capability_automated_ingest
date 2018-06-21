@@ -7,7 +7,7 @@ from . import sync_logging, sync_irods
 from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay, count_key
 from uuid import uuid1
 import time
-from tqdm import tqdm
+import progressbar
 import sys
 import json
 
@@ -349,7 +349,17 @@ def monitor_synchronization(job_name, config):
         logger.error("job not exists")
         raise Exception("job not exists")
 
-    with tqdm(total=1) as pbar:
+    widgets = [
+        ' [', progressbar.Timer(), '] ',
+        progressbar.Bar(),
+        ' (', progressbar.ETA(), ') ',
+        progressbar.DynamicMessage("count"), " ",
+        progressbar.DynamicMessage("tasks"), " ",
+        progressbar.DynamicMessage("failures"), " ",
+        progressbar.DynamicMessage("retries")
+    ]
+
+    with progressbar.ProgressBar(max_value=1, widgets=widgets, redirect_stdout=True) as bar:
         def update_pbar():
             total2 = get_with_key(r, tasks_key, job_name, int)
             total = r.llen(count_key(job_name))
@@ -357,12 +367,13 @@ def monitor_synchronization(job_name, config):
             failures = get_with_key(r, failures_key, job_name, int)
             retries = get_with_key(r, retries_key, job_name, int)
 
-            pbar.set_postfix(count=str(total), tasks=str(total2), failures=str(failures), retries=str(retries))
-            pbar.update(max(0, percentage - pbar.n))
+            bar.update(percentage, count=total, tasks=total2, failures=failures, retries=retries)
 
         while not done(r, job_name) or periodic(r, job_name):
             update_pbar()
             time.sleep(1)
+
+        update_pbar()
 
 
 def stop_synchronization(job_name, config):
