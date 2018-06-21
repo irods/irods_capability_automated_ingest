@@ -1,4 +1,4 @@
-from .sync_task import start_synchronization, stop_synchronization, list_synchronization
+from .sync_task import start_synchronization, stop_synchronization, list_synchronization, monitor_synchronization
 import argparse
 from uuid import uuid1
 import json
@@ -43,7 +43,8 @@ def handle_start(args):
         "timeout": args.timeout,
         "all": args.all,
         "event_handler": args.event_handler,
-        "config": get_config(args)
+        "config": get_config(args),
+        "synchronous": args.synchronous
     })
 
 
@@ -51,10 +52,13 @@ def handle_stop(args):
     stop_synchronization(args.job_name, get_config(args))
 
 
+def handle_watch(args):
+    monitor_synchronization(args.job_name, get_config(args))
+
+
 def handle_list(args):
     jobs = list_synchronization(get_config(args))
-    for job_id in jobs:
-        print(job_id)
+    print(json.dumps(jobs))
 
 
 def main():
@@ -75,6 +79,7 @@ def main():
     parser_start.add_argument('--append_json', action="store", metavar='APPEND JSON', type=json.loads, default=None, help='append json')
     parser_start.add_argument('--timeout', action="store", metavar='TIMEOUT', type=int, default=3600, help='timeout')
     parser_start.add_argument('--all', action="store_true", default=False, help='all')
+    parser_start.add_argument('--synchronous', action="store_true", default=False, help='synchronous')
     add_arguments(parser_start)
 
 
@@ -84,6 +89,11 @@ def main():
     parser_stop.add_argument('job_name', action="store", metavar='JOB NAME', type=str, help='job name')
     add_arguments(parser_stop)
     parser_stop.set_defaults(func=handle_stop)
+
+    parser_watch = subparsers.add_parser("watch", help="watch help")
+    parser_watch.add_argument('job_name', action="store", metavar='JOB NAME', type=str, help='job name')
+    add_arguments(parser_watch)
+    parser_watch.set_defaults(func=handle_watch)
 
     parser_list = subparsers.add_parser("list", help="list help")
     add_arguments(parser_list)

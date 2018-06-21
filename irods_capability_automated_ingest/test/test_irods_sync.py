@@ -137,11 +137,11 @@ def create_files(nfiles):
 
 
 def create_files2(depth, nfiles):
-    a = join(A, *list(map(lambda i : "a" + str(i), range(depth))))
+    a = join(A, *list(map(lambda i: "a" + str(i), range(depth))))
     makedirs(a)
     for i in range(nfiles):
-        with open(join(a,str(i)), "w") as f:
-            f.write("i" + str(i))
+        with open(join(a, str(i)), "w") as f:
+            f.write("i" * i)
 
 
 def recreate_files(nfiles):
@@ -149,10 +149,10 @@ def recreate_files(nfiles):
 
 
 def recreate_files2(depth, nfiles):
-    a = join(A, *list(map(lambda i : "a" + str(i), range(depth))))
+    a = join(A, *list(map(lambda i: "a" + str(i), range(depth))))
     for i in range(nfiles):
-        with open(join(a,str(i)), "w") as f:
-            f.write("i" + str(i * 2 + 1))
+        with open(join(a, str(i)), "w") as f:
+            f.write("i" * (i * 2 + 1))
 
 
 def ctime_files(nfiles=NFILES):

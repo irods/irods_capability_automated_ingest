@@ -30,6 +30,7 @@ The example diagrams below show a filesystem scanner and a landing zone.
 | operation | defines the mode of operation |  `Operation.REGISTER_SYNC` |
 | max_retries | defines max retries | 0
 | timeout | defines timeout | 3600
+| delay | | 
 
 Event handlers can use `logger` to write logs. See `structlog` for available logging methods and signatures.
 
@@ -82,10 +83,11 @@ source rodssync/bin/activate
 #### clone repo
 
 #### celery
- * celery
+ * celery[redis]
+ * progressbar2
  * python-redis-lock
 ```
-pip install celery[redis] python-redis-lock
+pip install celery[redis] progressbar2 python-redis-lock
 ```
 
 make sure you are in the repo for the following commands
@@ -97,16 +99,18 @@ start celery worker(s)
 
 `fish`
 ```
-set -lx CELERY_BROKER_URL "redis://localhost/0"
+set -xl CELERY_BROKER_URL <redis>
+set -xl PYTHONPATH (pwd)
 ```
 
 `bash`
 ```
-celery worker -A irods_capability_automated_ingest.sync_task -c <n>
+export CELERY_BROKER_URL=<redis>
+export PYTHONPATH=`pwd`
 ```
 
 ```
-celery -A irods_capability_automated_ingest.sync_task worker -l info -Q restart,path,file -c <n> 
+celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart,path,file -c <n> 
 ```
 
 #### job monitoring
@@ -138,7 +142,7 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 
 #### start
 ```
-python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --all ]
+python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --timeout <timeout> ] [ --all ] [ --synchronous ]
 ```
 
 If `-i` is not present, then only sync once
@@ -147,7 +151,9 @@ The `--append_json` is stored in `job.meta["append_json"]`
 
 The `--all` ignores cached last sync time.
 
-#### list restarting jobs
+The `--synchronous` will block until job is done and show progress bar
+
+#### list jobs
 ```
 python -m irods_capability_automated_ingest.irods_sync list
 ```
@@ -157,6 +163,10 @@ python -m irods_capability_automated_ingest.irods_sync list
 python -m irods_capability_automated_ingest.irods_sync stop <job name>
 ```
 
+#### watch
+```
+python -m irods_capability_automated_ingest.irods_sync watch <job name>
+```
 
 ### Intermediate: dockerize, manually config
 
