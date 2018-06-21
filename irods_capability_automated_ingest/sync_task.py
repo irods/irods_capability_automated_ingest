@@ -131,6 +131,7 @@ def sync_file(self, meta):
     target = meta["target"]
     config = meta["config"]
     logging_config = config["log"]
+    all = meta["all"]
     logger = sync_logging.get_sync_logger(logging_config)
 
     max_retries = get_max_retries(logger, meta)
@@ -186,6 +187,7 @@ def sync_dir(self, meta):
     target = meta["target"]
     config = meta["config"]
     logging_config = config["log"]
+    all = meta["all"]
     logger = sync_logging.get_sync_logger(logging_config)
 
     max_retries = get_max_retries(logger, meta)
