@@ -6,6 +6,7 @@ import importlib
 from .sync_utils import size, get_redis
 from .utils import Operation
 import redis_lock
+import json
 
 
 def call(hdlr_mod, hdlr, func, logger, *args, **options):
@@ -197,6 +198,9 @@ def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
     pass
 
 
+irods_session_map = {}
+
+
 def irods_session(hdlr_mod, meta, **options):
     env_irods_host = os.environ.get("IRODS_HOST")
     env_irods_port = os.environ.get("IRODS_PORT")
@@ -228,7 +232,15 @@ def irods_session(hdlr_mod, meta, **options):
         kwargs["client_user"] = client_user
         kwargs["client_zone"] = client_zone
 
-    return iRODSSession(**kwargs)
+    key = json.dumps(kwargs) # todo add timestamp of env file to key
+
+    sess = irods_session_map.get(key)
+
+    if sess is not None:
+        sess = iRODSSession(**kwargs)
+        irods_session_map[key] = sess
+
+    return sess
 
 
 def sync_data_from_file(meta, logger, content, **options):
