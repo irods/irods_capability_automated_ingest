@@ -1,6 +1,6 @@
 from os import listdir
 import os
-from os.path import isfile, join, getmtime, realpath, relpath, getctime
+from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir
 from datetime import datetime
 import redis_lock
 from . import sync_logging, sync_irods
@@ -136,7 +136,7 @@ def sync_path(self, meta):
             meta["task"] = "sync_file"
             async(r, logger, sync_file, meta, file_q_name)
             logger.info("succeeded", task=task, path=path)
-        else:
+        elif isdir(path):
             logger.info("walk dir", path=path)
             meta = meta.copy()
             meta["task"] = "sync_dir"
@@ -146,8 +146,12 @@ def sync_path(self, meta):
                 meta["path"] = join(path, n)
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
+        else:
+            logger.error("failed_OSError", err="path not exists", task=task, path=path,
+                           traceback=traceback.extract_stack())
+
     except OSError as err:
-        logger.warning("failed_OSError", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
+        logger.error("failed_OSError", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
     except Exception as err:
         logger.error("failed", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
