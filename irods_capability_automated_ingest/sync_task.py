@@ -57,7 +57,7 @@ class IrodsTask(app.Task):
         r.rpush(dequeue_key(job_name), task_id)
 
 
-@app.task(bound=True)
+@app.task(bind=True)
 def cleanup_task(self, config, job_name):
     try:
         r = get_redis(config)
