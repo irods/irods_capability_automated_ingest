@@ -147,13 +147,9 @@ def sync_path(self, meta):
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
         else:
-            logger.error("failed_OSError", err="path not exists", task=task, path=path,
-                           traceback=traceback.extract_stack())
+            raise RuntimeError("path not exists")
 
-    except OSError as err:
-        logger.error("failed_OSError", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
     except Exception as err:
-        logger.error("failed", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
 
@@ -202,10 +198,7 @@ def sync_file(self, meta):
             logger.info("succeeded_metadata_only", task=task, path=path)
         else:
             logger.info("succeeded_file_has_not_changed", task=task, path=path)
-    except OSError as err:
-        logger.warning("failed_OSError", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
     except Exception as err:
-        logger.error("failed", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
     finally:
@@ -265,10 +258,7 @@ def sync_dir(self, meta):
             logger.info("succeeded_metadata_only", task=task, path=path)
         else:
             logger.info("succeeded_file_has_not_changed", task=task, path=path)
-    except OSError as err:
-        logger.warning("failed_OSError", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
     except Exception as err:
-        logger.error("failed", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
     finally:
