@@ -27,6 +27,7 @@ def child_of(session, child_resc_name, resc_name):
             if parent_resc_id is None:
                 break
 
+            parent_resc_name = None
             for row in session.query(Resource.name).filter(Resource.id == parent_resc_id):
                 parent_resc_name = row[Resource.name]
             if parent_resc_name == resc_name:
