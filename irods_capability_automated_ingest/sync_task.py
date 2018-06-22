@@ -4,7 +4,9 @@ from os.path import isfile, join, getmtime, realpath, relpath, getctime
 from datetime import datetime
 import redis_lock
 from . import sync_logging, sync_irods
-from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay, count_key, stop_key
+from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, \
+    incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay, \
+    count_key, stop_key, dequeue_key
 from .utils import retry
 from uuid import uuid1
 import time
@@ -50,6 +52,8 @@ class IrodsTask(app.Task):
         if retry(logger, "decr_with_key", lambda: decr_with_key(r, tasks_key, job_name)) == 0:
             retry(logger, "cleanup", lambda: cleanup(r, job_name))
 
+        r.rpush(dequeue_key(job_name), task_id)
+
 
 def async(r, logger, task, meta, queue):
     job_name = meta["job_name"]
@@ -68,12 +72,23 @@ def done(r, job_name):
     return ntasks is None or ntasks == 0
 
 
+def init(r, job_name):
+    reset_with_key(r, count_key, job_name)
+    reset_with_key(r, dequeue_key, job_name)
+    set_with_key(r, tasks_key, job_name, 0)
+    set_with_key(r, failures_key, job_name, 0)
+    set_with_key(r, retries_key, job_name, 0)
+
+
 def cleanup(r, job_name, cli=False):
     set_with_key(r, stop_key, job_name, "")
-    tasks = map(lambda x: x.decode("utf-8"), r.lrange(count_key(job_name), 0, -1))
+    tasks = list(map(lambda x: x.decode("utf-8"), r.lrange(count_key(job_name), 0, -1)))
+    tasks2 = set(map(lambda x: x.decode("utf-8"), r.lrange(dequeue_key(job_name), 0, -1)))
+
+    tasks = [item for item in tasks if tasks not in tasks2]
 
     if cli:
-        tasks = progressbar.progressbar(tasks, max_value=r.llen(count_key(job_name)))
+        tasks = progressbar.progressbar(tasks, max_value=len(tasks))
 
     for task in tasks:
         app.control.revoke(task)
@@ -275,24 +290,15 @@ def restart(meta):
         logger.info("***************** restart *****************")
         r = get_redis(config)
 
-        reset_with_key(r, count_key, job_name)
-        set_with_key(r, tasks_key, job_name, 0)
-        set_with_key(r, failures_key, job_name, 0)
-        set_with_key(r, retries_key, job_name, 0)
+        if done(r, job_name):
+            logger.info("queue empty and worker not busy")
 
-        if interval is not None:
-            if done(r, job_name):
-                logger.info("queue empty and worker not busy")
-
-                meta = meta.copy()
-                meta["task"] = "sync_path"
-                async(r, logger, sync_path, meta, path_q_name)
-            else:
-                logger.info("queue not empty or worker busy")
-        else:
+            init(r, job_name)
             meta = meta.copy()
             meta["task"] = "sync_path"
             async(r, logger, sync_path, meta, path_q_name)
+        else:
+            logger.info("queue not empty or worker busy")
 
     except OSError as err:
         logger.warning("Warning: " + str(err))

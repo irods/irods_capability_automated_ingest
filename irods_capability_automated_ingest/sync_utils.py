@@ -61,6 +61,10 @@ def count_key(job_name):
     return "count:/"+job_name
 
 
+def dequeue_key(job_name):
+    return "dequeue:/"+job_name
+
+
 def failures_key(job_name):
     return "failures:/"+job_name
 
