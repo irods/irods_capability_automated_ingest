@@ -3,6 +3,7 @@ import argparse
 from uuid import uuid1
 import json
 
+
 def get_config(args):
     return {
         "log": {
@@ -11,12 +12,13 @@ def get_config(args):
             "interval": getattr(args, "log_interval", None),
             "level": getattr(args, "log_level", None)
         },
-        "redis":{
-            "host" : args.redis_host,
-            "port" : args.redis_port,
-            "db" : args.redis_db
+        "redis": {
+            "host": args.redis_host,
+            "port": args.redis_port,
+            "db": args.redis_db
         }
     }
+
 
 def add_arguments(parser):
     parser.add_argument('--redis_host', action="store", metavar="REDIS HOST", type=str, default="localhost", help="redis host")
@@ -82,7 +84,6 @@ def main():
     parser_start.add_argument('--synchronous', action="store_true", default=False, help='synchronous')
     add_arguments(parser_start)
 
-
     parser_start.set_defaults(func=handle_start)
 
     parser_stop = subparsers.add_parser("stop", help="stop help")
@@ -101,6 +102,7 @@ def main():
 
     args = parser.parse_args()
     args.func(args)
+
 
 if __name__ == "__main__":
     main()

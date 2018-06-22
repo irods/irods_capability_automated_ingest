@@ -73,7 +73,7 @@ def get_config():
             "interval": os.environ.get("log_interval"),
             "level": os.environ.get("log_level")
         },
-        "redis":{
+        "redis": {
             "host" : os.environ.get("redis_host", "localhost"),
             "port" : os.environ.get("redis_port", 6379),
             "db" : os.environ.get("redis_db", 0)

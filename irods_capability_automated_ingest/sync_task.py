@@ -7,7 +7,7 @@ from . import sync_logging, sync_irods
 from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, \
     incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay, \
     count_key, stop_key, dequeue_key
-from .utils import retry, MAX_RETRIES
+from .utils import retry
 from uuid import uuid1
 import time
 import progressbar
@@ -46,7 +46,6 @@ class IrodsTask(app.Task):
         meta = args[0]
         config = meta["config"]
         job_name = meta["job_name"]
-        restart_queue = meta["restart_queue"]
         logger = sync_logging.get_sync_logger(config["log"])
         logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
 
@@ -328,7 +327,6 @@ def start_synchronization(data):
     job_name = data["job_name"]
     interval = data["interval"]
     restart_queue = data["restart_queue"]
-    timeout = data["timeout"]
     sychronous = data["synchronous"]
 
     logger = sync_logging.get_sync_logger(logging_config)
@@ -396,7 +394,7 @@ def monitor_synchronization(job_name, config):
         progressbar.DynamicMessage("retries")
     ]
 
-    with progressbar.ProgressBar(max_value=1, widgets=widgets, redirect_stdout=True) as bar:
+    with progressbar.ProgressBar(max_value=1, widgets=widgets, redirect_stdout=True, redirect_stderr=True) as bar:
         def update_pbar():
             total2 = get_with_key(r, tasks_key, job_name, int)
             total = r.llen(count_key(job_name))

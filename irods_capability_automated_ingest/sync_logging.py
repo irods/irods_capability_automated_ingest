@@ -1,5 +1,3 @@
-import traceback
-
 import structlog
 import logging
 import logging.handlers
@@ -9,6 +7,7 @@ import time
 import sys
 
 irods_sync_logger = "irods_sync"
+
 
 def timestamper(logger, log_method, event_dict):
     utc_offset_sec = time.altzone if time.localtime().tm_isdst else time.timezone
@@ -73,4 +72,3 @@ def get_sync_logger_key(logging_config):
     if level is None:
         level = ""
     return filename + "/" + level
-
