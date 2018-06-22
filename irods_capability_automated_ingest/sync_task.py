@@ -7,7 +7,7 @@ from . import sync_logging, sync_irods
 from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, \
     incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay, \
     count_key, stop_key, dequeue_key
-from .utils import retry
+from .utils import retry, MAX_RETRIES
 from uuid import uuid1
 import time
 import progressbar
@@ -57,10 +57,15 @@ class IrodsTask(app.Task):
         r.rpush(dequeue_key(job_name), task_id)
 
 
-@app.task
-def cleanup_task(config, job_name):
-    r = get_redis(config)
-    retry(lambda: cleanup(r, job_name))
+@app.task(bound=True)
+def cleanup_task(self, config, job_name):
+    try:
+        r = get_redis(config)
+        cleanup(r, job_name)
+    except Exception as err:
+        logger = sync_logging.get_sync_logger(config["log"])
+        logger.error("failed_cleanup", job_name=job_name, err=err, stacktrace=traceback.extract_tb(err.__traceback__))
+        self.retry(max_retries=MAX_RETRIES, exc=err, countdown=1)
 
 
 def async(r, logger, task, meta, queue):
