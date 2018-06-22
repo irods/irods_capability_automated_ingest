@@ -1,4 +1,5 @@
 from enum import Enum
+import time
 
 class Operation(Enum):
     REGISTER_SYNC = 0
