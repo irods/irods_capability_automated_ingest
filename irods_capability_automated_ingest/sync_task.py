@@ -96,7 +96,7 @@ def init(r, job_name):
     set_with_key(r, retries_key, job_name, 0)
 
 
-def cleanup_running(r, job_name, cli=True, terminate=True):
+def interrupt(r, job_name, cli=True, terminate=True):
     set_with_key(r, stop_key, job_name, "")
     tasks = list(map(lambda x: x.decode("utf-8"), r.lrange(count_key(job_name), 0, -1)))
     tasks2 = set(map(lambda x: x.decode("utf-8"), r.lrange(dequeue_key(job_name), 0, -1)))
@@ -110,8 +110,6 @@ def cleanup_running(r, job_name, cli=True, terminate=True):
         app.control.revoke(task, terminate=terminate)
 
     # TODO stop restart job
-
-    cleanup(r, job_name)
 
     reset_with_key(r, stop_key, job_name)
 
@@ -429,7 +427,8 @@ def stop_synchronization(job_name, config):
             logger.error("job not exists")
             raise Exception("job not exists")
         else:
-            cleanup_running(r, job_name)
+            interrupt(r, job_name)
+            cleanup(r, job_name)
 
 
 def list_synchronization(config):
