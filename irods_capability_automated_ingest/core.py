@@ -30,7 +30,7 @@ class Core(object):
             cls.post_coll_create(*args, **options)
 
     @classmethod
-    def on_coll_create(cls, func, *args, **options):
+    def on_coll_modify(cls, func, *args, **options):
         if hasattr(cls, "pre_coll_modify"):
             cls.pre_coll_modify(*args, **options)
 
