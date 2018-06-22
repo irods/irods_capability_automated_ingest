@@ -49,6 +49,10 @@ def cleanup_key(job_id):
     return "cleanup:/"+job_id
 
 
+def stop_key(job_id):
+    return "stop:/"+job_id
+
+
 def tasks_key(job_name):
     return "tasks:/"+job_name
 

@@ -4,11 +4,11 @@ from os.path import isfile, join, getmtime, realpath, relpath, getctime
 from datetime import datetime
 import redis_lock
 from . import sync_logging, sync_irods
-from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay, count_key
+from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay, count_key, stop_key
+from .utils import retry
 from uuid import uuid1
 import time
 import progressbar
-import sys
 import json
 
 
@@ -44,10 +44,11 @@ class IrodsTask(app.Task):
         config = meta["config"]
         job_name = meta["job_name"]
         logger = sync_logging.get_sync_logger(config["log"])
-        r = get_redis(config)
         logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
-        if decr_with_key(r, tasks_key, job_name) == 0:
-            cleanup(r, job_name)
+
+        r = get_redis(config)
+        if retry(logger, "decr_with_key", lambda: decr_with_key(r, tasks_key, job_name)) == 0:
+            retry(logger, "cleanup", lambda: cleanup(r, job_name))
 
 
 def async(r, logger, task, meta, queue):
@@ -65,6 +66,11 @@ def done(r, job_name):
 
 
 def cleanup(r, job_name):
+    set_with_key(r, stop_key, job_name, "")
+    tasks = map(lambda x: x.decode("utf-8"), r.lrange(count_key(job_name), 0, -1))
+    for task in tasks:
+        app.control.revoke(task)
+
     hdlr = get_with_key(r, cleanup_key, job_name, lambda bs: json.loads(bs.decode("utf-8")))
     for f in hdlr:
         os.remove(f)
@@ -74,7 +80,10 @@ def cleanup(r, job_name):
     else:
         r.lrem("singlepass", 1, job_name)
 
+    # TODO stop restart job
+
     reset_with_key(r, cleanup_key, job_name)
+    reset_with_key(r, stop_key, job_name)
 
 
 def periodic(r, job_name):
@@ -177,7 +186,6 @@ def sync_file(self, meta):
             lock.release()
 
 
-
 @app.task(bind=True, base=IrodsTask)
 def sync_dir(self, meta):
     hdlr = meta["event_handler"]
@@ -239,7 +247,6 @@ def sync_dir(self, meta):
     finally:
         if lock is not None:
             lock.release()
-
 
 
 @app.task
@@ -390,9 +397,11 @@ def stop_synchronization(job_name, config):
     r = get_redis(config)
 
     with redis_lock.Lock(r, "lock:periodic"):
-        if not periodic(r, job_name):
+        if get_with_key(r, cleanup_key, job_name, str) is None:
             logger.error("job not exists")
             raise Exception("job not exists")
+        else:
+            cleanup(r, job_name)
 
 
 def list_synchronization(config):
