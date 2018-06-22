@@ -53,11 +53,14 @@ class IrodsTask(app.Task):
 
 def async(r, logger, task, meta, queue):
     job_name = meta["job_name"]
-    logger.info('incr_job_name', task=meta["task"], path=meta["path"], job_name=job_name)
-    incr_with_key(r, tasks_key, job_name)
-    task_id = task.name+":"+meta["path"]+":"+meta["target"]+":"+str(time.time())+":"+job_name
-    r.rpush(count_key(job_name), task_id)
-    task.s(meta).apply_async(queue=queue, task_id=task_id)
+    if get_with_key(r, stop_key, job_name) is None:
+        logger.info('incr_job_name', task=meta["task"], path=meta["path"], job_name=job_name)
+        incr_with_key(r, tasks_key, job_name)
+        task_id = task.name+":"+meta["path"]+":"+meta["target"]+":"+str(time.time())+":"+job_name
+        r.rpush(count_key(job_name), task_id)
+        task.s(meta).apply_async(queue=queue, task_id=task_id)
+    else:
+        logger.info('async_job_name_stopping', task=meta["task"], path=meta["path"], job_name=job_name)
 
 
 def done(r, job_name):
