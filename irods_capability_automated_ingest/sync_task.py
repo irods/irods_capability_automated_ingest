@@ -85,7 +85,7 @@ def cleanup(r, job_name, cli=False):
     tasks = list(map(lambda x: x.decode("utf-8"), r.lrange(count_key(job_name), 0, -1)))
     tasks2 = set(map(lambda x: x.decode("utf-8"), r.lrange(dequeue_key(job_name), 0, -1)))
 
-    tasks = [item for item in tasks if task not in tasks2]
+    tasks = [item for item in tasks if item not in tasks2]
 
     if cli:
         tasks = progressbar.progressbar(tasks, max_value=len(tasks))
