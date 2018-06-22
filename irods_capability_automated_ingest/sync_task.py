@@ -12,6 +12,7 @@ from uuid import uuid1
 import time
 import progressbar
 import json
+import traceback
 
 
 class IrodsTask(app.Task):
@@ -22,7 +23,7 @@ class IrodsTask(app.Task):
         job_name = meta["job_name"]
         logger = sync_logging.get_sync_logger(config["log"])
         r = get_redis(config)
-        logger.error('failed_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo, traceback=exc.__traceback__)
+        logger.error('failed_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo, traceback=traceback.extract_tb(exc.__traceback__))
         incr_with_key(r, failures_key, job_name)
 
     def on_retry(self, exc, task_id, args, kwargs, einfo):
@@ -31,7 +32,7 @@ class IrodsTask(app.Task):
         job_name = meta["job_name"]
         logger = sync_logging.get_sync_logger(config["log"])
         r = get_redis(config)
-        logger.warn('retry_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo, traceback=exc.__traceback__)
+        logger.warn('retry_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo, traceback=traceback.extract_tb(exc.__traceback__))
         incr_with_key(r, retries_key, job_name)
 
     def on_success(self, retval, task_id, args, kwargs):
@@ -146,9 +147,9 @@ def sync_path(self, meta):
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
     except OSError as err:
-        logger.warning("failed_OSError", err=err, task=task, path=path, traceback=err.__traceback__)
+        logger.warning("failed_OSError", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
     except Exception as err:
-        logger.error("failed", err=err, task=task, path=path, traceback=err.__traceback__)
+        logger.error("failed", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
 
@@ -198,9 +199,9 @@ def sync_file(self, meta):
         else:
             logger.info("succeeded_file_has_not_changed", task=task, path=path)
     except OSError as err:
-        logger.warning("failed_OSError", err=err, task=task, path=path, traceback=err.__traceback__)
+        logger.warning("failed_OSError", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
     except Exception as err:
-        logger.error("failed", err=err, task=task, path=path, traceback=err.__traceback__)
+        logger.error("failed", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
     finally:
@@ -261,9 +262,9 @@ def sync_dir(self, meta):
         else:
             logger.info("succeeded_file_has_not_changed", task=task, path=path)
     except OSError as err:
-        logger.warning("failed_OSError", err=err, task=task, path=path, traceback=err.__traceback__)
+        logger.warning("failed_OSError", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
     except Exception as err:
-        logger.error("failed", err=err, task=task, path=path, traceback=err.__traceback__)
+        logger.error("failed", err=err, task=task, path=path, traceback=traceback.extract_tb(err.__traceback__))
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
     finally:
@@ -301,9 +302,9 @@ def restart(meta):
             logger.info("queue not empty or worker busy")
 
     except OSError as err:
-        logger.warning("Warning: " + str(err), traceback=err.__traceback__)
+        logger.warning("Warning: " + str(err), traceback=traceback.extract_tb(err.__traceback__))
     except Exception as err:
-        logger.error("Unexpected error: " + str(err), traceback=err.__traceback__)
+        logger.error("Unexpected error: " + str(err), traceback=traceback.extract_tb(err.__traceback__))
         raise
 
 
