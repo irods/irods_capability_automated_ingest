@@ -70,7 +70,7 @@ def cleanup(r, job_name, cli=False):
     tasks = map(lambda x: x.decode("utf-8"), r.lrange(count_key(job_name), 0, -1))
 
     if cli:
-        tasks = progressbar.progressbar(tasks)
+        tasks = progressbar.progressbar(tasks, max_value=r.llen(count_key(job_name)))
 
     for task in tasks:
         app.control.revoke(task)
