@@ -51,7 +51,7 @@ class IrodsTask(app.Task):
         logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
 
         r = get_redis(config)
-        if retry(logger, "decr_with_key", lambda: decr_with_key(r, tasks_key, job_name)) == 0:
+        if retry(logger, "decr_with_key", lambda: decr_with_key(r, tasks_key, job_name)) == 0 and not retry(periodic(r, job_name)):
             cleanup_task.s(config, job_name).apply_async(queue=restart_queue)
 
         r.rpush(dequeue_key(job_name), task_id)
@@ -85,6 +85,20 @@ def done(r, job_name):
     return ntasks is None or ntasks == 0
 
 
+'''
+resource | scope | reset
+count_key | restart | init
+dequeue_key | restart | init
+tasks_key | restart | init
+failures_key | restart | init
+retries_key | restart | init
+cleanup_key | job | cleanup
+event_handlers | job | cleanup
+singlepass | job | cleanup 
+periodic | job | cleanup
+'''
+
+
 def init(r, job_name):
     reset_with_key(r, count_key, job_name)
     reset_with_key(r, dequeue_key, job_name)
@@ -93,7 +107,7 @@ def init(r, job_name):
     set_with_key(r, retries_key, job_name, 0)
 
 
-def cleanup(r, job_name, cli=False):
+def stop_cleanup(r, job_name, cli=True, terminate=True):
     set_with_key(r, stop_key, job_name, "")
     tasks = list(map(lambda x: x.decode("utf-8"), r.lrange(count_key(job_name), 0, -1)))
     tasks2 = set(map(lambda x: x.decode("utf-8"), r.lrange(dequeue_key(job_name), 0, -1)))
@@ -104,8 +118,16 @@ def cleanup(r, job_name, cli=False):
         tasks = progressbar.progressbar(tasks, max_value=len(tasks))
 
     for task in tasks:
-        app.control.revoke(task, terminate=cli)
+        app.control.revoke(task, terminate=terminate)
 
+    # TODO stop restart job
+
+    cleanup(r, job_name)
+
+    reset_with_key(r, stop_key, job_name)
+
+
+def cleanup(r, job_name):
     hdlr = get_with_key(r, cleanup_key, job_name, lambda bs: json.loads(bs.decode("utf-8")))
     for f in hdlr:
         os.remove(f)
@@ -115,10 +137,7 @@ def cleanup(r, job_name, cli=False):
     else:
         r.lrem("singlepass", 1, job_name)
 
-    # TODO stop restart job
-
     reset_with_key(r, cleanup_key, job_name)
-    reset_with_key(r, stop_key, job_name)
 
 
 def periodic(r, job_name):
@@ -421,7 +440,7 @@ def stop_synchronization(job_name, config):
             logger.error("job not exists")
             raise Exception("job not exists")
         else:
-            cleanup(r, job_name, cli=True)
+            stop_cleanup(r, job_name)
 
 
 def list_synchronization(config):
