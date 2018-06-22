@@ -65,9 +65,13 @@ def done(r, job_name):
     return ntasks is None or ntasks == 0
 
 
-def cleanup(r, job_name):
+def cleanup(r, job_name, cli=False):
     set_with_key(r, stop_key, job_name, "")
     tasks = map(lambda x: x.decode("utf-8"), r.lrange(count_key(job_name), 0, -1))
+
+    if cli:
+        tasks = progressbar.progressbar(tasks)
+
     for task in tasks:
         app.control.revoke(task)
 
@@ -401,7 +405,7 @@ def stop_synchronization(job_name, config):
             logger.error("job not exists")
             raise Exception("job not exists")
         else:
-            cleanup(r, job_name)
+            cleanup(r, job_name, cli=True)
 
 
 def list_synchronization(config):
