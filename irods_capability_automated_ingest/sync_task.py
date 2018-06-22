@@ -367,7 +367,11 @@ def monitor_synchronization(job_name, config):
         def update_pbar():
             total2 = get_with_key(r, tasks_key, job_name, int)
             total = r.llen(count_key(job_name))
-            percentage = (total - total2) / total
+            if total == 0:
+                percentage = 0
+            else:
+                percentage = max(0, min(1, (total - total2) / total))
+
             failures = get_with_key(r, failures_key, job_name, int)
             retries = get_with_key(r, retries_key, job_name, int)
 
