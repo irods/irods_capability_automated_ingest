@@ -46,14 +46,21 @@ class IrodsTask(app.Task):
         meta = args[0]
         config = meta["config"]
         job_name = meta["job_name"]
+        restart_queue = meta["restart_queue"]
         logger = sync_logging.get_sync_logger(config["log"])
         logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
 
         r = get_redis(config)
         if retry(logger, "decr_with_key", lambda: decr_with_key(r, tasks_key, job_name)) == 0:
-            retry(logger, "cleanup", lambda: cleanup(r, job_name))
+            cleanup_task.s(config, job_name).apply_async(queue=restart_queue)
 
         r.rpush(dequeue_key(job_name), task_id)
+
+
+@app.task
+def cleanup_task(config, job_name):
+    r = get_redis(config)
+    retry(lambda: cleanup(r, job_name))
 
 
 def async(r, logger, task, meta, queue):
