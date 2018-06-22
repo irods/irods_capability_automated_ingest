@@ -285,7 +285,7 @@ def restart(meta):
         logger.info("***************** restart *****************")
         r = get_redis(config)
 
-        if get_with_key(r, cleanup_key, job_name, str) is None or (periodic(r, job_name) and done(r, job_name)):
+        if not periodic(r, job_name) or done(r, job_name):
             logger.info("queue empty and worker not busy")
 
             init(r, job_name)
