@@ -51,21 +51,10 @@ class IrodsTask(app.Task):
         logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
 
         r = get_redis(config)
-        if retry(logger, "decr_with_key", lambda: decr_with_key(r, tasks_key, job_name)) == 0 and not retry(periodic(r, job_name)):
-            cleanup_task.s(config, job_name).apply_async(queue=restart_queue)
+        if retry(logger, decr_with_key, r, tasks_key, job_name) == 0 and not retry(logger, periodic, r, job_name):
+            retry(logger, cleanup, r, job_name)
 
         r.rpush(dequeue_key(job_name), task_id)
-
-
-@app.task(bind=True)
-def cleanup_task(self, config, job_name):
-    try:
-        r = get_redis(config)
-        cleanup(r, job_name)
-    except Exception as err:
-        logger = sync_logging.get_sync_logger(config["log"])
-        logger.error("failed_cleanup", job_name=job_name, err=err, stacktrace=traceback.extract_tb(err.__traceback__))
-        self.retry(max_retries=MAX_RETRIES, exc=err, countdown=1)
 
 
 def async(r, logger, task, meta, queue):
@@ -107,7 +96,7 @@ def init(r, job_name):
     set_with_key(r, retries_key, job_name, 0)
 
 
-def stop_cleanup(r, job_name, cli=True, terminate=True):
+def cleanup_running(r, job_name, cli=True, terminate=True):
     set_with_key(r, stop_key, job_name, "")
     tasks = list(map(lambda x: x.decode("utf-8"), r.lrange(count_key(job_name), 0, -1)))
     tasks2 = set(map(lambda x: x.decode("utf-8"), r.lrange(dequeue_key(job_name), 0, -1)))
@@ -127,7 +116,7 @@ def stop_cleanup(r, job_name, cli=True, terminate=True):
     reset_with_key(r, stop_key, job_name)
 
 
-def cleanup(r, job_name):
+def cleanup(r, job_name, ):
     hdlr = get_with_key(r, cleanup_key, job_name, lambda bs: json.loads(bs.decode("utf-8")))
     for f in hdlr:
         os.remove(f)
@@ -440,7 +429,7 @@ def stop_synchronization(job_name, config):
             logger.error("job not exists")
             raise Exception("job not exists")
         else:
-            stop_cleanup(r, job_name)
+            cleanup_running(r, job_name)
 
 
 def list_synchronization(config):

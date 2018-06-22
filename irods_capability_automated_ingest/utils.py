@@ -1,5 +1,6 @@
 from enum import Enum
 import time
+import traceback
 
 class Operation(Enum):
     REGISTER_SYNC = 0
@@ -13,14 +14,15 @@ class Operation(Enum):
 MAX_RETRIES = 10
 
 
-def retry(logger, task, func, max_retries=MAX_RETRIES):
+def retry(logger, func, *args, max_retries=MAX_RETRIES):
     retries = 0
     while retries <= max_retries:
         try:
-            res = func()
+            res = func(*args)
             return res
         except Exception as err:
             retries += 1
-            logger.log('failed_' + task, err=err)
+
+            logger.log('failed', func=func, args=args, err=err, stacktrace=traceback.extract_tb(err.__traceback__))
             time.sleep(1)
-    raise RuntimeError("max retries: " + task)
+    raise RuntimeError("max retries")
