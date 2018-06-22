@@ -104,7 +104,7 @@ def cleanup(r, job_name, cli=False):
         tasks = progressbar.progressbar(tasks, max_value=len(tasks))
 
     for task in tasks:
-        app.control.revoke(task)
+        app.control.revoke(task, terminate=cli)
 
     hdlr = get_with_key(r, cleanup_key, job_name, lambda bs: json.loads(bs.decode("utf-8")))
     for f in hdlr:
