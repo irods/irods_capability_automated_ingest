@@ -180,7 +180,7 @@ def sync_file(self, meta):
     target = meta["target"]
     config = meta["config"]
     logging_config = config["log"]
-    all = meta["all"]
+    ignore_cache = meta["ignore_cache"]
     logger = sync_logging.get_sync_logger(logging_config)
 
     max_retries = get_max_retries(logger, meta)
@@ -193,7 +193,7 @@ def sync_file(self, meta):
         lock = redis_lock.Lock(r, "sync_file:"+sync_key)
         lock.acquire()
         t = datetime.now().timestamp()
-        if not all:
+        if not ignore_cache:
             sync_time = get_with_key(r, sync_time_key, sync_key, float)
         else:
             sync_time = None
@@ -232,7 +232,7 @@ def sync_dir(self, meta):
     target = meta["target"]
     config = meta["config"]
     logging_config = config["log"]
-    all = meta["all"]
+    ignore_cache = meta["ignore_cache"]
     logger = sync_logging.get_sync_logger(logging_config)
 
     max_retries = get_max_retries(logger, meta)
@@ -245,7 +245,7 @@ def sync_dir(self, meta):
         lock = redis_lock.Lock(r, "sync_dir:"+path)
         lock.acquire()
         t = datetime.now().timestamp()
-        if not all:
+        if not ignore_cache:
             sync_time = get_with_key(r, sync_time_key, sync_key, float)
         else:
             sync_time = None
@@ -328,6 +328,7 @@ def start_synchronization(data):
     interval = data["interval"]
     restart_queue = data["restart_queue"]
     sychronous = data["synchronous"]
+    progress = data["progress"]
 
     logger = sync_logging.get_sync_logger(logging_config)
 
@@ -370,10 +371,10 @@ def start_synchronization(data):
             restart.s(data_copy).apply_async(queue=restart_queue)
         else:
             restart.s(data_copy).apply()
-            monitor_synchronization(job_name, config)
+            return monitor_synchronization(job_name, progress, config)
 
 
-def monitor_synchronization(job_name, config):
+def monitor_synchronization(job_name, progress, config):
 
     logging_config = config["log"]
 
@@ -384,37 +385,50 @@ def monitor_synchronization(job_name, config):
         logger.error("job not exists")
         raise Exception("job not exists")
 
-    widgets = [
-        ' [', progressbar.Timer(), '] ',
-        progressbar.Bar(),
-        ' (', progressbar.ETA(), ') ',
-        progressbar.DynamicMessage("count"), " ",
-        progressbar.DynamicMessage("tasks"), " ",
-        progressbar.DynamicMessage("failures"), " ",
-        progressbar.DynamicMessage("retries")
-    ]
+    if progress:
 
-    with progressbar.ProgressBar(max_value=1, widgets=widgets, redirect_stdout=True, redirect_stderr=True) as bar:
-        def update_pbar():
-            total2 = get_with_key(r, tasks_key, job_name, int)
-            total = r.llen(count_key(job_name))
-            if total == 0:
-                percentage = 0
-            else:
-                percentage = max(0, min(1, (total - total2) / total))
+        widgets = [
+            ' [', progressbar.Timer(), '] ',
+            progressbar.Bar(),
+            ' (', progressbar.ETA(), ') ',
+            progressbar.DynamicMessage("count"), " ",
+            progressbar.DynamicMessage("tasks"), " ",
+            progressbar.DynamicMessage("failures"), " ",
+            progressbar.DynamicMessage("retries")
+        ]
 
-            failures = get_with_key(r, failures_key, job_name, int)
-            retries = get_with_key(r, retries_key, job_name, int)
+        with progressbar.ProgressBar(max_value=1, widgets=widgets, redirect_stdout=True, redirect_stderr=True) as bar:
+            def update_pbar():
+                total2 = get_with_key(r, tasks_key, job_name, int)
+                total = r.llen(count_key(job_name))
+                if total == 0:
+                    percentage = 0
+                else:
+                    percentage = max(0, min(1, (total - total2) / total))
 
-            bar.update(percentage, count=total, tasks=total2, failures=failures, retries=retries)
+                failures = get_with_key(r, failures_key, job_name, int)
+                retries = get_with_key(r, retries_key, job_name, int)
 
-        while not done(r, job_name) or periodic(r, job_name):
+                bar.update(percentage, count=total, tasks=total2, failures=failures, retries=retries)
+
+            while not done(r, job_name) or periodic(r, job_name):
+                update_pbar()
+                time.sleep(1)
+
             update_pbar()
+
+    else:
+        while not done(r, job_name) or periodic(r, job_name):
             time.sleep(1)
+        
+    failures = get_with_key(r, failures_key, job_name, int)
+    if failures != 0:
+        return -1
+    else:
+        return 0
+    
 
-        update_pbar()
-
-
+                
 def stop_synchronization(job_name, config):
     logger = sync_logging.get_sync_logger(config["log"])
 

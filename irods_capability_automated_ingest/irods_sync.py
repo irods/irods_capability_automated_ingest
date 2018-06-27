@@ -2,6 +2,7 @@ from .sync_task import start_synchronization, stop_synchronization, list_synchro
 import argparse
 from uuid import uuid1
 import json
+import sys
 
 
 def get_config(args):
@@ -33,7 +34,7 @@ def add_arguments(parser):
 
 
 def handle_start(args):
-    start_synchronization({
+    return start_synchronization({
         "restart_queue": args.restart_queue,
         "path_queue": args.path_queue,
         "file_queue": args.file_queue,
@@ -43,24 +44,27 @@ def handle_start(args):
         "job_name": args.job_name,
         "append_json": args.append_json,
         "timeout": args.timeout,
-        "all": args.all,
+        "ignore_cache": args.ignore_cache,
         "event_handler": args.event_handler,
         "config": get_config(args),
-        "synchronous": args.synchronous
+        "synchronous": args.synchronous,
+        "progress": args.progress
     })
 
 
 def handle_stop(args):
     stop_synchronization(args.job_name, get_config(args))
+    return 0
 
 
 def handle_watch(args):
-    monitor_synchronization(args.job_name, get_config(args))
+    return monitor_synchronization(args.job_name, True, get_config(args))
 
 
 def handle_list(args):
     jobs = list_synchronization(get_config(args))
     print(json.dumps(jobs))
+    return 0
 
 
 def main():
@@ -80,8 +84,9 @@ def main():
     parser_start.add_argument('--job_name', action="store", metavar='JOB NAME', type=str, default=uuid, help='job name')
     parser_start.add_argument('--append_json', action="store", metavar='APPEND JSON', type=json.loads, default=None, help='append json')
     parser_start.add_argument('--timeout', action="store", metavar='TIMEOUT', type=int, default=3600, help='timeout')
-    parser_start.add_argument('--all', action="store_true", default=False, help='all')
+    parser_start.add_argument("--ignore_cache", '--all', action="store_true", default=False, help='ignore cache')
     parser_start.add_argument('--synchronous', action="store_true", default=False, help='synchronous')
+    parser_start.add_argument('--progress', action="store_true", default=False, help='progress')
     add_arguments(parser_start)
 
     parser_start.set_defaults(func=handle_start)
@@ -101,7 +106,7 @@ def main():
     parser_list.set_defaults(func=handle_list)
 
     args = parser.parse_args()
-    args.func(args)
+    sys.exit(args.func(args))
 
 
 if __name__ == "__main__":
