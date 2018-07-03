@@ -22,7 +22,6 @@ class event_handler(Core):
 
         t0 = time.time()
         set_with_key(r, t0_key, job_name, t0)
-        logger.info("pre_job", time=t0, job_name=job_name)
 
     @staticmethod
     def post_job(hdlr_mod, logger, meta):
