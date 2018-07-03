@@ -2,19 +2,10 @@ import os
 from os.path import dirname, getsize, getmtime, basename
 from irods.session import iRODSSession
 from irods.models import Resource, DataObject, Collection
-import importlib
-from .sync_utils import size, get_redis
+from .sync_utils import size, get_redis, call, get_hdlr_mod
 from .utils import Operation
 import redis_lock
 import json
-
-
-def call(hdlr_mod, hdlr, func, logger, *args, **options):
-    if hasattr(hdlr_mod, hdlr):
-        logger.debug("calling " + hdlr + " event handler: args = " + str(args) + ", options = " + str(options))
-        getattr(hdlr_mod, hdlr)(func, *args, **options)
-    else:
-        func(*args, **options)
 
 
 def child_of(session, child_resc_name, resc_name):
@@ -247,12 +238,7 @@ def irods_session(hdlr_mod, meta, **options):
 def sync_data_from_file(meta, logger, content, **options):
     target = meta["target"]
     path = meta["path"]
-    hdlr = meta["event_handler"]
-    if hdlr is not None:
-        hdlr_mod0 = importlib.import_module(hdlr)
-        hdlr_mod = getattr(hdlr_mod0, "event_handler", None)
-    else:
-        hdlr_mod = None
+    hdlr_mod = get_hdlr_mod(meta)
 
     session = irods_session(hdlr_mod, meta, **options)
 
@@ -328,12 +314,7 @@ def sync_metadata_from_file(meta, logger, **options):
 def sync_data_from_dir(meta, logger, content, **options):
     target = meta["target"]
     path = meta["path"]
-    hdlr = meta["event_handler"]
-    if hdlr is not None:
-        hdlr_mod0 = importlib.import_module(hdlr)
-        hdlr_mod = getattr(hdlr_mod0, "event_handler", None)
-    else:
-        hdlr_mod = None
+    hdlr_mod = get_hdlr_mod(meta)
 
     session = irods_session(hdlr_mod, meta, **options)
 

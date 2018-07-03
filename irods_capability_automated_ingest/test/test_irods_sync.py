@@ -7,7 +7,7 @@ from unittest import TestCase
 from redis import StrictRedis
 from subprocess import Popen
 from signal import SIGINT
-from os import makedirs, listdir
+from os import makedirs, listdir, remove
 from shutil import rmtree
 from os.path import join, realpath, getmtime, getsize, dirname, basename, relpath, isfile
 from irods.session import iRODSSession
@@ -17,6 +17,8 @@ from datetime import datetime
 from ..sync_utils import size, get_with_key, app, failures_key, retries_key
 from ..sync_task import done
 import time
+
+LOG_FILE = "/tmp/a"
 
 IRODS_MAJOR = 4
 IRODS_MINOR = 2
@@ -163,6 +165,8 @@ def ctime_files(nfiles=NFILES):
 
 def delete_files():
     rmtree(A)
+    if isfile(LOG_FILE):
+        remove(LOG_FILE)
 
 
 def read_file(path):
@@ -474,6 +478,27 @@ class Test_irods_sync(TestCase):
 
         workers = start_workers(1)
         wait_for(workers)
+
+    def do_pre_job(self, eh):
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
+        proc.wait()
+
+        workers = start_workers(1)
+        wait_for(workers)
+        with open("/tmp/a","r") as f:
+            lines = f.readlines()
+            self.assertEqual(lines, ["pre_job"])
+
+
+    def do_post_job(self, eh):
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
+        proc.wait()
+
+        workers = start_workers(1)
+        wait_for(workers)
+        with open("/tmp/a","r") as f:
+            lines = f.readlines()
+            self.assertEqual(lines, ["post_job"])
 
     def do_append_json(self, eh):
         recreate_files(NFILES)
@@ -832,6 +857,16 @@ class Test_irods_sync(TestCase):
 
     def test_retry(self):
         self.do_retry("irods_capability_automated_ingest.examples.retry")
+
+
+    # pre and post job
+    def test_pre_job(self):
+        self.do_pre_job("irods_capability_automated_ingest.examples.pre_job")
+
+
+    def test_post_job(self):
+        self.do_post_job("irods_capability_automated_ingest.examples.post_job")
+
 
 if __name__ == '__main__':
         unittest.main()

@@ -129,6 +129,7 @@ def get_timeout(logger, meta):
 
     return timeout
 
+
 def get_delay(logger, meta, retries):
     hdlr_mod = get_hdlr_mod(meta)
 
@@ -139,4 +140,11 @@ def get_delay(logger, meta, retries):
 
     return delay
 
+
+def call(hdlr_mod, hdlr, func, logger, *args, **options):
+    if hasattr(hdlr_mod, hdlr):
+        logger.debug("calling " + hdlr + " event handler: args = " + str(args) + ", options = " + str(options))
+        getattr(hdlr_mod, hdlr)(func, *args, **options)
+    else:
+        func(*args, **options)
 

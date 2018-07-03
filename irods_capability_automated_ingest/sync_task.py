@@ -6,7 +6,7 @@ import redis_lock
 from . import sync_logging, sync_irods
 from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key, set_with_key, decr_with_key, \
     incr_with_key, reset_with_key, cleanup_key, sync_time_key, get_timeout, failures_key, retries_key, get_delay, \
-    count_key, stop_key, dequeue_key
+    count_key, stop_key, dequeue_key, get_hdlr_mod
 from .utils import retry
 from uuid import uuid1
 import time
@@ -50,10 +50,16 @@ class IrodsTask(app.Task):
         logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
 
         r = get_redis(config)
-        if retry(logger, decr_with_key, r, tasks_key, job_name) == 0 and not retry(logger, periodic, r, job_name):
+        done = retry(logger, decr_with_key, r, tasks_key, job_name) == 0 and not retry(logger, periodic, r, job_name)
+        if done:
             retry(logger, cleanup, r, job_name)
 
         r.rpush(dequeue_key(job_name), task_id)
+
+        if done:
+            hdlr_mod = get_hdlr_mod(meta)
+            if hdlr_mod is not None and hasattr(hdlr_mod, "post_job"):
+                hdlr_mod.post_job(hdlr_mod, logger, meta)
 
 
 def async(r, logger, task, meta, queue):
@@ -90,9 +96,9 @@ periodic | job | cleanup
 def init(r, job_name):
     reset_with_key(r, count_key, job_name)
     reset_with_key(r, dequeue_key, job_name)
-    set_with_key(r, tasks_key, job_name, 0)
-    set_with_key(r, failures_key, job_name, 0)
-    set_with_key(r, retries_key, job_name, 0)
+    reset_with_key(r, tasks_key, job_name)
+    reset_with_key(r, failures_key, job_name)
+    reset_with_key(r, retries_key, job_name)
 
 
 def interrupt(r, job_name, cli=True, terminate=True):
@@ -298,7 +304,12 @@ def restart(meta):
 
     timeout = get_timeout(logger, meta)
 
+    hdlr_mod = get_hdlr_mod(meta)
+
     try:
+
+        if hdlr_mod is not None and hasattr(hdlr_mod, "pre_job"):
+            hdlr_mod.pre_job(hdlr_mod, logger, meta)
         logger.info("***************** restart *****************")
         r = get_redis(config)
 
@@ -317,6 +328,7 @@ def restart(meta):
     except Exception as err:
         logger.error("Unexpected error: " + str(err), traceback=traceback.extract_tb(err.__traceback__))
         raise
+
 
 
 def start_synchronization(data):
