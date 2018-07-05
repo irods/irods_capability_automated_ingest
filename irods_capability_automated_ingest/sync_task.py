@@ -62,6 +62,16 @@ class IrodsTask(app.Task):
                 hdlr_mod.post_job(hdlr_mod, logger, meta)
 
 
+class RestartTask(app.Task):
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        meta = args[0]
+        config = meta["config"]
+        job_name = meta["job_name"]
+        logger = sync_logging.get_sync_logger(config["log"])
+        logger.error('failed_restart', path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo, traceback=traceback.extract_tb(exc.__traceback__))
+
+
 def async(r, logger, task, meta, queue):
     job_name = meta["job_name"]
     if get_with_key(r, stop_key, job_name, str) is None:
@@ -289,7 +299,7 @@ def sync_dir(self, meta):
             lock.release()
 
 
-@app.task
+@app.task(base=RestartTask)
 def restart(meta):
     job_name = meta["job_name"]
     path_q_name = meta["path_queue"]
@@ -380,8 +390,13 @@ def start_synchronization(data):
         if not sychronous:
             restart.s(data_copy).apply_async(queue=restart_queue)
         else:
-            restart.s(data_copy).apply()
-            return monitor_synchronization(job_name, progress, config)
+            res = restart.s(data_copy).apply()
+            if res.failed():
+                print(res.traceback)
+                r.lrem("singlepass", 1, job_name)
+                return -1
+            else:
+                return monitor_synchronization(job_name, progress, config)
 
 
 def monitor_synchronization(job_name, progress, config):
