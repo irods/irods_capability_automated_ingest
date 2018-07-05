@@ -68,8 +68,9 @@ def async(r, logger, task, meta, queue):
         logger.info('incr_job_name', task=meta["task"], path=meta["path"], job_name=job_name)
         incr_with_key(r, tasks_key, job_name)
         task_id = task.name+":"+meta["path"]+":"+meta["target"]+":"+str(time.time())+":"+job_name
+        timeout = get_timeout(logger, meta)
         r.rpush(count_key(job_name), task_id)
-        task.s(meta).apply_async(queue=queue, task_id=task_id)
+        task.s(meta).apply_async(queue=queue, task_id=task_id, time_limit=timeout)
     else:
         logger.info('async_job_name_stopping', task=meta["task"], path=meta["path"], job_name=job_name)
 
@@ -147,7 +148,6 @@ def sync_path(self, meta):
     config = meta["config"]
     logging_config = config["log"]
     logger = sync_logging.get_sync_logger(logging_config)
-    timeout = get_timeout(logger, meta)
 
     max_retries = get_max_retries(logger, meta)
 
@@ -301,8 +301,6 @@ def restart(meta):
         restart.s(meta).apply_async(task_id=job_name, queue=restart_queue, countdown=interval)
 
     logger = sync_logging.get_sync_logger(logging_config)
-
-    timeout = get_timeout(logger, meta)
 
     hdlr_mod = get_hdlr_mod(meta)
 

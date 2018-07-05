@@ -500,6 +500,16 @@ class Test_irods_sync(TestCase):
             lines = f.readlines()
             self.assertEqual(lines, ["post_job"])
 
+    def do_timeout(self, eh):
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO"])
+        proc.wait()
+
+        workers = start_workers(1)
+        wait_for(workers)
+
+        r = StrictRedis()
+        self.do_assert_failed_queue(count=10)
+
     def do_append_json(self, eh):
         recreate_files(NFILES)
 
@@ -857,6 +867,11 @@ class Test_irods_sync(TestCase):
 
     def test_retry(self):
         self.do_retry("irods_capability_automated_ingest.examples.retry")
+
+
+    # timeout
+    def test_timeout(self):
+        self.do_timeout("irods_capability_automated_ingest.examples.timeout")
 
 
     # pre and post job
