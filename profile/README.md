@@ -1,0 +1,45 @@
+=== log profile ===
+
+`--profile` `--profile_filename <profile filename>` `--profile_level INFO`
+
+=== elasticsearch ===
+
+`config/elasticsearch.yml`
+
+add
+
+```
+http.cors.enabled: true
+http.cors.allow-origin: "*"
+```
+
+```
+curl -XPUT <elasticsearch host>:9200/icaiprofile -d '
+{
+  "mappings": {
+    "document": {
+      "properties": {
+	 "hostname": {
+	   "type": "keyword"
+	 }
+      }
+    }
+  }
+}
+```
+=== ingest ===
+
+```
+pip install elasticsearch
+```
+
+```
+python profile.py <profile filename> <elasticsearch host>
+```
+
+=== visualize ===
+
+firefox profile.html
+
+	
+

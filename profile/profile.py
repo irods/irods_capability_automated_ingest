@@ -42,7 +42,8 @@ def task_action():
                         "index": obj["index"],
                         "start": start,
                         "finish": finish,
-                        "task_name": obj["task_name"]
+                        "task_name": obj["task_name"],
+                        "task_id": obj["task_id"]
                     }
                 }
                 i += 1

@@ -1,57 +1,92 @@
 google.charts.load("current", {packages:["timeline"]});
-google.charts.setOnLoadCallback(drawChart);
-function drawChart() {
-    $.ajax({
-	dataType: "text",
-	url: "profile"}).done(function(results){
-	    console.log(results); 
-	    var container = document.getElementById('example3.1');
-	    var chart = new google.visualization.Timeline(container);
-            var dataTable = new google.visualization.DataTable();
-            dataTable.addColumn({ type: 'string', id: 'Position' });
-            dataTable.addColumn({ type: 'string', id: 'Name' });
-	    dataTable.addColumn({ type: "string", role: "style"});
-            dataTable.addColumn({ type: 'date', id: 'Start' });
-            dataTable.addColumn({ type: 'date', id: 'End' });
-	    
-	    var timeline = [];
-	    var task_buf = {};
-	    var resources = new Set();
-	    var lines = results.split("\n");
-	    var rows = [];
-	    var colorMap = {}
-	    colorMap["irods_capability_automated_ingest.sync_task.sync_file"] = '#ff8888';
-	    colorMap["irods_capability_automated_ingest.sync_task.sync_dir"] = '#88ff88';
-	    colorMap["irods_capability_automated_ingest.sync_task.sync_path"] = '#8888ff';
-	    colorMap["irods_capability_automated_ingest.sync_task.sync_restart"] = '#234783';
-	    lines.forEach(function(line){
-		if(line !== "") {
-		    var obj = JSON.parse(line)
 
-		    var task_id = obj["task_id"]
-		    console.log(obj)
-		    var buf = task_buf[task_id]
-		    if (buf === undefined)
-			task_buf[task_id] = obj
-		    else {
-			delete task_buf[task_id]
-			if (obj["event"] === "task_prerun") {
-			    var start=obj["@timestamp"]
-			    var finish=buf["@timestamp"]
-			} else {
-			    var start=buf["@timestamp"]
-			    var finish=obj["@timestamp"]
+function drawChart(){
+    var startDate = new Date(document.getElementById('start').value);
+    var finishDate = new Date(document.getElementById('end').value) ;
+    if (isNaN(startDate ))
+	startDate = undefined;
+    
+    if (isNaN(finishDate ))
+	finishDate = undefined;
+    drawChart2(startDate, finishDate);
+}
+function drawChart2(startDate, finishDate) {
+
+    var json = {
+	size: 10000,
+	sort: [
+	    {hostname:{order:"asc"}},
+	    {index:{order:"asc"}}
+	],
+	query: {
+	    bool: {
+		should: [
+		    {
+			range:{
+			    start: {
+				gte: startDate,
+				lte: finishDate
+			    }
 			}
-			var row = [obj["hostname"]+"/"+obj["index"], obj["task_id"], colorMap[obj["task_name"]], new Date(start), new Date(finish)];
-			console.log(row);
-			dataTable.addRow(row);
-			task_name = obj["task_name"]
-			rows.push(task_name)
+		    }, {
+			range: {
+			    finish: {
+				gte: startDate,
+				lte: finishDate
+			    }
+			}
 		    }
-		}
+		],
+		minimum_should_match: 1
+	    }
+	}
+    };
+    
+    $.ajax({
+	type: "POST",
+	contentType: "application/json",
+	dataType: "json",
+	url: "http://localhost:9200/icaiprofile/_search",
+	data: JSON.stringify(json)
+    }).done(function(results){
+	hits = results["hits"]["hits"].map(function(h){return h["_source"];});
 
-	    });
-
-	    chart.draw(dataTable, {height:"100%", width:"100%"});
+	var container = document.getElementById('example3.1');
+	var chart = new google.visualization.Timeline(container);
+        var dataTable = new google.visualization.DataTable();
+        dataTable.addColumn({ type: 'string', id: 'Position' });
+        dataTable.addColumn({ type: 'string', id: 'Name' });
+	dataTable.addColumn({ type: "string", role: "style"});
+        dataTable.addColumn({ type: 'date', id: 'Start' });
+        dataTable.addColumn({ type: 'date', id: 'End' });
+	
+	var timeline = [];
+	var resources = new Set();
+	var colorMap = {}
+	colorMap["irods_capability_automated_ingest.sync_task.sync_file"] = '#ff8888';
+	colorMap["irods_capability_automated_ingest.sync_task.sync_dir"] = '#88ff88';
+	colorMap["irods_capability_automated_ingest.sync_task.sync_path"] = '#8888ff';
+	colorMap["irods_capability_automated_ingest.sync_task.sync_restart"] = '#234783';
+	console.log(hits)
+	hits.forEach(function(obj){
+	    var task_id = obj["task_id"]
+	    var start=obj["start"]
+	    var finish=obj["finish"]
+	    var row = [obj["hostname"]+"/"+obj["index"], obj["task_id"], colorMap[obj["task_name"]], new Date(start), new Date(finish)];
+	    dataTable.addRow(row);
 	});
+	
+	chart.draw(dataTable, {
+	    height:"100%",
+	    width:"100%",
+	    hAxis: {
+		format: "MMM d, y HH:mm:ss",
+		minValue: startDate,
+		maxValue: finishDate
+	    }
+	});
+    }).fail(function(a,b,c){
+	console.log(b)
+	console.log(c);
+    });
 }
