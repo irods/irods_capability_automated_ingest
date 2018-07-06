@@ -23,7 +23,7 @@ def task_prerun(task_id=None, task=None, args=None, kwargs=None, **kw):
         config = meta["config"]
         profile_log = config.get("profile")
         logger = sync_logging.get_sync_logger(profile_log)
-        logger.info("task_prerun", task_id=task_id, task_name=task.name, hostname=task.request.hostname, worker_pid=current_process().index)
+        logger.info("task_prerun", task_id=task_id, task_name=task.name, hostname=task.request.hostname, index=current_process().index)
 
 
 @task_postrun.connect()
