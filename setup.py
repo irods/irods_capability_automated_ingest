@@ -38,7 +38,8 @@ setup(
         'redis>=2.10.6',
         'celery[redis]',
         'structlog>=18.1.0',
-        'progressbar2'
+        'progressbar2',
+        'billiard'
     ],
     setup_requires=['setuptools>=38.6.0'],
     entry_points={

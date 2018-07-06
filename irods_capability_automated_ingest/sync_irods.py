@@ -239,15 +239,19 @@ def sync_data_from_file(meta, logger, content, **options):
     target = meta["target"]
     path = meta["path"]
     hdlr_mod = get_hdlr_mod(meta)
+    init = meta["initial_ingest"]
 
     session = irods_session(hdlr_mod, meta, **options)
 
-    if session.data_objects.exists(target):
-        exists = True
-    elif session.collections.exists(target):
-        raise Exception("sync: cannot syncing file " + path + " to collection " + target)
-    else:
+    if init:
         exists = False
+    else:
+        if session.data_objects.exists(target):
+            exists = True
+        elif session.collections.exists(target):
+            raise Exception("sync: cannot syncing file " + path + " to collection " + target)
+        else:
+            exists = False
 
     if hasattr(hdlr_mod, "operation"):
         op = hdlr_mod.operation(session, meta, **options)

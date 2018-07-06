@@ -24,10 +24,12 @@ def put(job_name, data):
     data2.setdefault('file_queue', "file")
     data2.setdefault('path_queue', "path")
     data2.setdefault('restart_queue', "restart")
-    data2.setdefault("all", False)
+    data2.setdefault("ignore_cache", False)
+    data2.setdefault("initial_ingest", False)
     data2.setdefault("synchronous", False)
     data2.setdefault("timeout", 3600)
     data2.setdefault("interval", None)
+    data2.setdefault("profile", False)
     data2["job_name"] = job_name
     data2["config"] = get_config()
 

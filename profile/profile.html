@@ -1,0 +1,24 @@
+<html>
+  <head>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/moment.js/2.8.4/moment.min.js"></script>
+    <script src="vis.js"></script>
+    <link href="vis.css" rel="stylesheet" type="text/css"/>
+    <script type="text/javascript" src="profile.js"></script>
+    <link href="profile.css" rel="stylesheet" type="text/css"/>
+  </head>
+  <body>
+    index: <input id="index" type="text"/>
+    <br/>
+    min:<span id="minDate"></span>
+    max:<span id="maxDate"></span>
+    <button type="button" onclick="getMinAndMaxDate()">get min and max date</button>
+    <br/>
+    start: <input id="start" type="text"/>
+    duration (ms): <input id="duration" type="text"/>
+    #events:<span id="numEvents"></span>
+    <button type="button" onclick="drawChart()">refresh</button>
+    <div id="visualization"></div>
+  </body>
+</html>
