@@ -393,7 +393,7 @@ def start_synchronization(data):
             res = restart.s(data_copy).apply()
             if res.failed():
                 print(res.traceback)
-                r.lrem("singlepass", 1, job_name)
+                cleanup(r, job_name)
                 return -1
             else:
                 return monitor_synchronization(job_name, progress, config)
