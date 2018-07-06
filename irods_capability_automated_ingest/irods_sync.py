@@ -13,6 +13,12 @@ def get_config(args):
             "interval": getattr(args, "log_interval", None),
             "level": getattr(args, "log_level", None)
         },
+        "profile": {
+            "filename": getattr(args, "profile_filename", None),
+            "when": getattr(args, "profile_when", None),
+            "interval": getattr(args, "profile_interval", None),
+            "level": getattr(args, "profile_level", None)
+        },
         "redis": {
             "host": args.redis_host,
             "port": args.redis_port,
@@ -31,6 +37,12 @@ def add_arguments(parser):
                         help="log interval")
     parser.add_argument('--log_level', action="store", metavar="LOG LEVEL", type=str, default=None,
                         help="log level")
+    parser.add_argument('--profile_filename', action="store", metavar="PROFILE FILE", type=str, default=None, help="profile filename")
+    parser.add_argument('--profile_when', action="store", metavar="PROFILE WHEN", type=str, default=None, help="profile when")
+    parser.add_argument('--profile_interval', action="store", metavar="PROFILE INTERVAL", type=int, default=None,
+                        help="profile interval")
+    parser.add_argument('--profile_level', action="store", metavar="PROFILE LEVEL", type=str, default=None,
+                        help="profile level")
 
 
 def handle_start(args):
@@ -85,6 +97,7 @@ def main():
     parser_start.add_argument("--ignore_cache", action="store_true", default=False, help='ignore cache')
     parser_start.add_argument('--synchronous', action="store_true", default=False, help='synchronous')
     parser_start.add_argument('--progress', action="store_true", default=False, help='progress')
+    parser_start.add_argument('--profile', action="store_true", default=False, help='profile')
     add_arguments(parser_start)
 
     parser_start.set_defaults(func=handle_start)

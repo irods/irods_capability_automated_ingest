@@ -28,6 +28,7 @@ def put(job_name, data):
     data2.setdefault("synchronous", False)
     data2.setdefault("timeout", 3600)
     data2.setdefault("interval", None)
+    data2.setdefault("profile", False)
     data2["job_name"] = job_name
     data2["config"] = get_config()
 
