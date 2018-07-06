@@ -59,7 +59,8 @@ def handle_start(args):
         "event_handler": args.event_handler,
         "config": get_config(args),
         "synchronous": args.synchronous,
-        "progress": args.progress
+        "progress": args.progress,
+        "profile": args.profile
     })
 
 

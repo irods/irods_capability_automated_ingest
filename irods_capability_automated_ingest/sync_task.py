@@ -14,25 +14,26 @@ import progressbar
 import json
 import traceback
 from celery.signals import before_task_publish, after_task_publish, task_prerun, task_postrun, task_retry, task_success, task_failure, task_revoked, task_unknown, task_rejected
+from billiard import current_process
 
 @task_prerun.connect()
-def task_prerun(signal=None, sender=None, task_id=None, task=None, args=None, kwargs=None):
+def task_prerun(task_id=None, task=None, args=None, kwargs=None, **kw):
     meta = args[0]
     if meta["profile"]:
         config = meta["config"]
         profile_log = config.get("profile")
         logger = sync_logging.get_sync_logger(profile_log)
-        logger.log("task_prerun", task_id=task_id, task_name=task.name, hostname=task.request.hostname, worker_pid=task.request.worker_pid)
+        logger.info("task_prerun", task_id=task_id, task_name=task.name, hostname=task.request.hostname, worker_pid=current_process().index)
 
 
 @task_postrun.connect()
-def task_postrun(signal=None, sender=None, task_id=None, task=None, args=None, kwargs=None, retval=None, state=None):
+def task_postrun(task_id=None, task=None, args=None, kwargs=None, retval=None, state=None, **kw):
     meta = args[0]
     if meta["profile"]:
         config = meta["config"]
         profile_log = config.get("profile")
         logger = sync_logging.get_sync_logger(profile_log)
-        logger.log("task_postrun", task_id=task_id, task_name=task.name, hostname=task.request.hostname, worker_pid=task.request.worker_pid,state=state)
+        logger.info("task_postrun", task_id=task_id, task_name=task.name, hostname=task.request.hostname, index=current_process().index,state=state)
 
 class IrodsTask(app.Task):
 
