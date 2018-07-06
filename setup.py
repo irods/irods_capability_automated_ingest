@@ -39,10 +39,7 @@ setup(
         'celery[redis]',
         'structlog>=18.1.0',
         'progressbar2',
-        'billiard',
-        'numpy',
-        'plotly',
-        'colorsys'
+        'billiard'
     ],
     setup_requires=['setuptools>=38.6.0'],
     entry_points={
