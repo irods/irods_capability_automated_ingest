@@ -56,6 +56,7 @@ def handle_start(args):
         "job_name": args.job_name,
         "append_json": args.append_json,
         "ignore_cache": args.ignore_cache,
+        "initial_ingest": args.initial_ingest,
         "event_handler": args.event_handler,
         "config": get_config(args),
         "synchronous": args.synchronous,
@@ -96,6 +97,7 @@ def main():
     parser_start.add_argument('--job_name', action="store", metavar='JOB NAME', type=str, default=uuid, help='job name')
     parser_start.add_argument('--append_json', action="store", metavar='APPEND JSON', type=json.loads, default=None, help='append json')
     parser_start.add_argument("--ignore_cache", action="store_true", default=False, help='ignore cache')
+    parser_start.add_argument("--initial_ingest", action="store_true", default=False, help='initial ingest')
     parser_start.add_argument('--synchronous', action="store_true", default=False, help='synchronous')
     parser_start.add_argument('--progress', action="store_true", default=False, help='progress')
     parser_start.add_argument('--profile', action="store_true", default=False, help='profile')
