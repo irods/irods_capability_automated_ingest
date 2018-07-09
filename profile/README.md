@@ -14,7 +14,7 @@ http.cors.allow-origin: "*"
 ```
 
 ```
-curl -XPUT <elasticsearch host>:9200/icaiprofile -d '
+curl -XPUT <elasticsearch host>:9200/icaiprofile -H "Content-Type: application/json" -d '
 {
   "mappings": {
     "document": {
@@ -25,7 +25,7 @@ curl -XPUT <elasticsearch host>:9200/icaiprofile -d '
       }
     }
   }
-}
+}'
 ```
 === ingest ===
 
