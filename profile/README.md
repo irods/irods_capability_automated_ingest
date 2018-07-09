@@ -34,7 +34,7 @@ pip install elasticsearch
 ```
 
 ```
-python profile.py <profile filename> <elasticsearch host>
+python profile.py <profile filename> <additional properties> <elasticsearch host> <index>
 ```
 
 === visualize ===

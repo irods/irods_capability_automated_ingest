@@ -2,15 +2,16 @@ google.charts.load("current", {packages:["timeline"]});
 
 function drawChart(){
     var startDate = new Date(document.getElementById('start').value);
-    var finishDate = new Date(document.getElementById('end').value) ;
+    var finishDate = new Date(document.getElementById('end').value);
+    var index = document.getElementById('index').value;
     if (isNaN(startDate ))
 	startDate = undefined;
     
     if (isNaN(finishDate ))
 	finishDate = undefined;
-    drawChart2(startDate, finishDate);
+    drawChart2(index, startDate, finishDate);
 }
-function drawChart2(startDate, finishDate) {
+function drawChart2(index, startDate, finishDate) {
 
     var json = {
 	size: 10000,
@@ -46,7 +47,7 @@ function drawChart2(startDate, finishDate) {
 	type: "POST",
 	contentType: "application/json",
 	dataType: "json",
-	url: "http://localhost:9200/icaiprofile/_search",
+	url: "http://localhost:9200/" + index + "/_search",
 	data: JSON.stringify(json)
     }).done(function(results){
 	hits = results["hits"]["hits"].map(function(h){return h["_source"];});
@@ -69,10 +70,10 @@ function drawChart2(startDate, finishDate) {
 	colorMap["irods_capability_automated_ingest.sync_task.sync_restart"] = '#234783';
 	console.log(hits)
 	hits.forEach(function(obj){
-	    var task_id = obj["task_id"]
+	    var task_id = obj["event_id"]
 	    var start=obj["start"]
 	    var finish=obj["finish"]
-	    var row = [obj["hostname"]+"/"+obj["index"], obj["task_id"], colorMap[obj["task_name"]], new Date(start), new Date(finish)];
+	    var row = [obj["hostname"]+"/"+obj["index"], task_id, colorMap[obj["event_name"]], new Date(start), new Date(finish)];
 	    dataTable.addRow(row);
 	});
 	

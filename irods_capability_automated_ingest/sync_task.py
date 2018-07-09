@@ -23,7 +23,7 @@ def task_prerun(task_id=None, task=None, args=None, kwargs=None, **kw):
         config = meta["config"]
         profile_log = config.get("profile")
         logger = sync_logging.get_sync_logger(profile_log)
-        logger.info("task_prerun", task_id=task_id, task_name=task.name, hostname=task.request.hostname, index=current_process().index)
+        logger.info("task_prerun", event_id=task_id, event_name=task.name, hostname=task.request.hostname, index=current_process().index)
 
 
 @task_postrun.connect()
@@ -33,7 +33,7 @@ def task_postrun(task_id=None, task=None, args=None, kwargs=None, retval=None, s
         config = meta["config"]
         profile_log = config.get("profile")
         logger = sync_logging.get_sync_logger(profile_log)
-        logger.info("task_postrun", task_id=task_id, task_name=task.name, hostname=task.request.hostname, index=current_process().index,state=state)
+        logger.info("task_postrun", event_id=task_id, event_name=task.name, hostname=task.request.hostname, index=current_process().index,state=state)
 
 class IrodsTask(app.Task):
 

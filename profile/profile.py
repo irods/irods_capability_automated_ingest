@@ -3,48 +3,56 @@ import json
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 
-input = sys.argv[1]
-output = sys.argv[2]
+input_file = sys.argv[1]
+keys_str = sys.argv[2]
+output = sys.argv[3]
+index = sys.argv[4]
+
+keys = keys_str.split(",")
 es = Elasticsearch(output)
 
+
 def task_action():
-    
+
     task_buf = {}
 
     i = 0
-    with open(input, "r") as f:
+    with open(input_file, "r") as f:
     
         line = f.readline().rstrip("\n")
         while line != "":
             obj = json.loads(line)
 
-            task_id = obj["task_id"]
+            event_id = obj["event_id"]
             print(obj)
-            buf = task_buf.get(task_id)
+            buf = task_buf.get(event_id)
             if buf is None:
-                task_buf[task_id] = obj
+                task_buf[event_id] = obj
             else:
-                del task_buf[task_id]
+                del task_buf[event_id]
                 if obj["event"] == "task_prerun":
-                    start=obj["@timestamp"]
-                    finish=buf["@timestamp"]
+                    start = obj["@timestamp"]
+                    finish = buf["@timestamp"]
                 else:
-                    start=buf["@timestamp"]
-                    finish=obj["@timestamp"]
+                    start = buf["@timestamp"]
+                    finish = obj["@timestamp"]
+
+                di = {
+                    "start": start,
+                    "finish": finish,
+                    "hostname": obj["hostname"],
+                    "index": obj["index"],
+                    "event_name": obj["event_name"],
+                    "event_id": obj["event_id"]
+                }
+
+                for key in keys:
+                    di[key] = obj[key]
+
                 d = {
-                    "_index": "icaiprofile",
+                    "_index": index,
                     "_type": "document",
-#                    "_id" : i,
-#                    "_routing": 5,
-#                    "pipeline": "icaipipeline",
-                    "_source": {
-                        "hostname": obj["hostname"],
-                        "index": obj["index"],
-                        "start": start,
-                        "finish": finish,
-                        "task_name": obj["task_name"],
-                        "task_id": obj["task_id"]
-                    }
+                    "_source": di
                 }
                 i += 1
                 yield d
