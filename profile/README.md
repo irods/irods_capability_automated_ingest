@@ -13,20 +13,6 @@ http.cors.enabled: true
 http.cors.allow-origin: "*"
 ```
 
-```
-curl -XPUT <elasticsearch host>:9200/icaiprofile -H "Content-Type: application/json" -d '
-{
-  "mappings": {
-    "document": {
-      "properties": {
-	 "hostname": {
-	   "type": "keyword"
-	 }
-      }
-    }
-  }
-}'
-```
 === ingest ===
 
 ```
@@ -34,7 +20,7 @@ pip install elasticsearch
 ```
 
 ```
-python profile.py <profile filename> <additional properties> <elasticsearch host> <index>
+python profile.py <profile filename> <index> [ --elasticsearch_host <elasticsearch host> ] [ --additional_key <additional properties> ]
 ```
 
 === visualize ===

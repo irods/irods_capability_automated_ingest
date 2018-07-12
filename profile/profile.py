@@ -23,6 +23,13 @@ index = args.elasticsearch_index
 
 es = Elasticsearch(output)
 
+es.indices.put_mapping(doc_type="document", index=index, body={
+    "properties": {
+        "hostname": {
+            "type": "keyword"
+        }
+    }
+})
 
 def task_action():
 
