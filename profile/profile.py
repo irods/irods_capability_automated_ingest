@@ -15,7 +15,6 @@ parser.add_argument('--additional_key', dest='keys', action='store', nargs="*",
                     help='additional key')
 
 args = parser.parse_args()
-print(args.accumulate(args.integers))
 
 input_file = args.input_file
 keys = args.keys
@@ -37,7 +36,7 @@ def task_action():
             obj = json.loads(line)
 
             event_id = obj["event_id"]
-            print(obj)
+            # print(obj)
             buf = task_buf.get(event_id)
             if buf is None:
                 task_buf[event_id] = obj
@@ -68,8 +67,9 @@ def task_action():
                     "_source": di
                 }
                 i += 1
+                print(i)
                 yield d
             line = f.readline().rstrip("\n")
-        
+
 
 bulk(es, task_action())
