@@ -43,7 +43,14 @@ function getMinAndMaxDate() {
 }
 
 function groupName(obj) {
-    return obj["hostname"]+"/"+obj["index"]
+    let index = obj["index"]
+    let indexString = ""
+    if (index < 10) {
+	indexString = "0" + index
+    } else {
+	indexString = "" + index
+    }
+    return obj["hostname"]+"/" + indexString
 }
 
 function drawChart2(index, startDate, finishDate) {
@@ -95,8 +102,10 @@ function drawChart2(index, startDate, finishDate) {
 
         const groupNames = Array.from(groupNames0).sort()
         const groups = new vis.DataSet()
+	const groupMap = {}
         for(let g = 0; g < groupNames.length; g++) {
             groups.add({id: g, content: groupNames[g]})
+	    groupMap[groupNames[g]] = g
         }
 
         const colorMap = {}
@@ -115,15 +124,28 @@ function drawChart2(index, startDate, finishDate) {
             let taskEndDate = new Date(finish)
             items.add({
                 id: index,
-                group: groupName(obj),
+                group: groupMap[groupName(obj)],
                 content: task_id,
+		title: `${task_id}<br/>start: ${taskStartDate}<br/>finish: ${taskEndDate}`,
                 start: taskStartDate,
                 end: taskEndDate,
                 className: colorMap[task_name]
             })
         });
 
+	let options = {
+	    min: startDate,
+	    max: finishDate,
+	    tooltip: {
+		overflowMethod: "cap"
+	    },
+	    stack: false,
+	    groupOrder: "content"
+	}
+
+	container.innerHTML = ""
         let timeline = new vis.Timeline(container)
+	timeline.setOptions(options)
         timeline.setGroups(groups)
         timeline.setItems(items)
     }).fail((a,b,c) => {
