@@ -110,8 +110,8 @@ function drawChart2(index, startDate, finishDate) {
 	    let finish=obj["finish"]
 	    let taskStartDate = new Date(start)
 	    let taskEndDate = new Date(finish)
-	    let barStartDate = Math.max(taskStartDate, startDate)
-	    let barEndDate = Math.min(taskEndDate, finishDate)
+	    let barStartDate = new Date(Math.max(taskStartDate, startDate))
+	    let barEndDate = new Date(Math.min(taskEndDate, finishDate))
 	    let row = [obj["hostname"]+"/"+obj["index"], task_id, colorMap[obj["event_name"]], barStartDate, barEndDate, taskStartDate, taskEndDate];
 	    dataTable.addRow(row);
 	});
