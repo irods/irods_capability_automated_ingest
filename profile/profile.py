@@ -5,11 +5,11 @@ from elasticsearch.helpers import bulk
 import argparse
 
 parser = argparse.ArgumentParser(description='Ingest profile data into Elasticsearch')
-parser.add_argument('input_file', metavar='INPUT FILE', type=str, required=True,
+parser.add_argument('input_file', metavar='INPUT FILE', type=str,
                     help='input file')
 parser.add_argument('--elasticsearch_host', metavar='ELASTICSEARCH HOST', type=str, default="localhost",
                     help='elasticsearch host')
-parser.add_argument('elasticsearch_index', metavar='ELASTICSEARCH INDEX', type=str, required=True,
+parser.add_argument('elasticsearch_index', metavar='ELASTICSEARCH INDEX', type=str,
                     help='elasticsearch index')
 parser.add_argument('--additional_key', dest='keys', action='store', nargs="*",
                     help='additional key')
