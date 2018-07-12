@@ -12,6 +12,37 @@ function drawChart(){
 	finishDate = undefined;
     drawChart2(index, startDate, finishDate);
 }
+
+function getMinAndMaxDate() {
+    let json = {
+        aggs: {
+            minDate : {
+                min : {
+                    field : "start"
+                }
+            },
+            maxDate : {
+                max : {
+                    field : "finish"
+                }
+            }
+        }
+    }
+    $.ajax({
+    type: "POST",
+	contentType: "application/json",
+	dataType: "json",
+	url: "http://localhost:9200/" + index + "/_search?size=0",
+    data: JSON.stringify(json)
+    }).done(results => {
+        let minDate = document.getElementById("minDate")
+        let maxDate = document.getElementById("maxDate")
+        minDate.innerHTML = results["minDate"]
+        maxDate.innerHTML = results["maxDate"]
+    })
+
+}
+
 function drawChart2(index, startDate, finishDate) {
 
     var json = {
