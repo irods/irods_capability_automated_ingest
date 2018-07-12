@@ -93,7 +93,7 @@ function drawChart2(index, startDate, finishDate) {
             groupNames0.add(groupName(obj))
         });
 
-        const groupNames = Array.from(groupNamesSet).sort()
+        const groupNames = Array.from(groupNames0).sort()
         const groups = new vis.DataSet()
         for(let g = 0; g < groupNames.length; g++) {
             groups.add({id: g, content: groupNames[g]})
