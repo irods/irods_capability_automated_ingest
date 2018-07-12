@@ -120,7 +120,7 @@ function drawChart2(index, startDate, finishDate) {
                 group: groupName(obj),
                 content: task_id,
                 start: taskStartDate,
-                end: taskEndDate
+                end: taskEndDate,
                 className: colorMap[task_name]
             })
         });
