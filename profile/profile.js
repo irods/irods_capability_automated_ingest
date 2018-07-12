@@ -57,10 +57,6 @@ function drawChart2(index, startDate, finishDate) {
 
     const json = {
         size: 10000,
-        sort: [
-            {hostname:{order:"asc"}},
-            {index:{order:"asc"}}
-        ],
         query: {
             bool: {
             should: [
@@ -115,6 +111,7 @@ function drawChart2(index, startDate, finishDate) {
         colorMap["irods_capability_automated_ingest.sync_task.restart"] = 'restart';
 
         const items = new vis.DataSet()
+	let count = 0
         hits.forEach((obj, index) => {
             let task_id = obj["event_id"]
             let task_name = obj["event_name"]
@@ -131,17 +128,28 @@ function drawChart2(index, startDate, finishDate) {
                 end: taskEndDate,
                 className: colorMap[task_name]
             })
+	    count++
         });
+	document.getElementById("numEvents").innerHTML = count
 
 	let options = {
-	    min: startDate,
-	    max: finishDate,
 	    tooltip: {
 		overflowMethod: "cap"
 	    },
-	    zoomable: false,
+	    moveable: true,
+	    zoomable: true,
+	    selectable: false,
+	    showCurrentTime: false,
 	    stack: false,
 	    groupOrder: "content"
+	}
+	if(startDate !== undefined) {
+	    options["min"] = startDate
+	    options["start"] = startDate
+	    options["end"] = new Date(startDate.valueOf() + 1000)
+	}
+	if(finishDate !== undefined) {
+	    options["max"] = finishDate
 	}
 
 	container.innerHTML = ""
