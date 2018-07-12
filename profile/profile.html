@@ -2,8 +2,9 @@
   <head>
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/moment.js/2.8.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet" type="text/css"/>
     <script type="text/javascript" src="profile.js"></script>
   </head>
   <body>
@@ -16,6 +17,6 @@
     start: <input id="start" type="text"/>
     duration (ms): <input id="duration" type="text"/>
     <button type="button" onclick="drawChart()">refresh</button>
-    <div id="example3.1" style="height: 1280px;"></div>
+    <div id="visualization" style="height: 1280px;"></div>
   </body>
 </html>

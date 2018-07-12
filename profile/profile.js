@@ -44,89 +44,92 @@ function getMinAndMaxDate() {
 
 }
 
+function groupName(obj) {
+    return obj["hostname"]+"/"+obj["index"]
+}
+
 function drawChart2(index, startDate, finishDate) {
 
-    var json = {
-	size: 10000,
-	sort: [
-	    {hostname:{order:"asc"}},
-	    {index:{order:"asc"}}
-	],
-	query: {
-	    bool: {
-		should: [
-		    {
-			range:{
-			    start: {
-				gte: startDate,
-				lte: finishDate
-			    }
-			}
-		    }, {
-			range: {
-			    finish: {
-				gte: startDate,
-				lte: finishDate
-			    }
-			}
-		    }
-		],
-		minimum_should_match: 1
-	    }
-	}
+    const json = {
+        size: 10000,
+        sort: [
+            {hostname:{order:"asc"}},
+            {index:{order:"asc"}}
+        ],
+        query: {
+            bool: {
+            should: [
+                {
+                range:{
+                    start: {
+                    gte: startDate,
+                    lte: finishDate
+                    }
+                }
+                }, {
+                range: {
+                    finish: {
+                    gte: startDate,
+                    lte: finishDate
+                    }
+                }
+                }
+            ],
+            minimum_should_match: 1
+            }
+        }
     };
     
     $.ajax({
-	type: "POST",
-	contentType: "application/json",
-	dataType: "json",
-	url: "http://localhost:9200/" + index + "/_search",
-	data: JSON.stringify(json)
-    }).done(function(results){
-	hits = results["hits"]["hits"].map(function(h){return h["_source"];});
+        type: "POST",
+        contentType: "application/json",
+        dataType: "json",
+        url: "http://localhost:9200/" + index + "/_search",
+        data: JSON.stringify(json)
+    }).done(results => {
+        const hits = results["hits"]["hits"].map(h => h["_source"])
+        const container = document.getElementById("visualization")
+        const groupNames0 = new Set()
 
-	var container = document.getElementById('example3.1');
-	var chart = new google.visualization.Timeline(container);
-        var dataTable = new google.visualization.DataTable();
-        dataTable.addColumn({ type: 'string', id: 'Position' });
-        dataTable.addColumn({ type: 'string', id: 'Name' });
-	    dataTable.addColumn({ type: "string", role: "style"});
-        dataTable.addColumn({ type: 'date', id: 'Start Bar' });
-        dataTable.addColumn({ type: 'date', id: 'End Bar' });
-        dataTable.addColumn({ type: 'date', id: 'Start', role: "annotation" });
-        dataTable.addColumn({ type: 'date', id: 'End' , role: "annotation" });
+        hits.forEach(obj => {
+            groupNames0.add(groupName(obj))
+        });
 
-	var timeline = [];
-	var resources = new Set();
-	var colorMap = {}
-	colorMap["irods_capability_automated_ingest.sync_task.sync_file"] = '#ff8888';
-	colorMap["irods_capability_automated_ingest.sync_task.sync_dir"] = '#88ff88';
-	colorMap["irods_capability_automated_ingest.sync_task.sync_path"] = '#8888ff';
-	colorMap["irods_capability_automated_ingest.sync_task.sync_restart"] = '#234783';
-	console.log(hits)
-	hits.forEach(function(obj){
-	    let task_id = obj["event_id"]
-	    let start=obj["start"]
-	    let finish=obj["finish"]
-	    let taskStartDate = new Date(start)
-	    let taskEndDate = new Date(finish)
-	    let barStartDate = new Date(Math.max(taskStartDate, startDate))
-	    let barEndDate = new Date(Math.min(taskEndDate, finishDate))
-	    let row = [obj["hostname"]+"/"+obj["index"], task_id, colorMap[obj["event_name"]], barStartDate, barEndDate, taskStartDate, taskEndDate];
-	    dataTable.addRow(row);
-	});
-	
-	chart.draw(dataTable, {
-	    height:"100%",
-	    width:"100%",
-	    hAxis: {
-		format: "MMM d, y HH:mm:ss",
-		minValue: startDate,
-		maxValue: finishDate
-	    }
-	});
-    }).fail(function(a,b,c){
-	console.log(b)
-	console.log(c);
+        const groupNames = Array.from(groupNamesSet).sort()
+        const groups = new vis.DataSet()
+        for(let g = 0; g < groupNames.length; g++) {
+            groups.add({id: g, content: groupNames[g]})
+        }
+
+        const colorMap = {}
+        colorMap["irods_capability_automated_ingest.sync_task.sync_file"] = 'sync_file';
+        colorMap["irods_capability_automated_ingest.sync_task.sync_dir"] = 'sync_dir';
+        colorMap["irods_capability_automated_ingest.sync_task.sync_path"] = 'sync_path';
+        colorMap["irods_capability_automated_ingest.sync_task.restart"] = 'restart';
+
+        const items = new vis.DataSet()
+        hits.forEach((obj, index) => {
+            let task_id = obj["event_id"]
+            let task_name = obj["event_name"]
+            let start=obj["start"]
+            let finish=obj["finish"]
+            let taskStartDate = new Date(start)
+            let taskEndDate = new Date(finish)
+            items.add({
+                id: index,
+                group: groupName(obj),
+                content: task_id,
+                start: taskStartDate,
+                end: taskEndDate
+                className: colorMap[task_name]
+            })
+        });
+
+        let timeline = new vis.Timeline(container)
+        timeline.setGroups(groups)
+        timeline.setItems(items)
+    }).fail((a,b,c) => {
+        console.log(b)
+        console.log(c)
     });
 }

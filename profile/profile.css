@@ -1,0 +1,16 @@
+.vis-item.sync_file {
+    background-color: red;
+}
+
+
+.vis-item.sync_dir {
+    background-color: green;
+}
+
+.vis-item.sync_path {
+    background-color: blue;
+}
+
+.vis-item.restart {
+    background-color: grey;
+}
