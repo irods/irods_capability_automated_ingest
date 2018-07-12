@@ -11,7 +11,7 @@ parser.add_argument('--elasticsearch_host', metavar='ELASTICSEARCH HOST', type=s
                     help='elasticsearch host')
 parser.add_argument('elasticsearch_index', metavar='ELASTICSEARCH INDEX', type=str,
                     help='elasticsearch index')
-parser.add_argument('--additional_key', dest='keys', action='store', nargs="*",
+parser.add_argument('--additional_key', dest='keys', action='store', nargs="*", default=[],
                     help='additional key')
 
 args = parser.parse_args()
