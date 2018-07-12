@@ -38,8 +38,8 @@ function getMinAndMaxDate() {
     }).done(results => {
         let minDate = document.getElementById("minDate")
         let maxDate = document.getElementById("maxDate")
-        minDate.innerHTML = results["minDate"]["value_as_string"]
-        maxDate.innerHTML = results["maxDate"]["value_as_string"]
+        minDate.innerHTML = results["aggregations"]["minDate"]["value_as_string"]
+        maxDate.innerHTML = results["aggregations"]["maxDate"]["value_as_string"]
     })
 
 }
