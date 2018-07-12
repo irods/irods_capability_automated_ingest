@@ -3,7 +3,7 @@ google.charts.load("current", {packages:["timeline"]});
 function drawChart(){
     let startDate = new Date(document.getElementById('start').value)
     let duration = document.getElementById('duration').value
-    let finishDate = new Date(startData.valueOf() + duration);
+    let finishDate = startDate == undefined || duration == undefined ? undefined : new Date(startDate.valueOf() + duration)
     var index = document.getElementById('index').value;
     if (isNaN(startDate ))
 	startDate = undefined;
