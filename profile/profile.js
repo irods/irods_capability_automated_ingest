@@ -14,6 +14,7 @@ function drawChart(){
 }
 
 function getMinAndMaxDate() {
+    var index = document.getElementById('index').value;
     let json = {
         aggs: {
             minDate : {
