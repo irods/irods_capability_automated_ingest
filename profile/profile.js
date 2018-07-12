@@ -90,10 +90,12 @@ function drawChart2(index, startDate, finishDate) {
         var dataTable = new google.visualization.DataTable();
         dataTable.addColumn({ type: 'string', id: 'Position' });
         dataTable.addColumn({ type: 'string', id: 'Name' });
-	dataTable.addColumn({ type: "string", role: "style"});
+	    dataTable.addColumn({ type: "string", role: "style"});
+        dataTable.addColumn({ type: 'date', id: 'Start Bar' });
+        dataTable.addColumn({ type: 'date', id: 'End Bar' });
         dataTable.addColumn({ type: 'date', id: 'Start' });
         dataTable.addColumn({ type: 'date', id: 'End' });
-	
+
 	var timeline = [];
 	var resources = new Set();
 	var colorMap = {}
@@ -103,10 +105,14 @@ function drawChart2(index, startDate, finishDate) {
 	colorMap["irods_capability_automated_ingest.sync_task.sync_restart"] = '#234783';
 	console.log(hits)
 	hits.forEach(function(obj){
-	    var task_id = obj["event_id"]
-	    var start=obj["start"]
-	    var finish=obj["finish"]
-	    var row = [obj["hostname"]+"/"+obj["index"], task_id, colorMap[obj["event_name"]], new Date(start), new Date(finish)];
+	    let task_id = obj["event_id"]
+	    let start=obj["start"]
+	    let finish=obj["finish"]
+	    let taskStartDate = new Date(start)
+	    let taskEndDate = new Date(finish)
+	    let barStartDate = Math.max(taskStartDate, startDate)
+	    let barEndDate = Math.min(taskEndDate, endDate)
+	    let row = [obj["hostname"]+"/"+obj["index"], task_id, colorMap[obj["event_name"]], barStartDate, barEndDate, taskStartDate, taskEndDate];
 	    dataTable.addRow(row);
 	});
 	
