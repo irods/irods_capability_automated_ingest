@@ -1,5 +1,3 @@
-google.charts.load("current", {packages:["timeline"]});
-
 function drawChart(){
     let startDate = new Date(document.getElementById('start').value)
     let duration = parseInt(document.getElementById('duration').value)
