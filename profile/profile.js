@@ -93,8 +93,8 @@ function drawChart2(index, startDate, finishDate) {
 	    dataTable.addColumn({ type: "string", role: "style"});
         dataTable.addColumn({ type: 'date', id: 'Start Bar' });
         dataTable.addColumn({ type: 'date', id: 'End Bar' });
-        dataTable.addColumn({ type: 'date', id: 'Start' });
-        dataTable.addColumn({ type: 'date', id: 'End' });
+        dataTable.addColumn({ type: 'date', id: 'Start', role: "annotation" });
+        dataTable.addColumn({ type: 'date', id: 'End' , role: "annotation" });
 
 	var timeline = [];
 	var resources = new Set();
