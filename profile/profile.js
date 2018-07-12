@@ -1,8 +1,9 @@
 google.charts.load("current", {packages:["timeline"]});
 
 function drawChart(){
-    var startDate = new Date(document.getElementById('start').value);
-    var finishDate = new Date(document.getElementById('end').value);
+    let startDate = new Date(document.getElementById('start').value)
+    let duration = document.getElementById('duration').value
+    let finishDate = new Date(startData.valueOf() + duration);
     var index = document.getElementById('index').value;
     if (isNaN(startDate ))
 	startDate = undefined;
