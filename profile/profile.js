@@ -139,6 +139,7 @@ function drawChart2(index, startDate, finishDate) {
 	    tooltip: {
 		overflowMethod: "cap"
 	    },
+	    zoomable: false,
 	    stack: false,
 	    groupOrder: "content"
 	}

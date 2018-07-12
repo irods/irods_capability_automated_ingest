@@ -38,6 +38,7 @@ es.indices.create(index, body={
 def task_action():
 
     task_buf = {}
+    task_counter = {}
 
     i = 0
     with open(input_file, "r") as f:
@@ -60,12 +61,13 @@ def task_action():
                     start = buf["@timestamp"]
                     finish = obj["@timestamp"]
 
+                event_name = obj["event_name"]
                 di = {
                     "start": start,
                     "finish": finish,
                     "hostname": obj["hostname"],
                     "index": obj["index"],
-                    "event_name": obj["event_name"],
+                    "event_name": event_name,
                     "event_id": obj["event_id"]
                 }
 
@@ -79,8 +81,16 @@ def task_action():
                 }
                 i += 1
                 print(i)
+                if event_name in task_counter:
+                    task_counter[event_name] += 1
+                else:
+                    task_counter[event_name] = 1
                 yield d
             line = f.readline().rstrip("\n")
+    if len(task_buf) != 0:
+        print(task_buf)
+
+    print(task_counter)
 
 
 bulk(es, task_action())
