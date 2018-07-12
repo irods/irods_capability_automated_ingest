@@ -23,10 +23,14 @@ index = args.elasticsearch_index
 
 es = Elasticsearch(output)
 
-es.indices.put_mapping(doc_type="document", index=index, body={
-    "properties": {
-        "hostname": {
-            "type": "keyword"
+es.indices.create(index, body={
+    "mappings": {
+        "document": {
+            "properties": {
+                "hostname": {
+                    "type": "keyword"
+                }
+            }
         }
     }
 })
