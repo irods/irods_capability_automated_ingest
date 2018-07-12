@@ -2,13 +2,26 @@ import sys
 import json
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
+import argparse
 
-input_file = sys.argv[1]
-keys_str = sys.argv[2]
-output = sys.argv[3]
-index = sys.argv[4]
+parser = argparse.ArgumentParser(description='Ingest profile data into Elasticsearch')
+parser.add_argument('input_file', metavar='INPUT FILE', type=str, required=True,
+                    help='input file')
+parser.add_argument('--elasticsearch_host', metavar='ELASTICSEARCH HOST', type=str, default="localhost",
+                    help='elasticsearch host')
+parser.add_argument('elasticsearch_index', metavar='ELASTICSEARCH INDEX', type=str, required=True,
+                    help='elasticsearch index')
+parser.add_argument('--additional_key', dest='keys', action='store', nargs="*",
+                    help='additional key')
 
-keys = keys_str.split(",")
+args = parser.parse_args()
+print(args.accumulate(args.integers))
+
+input_file = args.input_file
+keys = args.keys
+output = args.elasticsearch_host
+index = args.elasticsearch_index
+
 es = Elasticsearch(output)
 
 
