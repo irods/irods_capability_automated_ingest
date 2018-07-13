@@ -216,65 +216,15 @@ def sync_path(self, meta):
 
 @app.task(bind=True, base=IrodsTask)
 def sync_file(self, meta):
-    hdlr = meta["event_handler"]
-    task = meta["task"]
-    path = meta["path"]
-    root = meta["root"]
-    target = meta["target"]
-    config = meta["config"]
-    logging_config = config["log"]
-    ignore_cache = meta["ignore_cache"]
-    logger = sync_logging.get_sync_logger(logging_config)
-
-    max_retries = get_max_retries(logger, meta)
-
-    lock = None
-    try:
-        logger.info("synchronizing file. path = " + path)
-        r = get_redis(config)
-        sync_key = path + ":" + target
-        lock = redis_lock.Lock(r, "sync_file:"+sync_key)
-        lock.acquire()
-        t = datetime.now().timestamp()
-        if not ignore_cache:
-            sync_time = get_with_key(r, sync_time_key, sync_key, float)
-        else:
-            sync_time = None
-
-        mtime = meta.get("mtime")
-        if mtime is None:
-            mtime = getmtime(path)
-
-        ctime = meta.get("ctime")
-        if ctime is None:
-            ctime = getctime(path)
-
-        if sync_time is None or mtime >= sync_time:
-            logger.info("synchronizing file", path=path, t0=sync_time, t=t, mtime=mtime)
-            meta2 = meta.copy()
-            meta2["target"] = join(target, relpath(path, start=root))
-            sync_irods.sync_data_from_file(meta2, logger, True)
-            set_with_key(r, sync_time_key, sync_key, str(t))
-            logger.info("succeeded", task=task, path=path)
-        elif ctime >= sync_time:
-            logger.info("synchronizing file", path=path, t0=sync_time, t=t, ctime=ctime)
-            meta2 = meta.copy()
-            meta2["target"] = join(target, relpath(path, start=root))
-            sync_irods.sync_metadata_from_file(meta2, logger)
-            set_with_key(r, sync_time_key, sync_key, str(t))
-            logger.info("succeeded_metadata_only", task=task, path=path)
-        else:
-            logger.info("succeeded_file_has_not_changed", task=task, path=path)
-    except Exception as err:
-        retry_countdown = get_delay(logger, meta, self.request.retries + 1)
-        raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
-    finally:
-        if lock is not None:
-            lock.release()
+    sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
 
 
 @app.task(bind=True, base=IrodsTask)
 def sync_dir(self, meta):
+    sync_entry(self, meta, "dir", sync_irods.sync_data_from_dir, sync_irods.sync_metadata_from_dir)
+
+
+def sync_entry(self, meta, cls, data, meta):
     hdlr = meta["event_handler"]
     task = meta["task"]
     path = meta["path"]
@@ -289,16 +239,17 @@ def sync_dir(self, meta):
 
     lock = None
     try:
-        logger.info("synchronizing dir. path = " + path)
+        logger.info("synchronizing " + cls + ". path = " + path)
         r = get_redis(config)
         sync_key = path + ":" + target
-        lock = redis_lock.Lock(r, "sync_dir:"+path)
+        lock = redis_lock.Lock(r, "sync_" + cls + ":"+sync_key)
         lock.acquire()
         t = datetime.now().timestamp()
         if not ignore_cache:
             sync_time = get_with_key(r, sync_time_key, sync_key, float)
         else:
             sync_time = None
+
         mtime = meta.get("mtime")
         if mtime is None:
             mtime = getmtime(path)
@@ -308,14 +259,14 @@ def sync_dir(self, meta):
             ctime = getctime(path)
 
         if sync_time is None or mtime >= sync_time:
-            logger.info("synchronizing dir", path=path, t0=sync_time, t=t, mtime=mtime)
+            logger.info("synchronizing " + cls, path=path, t0=sync_time, t=t, mtime=mtime)
             if path == root:
                 target2 = target
             else:
                 target2 = join(target, relpath(path, start=root))
             meta2 = meta.copy()
             meta2["target"] = target2
-            sync_irods.sync_data_from_dir(meta2, logger, True)
+            data(meta2, logger, True)
             set_with_key(r, sync_time_key, sync_key, str(t))
             logger.info("succeeded", task=task, path=path)
         elif ctime >= sync_time:
@@ -326,11 +277,11 @@ def sync_dir(self, meta):
                 target2 = join(target, relpath(path, start=root))
             meta2 = meta.copy()
             meta2["target"] = target2
-            sync_irods.sync_metadata_from_dir(meta2, logger)
+            meta(meta2, logger)
             set_with_key(r, sync_time_key, sync_key, str(t))
             logger.info("succeeded_metadata_only", task=task, path=path)
         else:
-            logger.info("succeeded_file_has_not_changed", task=task, path=path)
+            logger.info("succeeded_" + cls + "_has_not_changed", task=task, path=path)
     except Exception as err:
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
