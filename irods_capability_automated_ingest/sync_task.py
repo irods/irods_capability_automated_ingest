@@ -224,7 +224,7 @@ def sync_dir(self, meta):
     sync_entry(self, meta, "dir", sync_irods.sync_data_from_dir, sync_irods.sync_metadata_from_dir)
 
 
-def sync_entry(self, meta, cls, data, meta):
+def sync_entry(self, meta, cls, datafunc, metafunc):
     hdlr = meta["event_handler"]
     task = meta["task"]
     path = meta["path"]
@@ -266,7 +266,7 @@ def sync_entry(self, meta, cls, data, meta):
                 target2 = join(target, relpath(path, start=root))
             meta2 = meta.copy()
             meta2["target"] = target2
-            data(meta2, logger, True)
+            datafunc(meta2, logger, True)
             set_with_key(r, sync_time_key, sync_key, str(t))
             logger.info("succeeded", task=task, path=path)
         elif ctime >= sync_time:
@@ -277,7 +277,7 @@ def sync_entry(self, meta, cls, data, meta):
                 target2 = join(target, relpath(path, start=root))
             meta2 = meta.copy()
             meta2["target"] = target2
-            meta(meta2, logger)
+            metafunc(meta2, logger)
             set_with_key(r, sync_time_key, sync_key, str(t))
             logger.info("succeeded_metadata_only", task=task, path=path)
         else:
