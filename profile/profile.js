@@ -42,6 +42,16 @@ function getMinAndMaxDate() {
 
 }
 
+function getMin() {
+    let minDate = document.getElementById("minDate")
+    return minDate.innerHTML
+}
+
+function setStart(value) {
+    let startDate = document.getElementById('start')
+    startDate.value = value
+}
+
 function groupName(obj) {
     let index = obj["index"]
     let indexString = ""

@@ -202,6 +202,8 @@ def sync_path(self, meta):
                 meta["path"] = n.path
                 meta["isfile"] = n.is_file()
                 meta["isdir"] = n.is_dir()
+                meta["ctime"] = n.stat().st_ctime
+                meta["mtime"] = n.stat().st_mtime
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
         else:
@@ -238,8 +240,15 @@ def sync_file(self, meta):
             sync_time = get_with_key(r, sync_time_key, sync_key, float)
         else:
             sync_time = None
-        mtime = getmtime(path)
-        ctime = getctime(path)
+
+        mtime = meta.get("mtime")
+        if mtime is None:
+            mtime = getmtime(path)
+
+        ctime = meta.get("ctime")
+        if ctime is None:
+            ctime = getctime(path)
+
         if sync_time is None or mtime >= sync_time:
             logger.info("synchronizing file", path=path, t0=sync_time, t=t, mtime=mtime)
             meta2 = meta.copy()
@@ -290,8 +299,14 @@ def sync_dir(self, meta):
             sync_time = get_with_key(r, sync_time_key, sync_key, float)
         else:
             sync_time = None
-        mtime = getmtime(path)
-        ctime = getctime(path)
+        mtime = meta.get("mtime")
+        if mtime is None:
+            mtime = getmtime(path)
+
+        ctime = meta.get("ctime")
+        if ctime is None:
+            ctime = getctime(path)
+
         if sync_time is None or mtime >= sync_time:
             logger.info("synchronizing dir", path=path, t0=sync_time, t=t, mtime=mtime)
             if path == root:
