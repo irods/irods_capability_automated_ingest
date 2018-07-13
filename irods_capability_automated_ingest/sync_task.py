@@ -1,4 +1,4 @@
-from os import listdir
+from os import scandir
 import os
 from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir
 from datetime import datetime
@@ -177,26 +177,31 @@ def sync_path(self, meta):
     file_q_name = meta["file_queue"]
     config = meta["config"]
     logging_config = config["log"]
+    cached_is_file = meta.get("is_file")
+    cached_is_dir = meta.get("is_dir")
+
     logger = sync_logging.get_sync_logger(logging_config)
 
     max_retries = get_max_retries(logger, meta)
 
     try:
         r = get_redis(config)
-        if isfile(path):
+        if (cached_is_file is not None and cached_is_file) or isfile(path):
             logger.info("enqueue file path", path=path)
             meta = meta.copy()
             meta["task"] = "sync_file"
             async(r, logger, sync_file, meta, file_q_name)
             logger.info("succeeded", task=task, path=path)
-        elif isdir(path):
+        elif (cached_is_dir is not None and cached_is_dir) or isdir(path):
             logger.info("walk dir", path=path)
             meta = meta.copy()
             meta["task"] = "sync_dir"
             async(r, logger, sync_dir, meta, file_q_name)
-            for n in listdir(path):
+            for n in scandir(path):
                 meta = meta.copy()
-                meta["path"] = join(path, n)
+                meta["path"] = n.path
+                meta["isfile"] = n.is_file()
+                meta["isdir"] = n.is_dir()
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
         else:
