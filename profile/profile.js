@@ -1,13 +1,12 @@
 function drawChart(){
     let startDate = new Date(document.getElementById('start').value)
+    if (isNaN(startDate))
+    	startDate = undefined
     let duration = parseInt(document.getElementById('duration').value)
     let finishDate = startDate == undefined || duration == undefined ? undefined : new Date(startDate.valueOf() + duration)
-    var index = document.getElementById('index').value;
-    if (isNaN(startDate ))
-	startDate = undefined;
-    
-    if (isNaN(finishDate ))
-	finishDate = undefined;
+    let index = document.getElementById('index').value;
+    if (isNaN(finishDate))
+	    finishDate = undefined
     drawChart2(index, startDate, finishDate);
 }
 
@@ -28,11 +27,11 @@ function getMinAndMaxDate() {
         }
     }
     $.ajax({
-    type: "POST",
-	contentType: "application/json",
-	dataType: "json",
-	url: "http://localhost:9200/" + index + "/_search?size=0",
-    data: JSON.stringify(json)
+        type: "POST",
+        contentType: "application/json",
+        dataType: "json",
+        url: "http://localhost:9200/" + index + "/_search?size=0",
+        data: JSON.stringify(json)
     }).done(results => {
         let minDate = document.getElementById("minDate")
         let maxDate = document.getElementById("maxDate")
@@ -47,8 +46,18 @@ function getMin() {
     return minDate.innerHTML
 }
 
+function getMax() {
+    let minDate = document.getElementById("maxDate")
+    return minDate.innerHTML
+}
+
 function setStart(value) {
     let startDate = document.getElementById('start')
+    startDate.value = value
+}
+
+function setFinish(value) {
+    let startDate = document.getElementById('finish')
     startDate.value = value
 }
 
@@ -56,9 +65,9 @@ function groupName(obj) {
     let index = obj["index"]
     let indexString = ""
     if (index < 10) {
-	indexString = "0" + index
+	    indexString = "0" + index
     } else {
-	indexString = "" + index
+	    indexString = "" + index
     }
     return obj["hostname"]+"/" + indexString
 }
@@ -94,14 +103,14 @@ function drawChart2(index, startDate, finishDate) {
 
     const handleResults = (sid, remaining, data) => {
         data.forEach(h => {
-	    hits.push(h["_source"])
-	    remaining--
-	})
-	if(remaining !== 0) {
-	    scroll(sid, remaining)
-	} else {
-	    showTable(startDate, finishDate, hits)
-	}
+            hits.push(h["_source"])
+            remaining--
+        })
+        if(remaining !== 0) {
+            scroll(sid, remaining)
+        } else {
+            showTable(startDate, finishDate, hits)
+        }
     }
     
     const scroll = (sid, remaining) => {
@@ -110,16 +119,16 @@ function drawChart2(index, startDate, finishDate) {
 	    scroll_id: sid
 	}
 	$.ajax({
-            type: "POST",
-            contentType: "application/json",
-            dataType: "json",
-            url: "http://localhost:9200/_search/scroll",
-            data: JSON.stringify(json)
+        type: "POST",
+        contentType: "application/json",
+        dataType: "json",
+        url: "http://localhost:9200/_search/scroll",
+        data: JSON.stringify(json)
 	}).done(results => {
 	    handleResults(results["_scroll_id"], remaining, results["hits"]["hits"])
 	}).fail((a,b,c) => {
-            console.log(b)
-            console.log(c)
+        console.log(b)
+        console.log(c)
 	})
     }
     
@@ -130,9 +139,9 @@ function drawChart2(index, startDate, finishDate) {
         url: "http://localhost:9200/" + index + "/_search?scroll=1m",
         data: JSON.stringify(json)
     }).done(results => {
-	const data = results["hits"]
-	const total = data["total"]
-	handleResults(results["_scroll_id"], total, data["hits"])
+        const data = results["hits"]
+        const total = data["total"]
+        handleResults(results["_scroll_id"], total, data["hits"])
     }).fail((a,b,c) => {
         console.log(b)
         console.log(c)
@@ -152,7 +161,7 @@ function showTable(startDate, finishDate, hits){
     const groupMap = {}
     for(let g = 0; g < groupNames.length; g++) {
         groups.add({id: g, content: groupNames[g]})
-	groupMap[groupNames[g]] = g
+	    groupMap[groupNames[g]] = g
     }
 
     const colorMap = {}
@@ -184,23 +193,23 @@ function showTable(startDate, finishDate, hits){
     })
 
     let options = {
-	tooltip: {
-	    overflowMethod: "cap"
-	},
-	moveable: true,
-	zoomable: true,
-	selectable: false,
-	showCurrentTime: false,
-	stack: false,
-	groupOrder: "content"
+        tooltip: {
+            overflowMethod: "cap"
+        },
+        moveable: true,
+        zoomable: true,
+        selectable: false,
+        showCurrentTime: false,
+        stack: false,
+        groupOrder: "content"
     }
     if(startDate !== undefined) {
-	options["min"] = startDate
-	options["start"] = startDate
-	options["end"] = new Date(startDate.valueOf() + 1000)
+	    options["min"] = startDate
+	    options["start"] = startDate
+	    options["end"] = new Date(startDate.valueOf() + 1000)
     }
     if(finishDate !== undefined) {
-	options["max"] = finishDate
+	    options["max"] = finishDate
     }
     
     container.innerHTML = ""
