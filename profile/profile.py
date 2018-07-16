@@ -23,18 +23,21 @@ index = args.elasticsearch_index
 
 es = Elasticsearch(output)
 
-es.indices.create(index, body={
-    "mappings": {
-        "document": {
-            "properties": {
-                "hostname": {
-                    "type": "keyword"
+try:
+    es.indices.create(index, body={
+        "mappings": {
+            "document": {
+                "properties": {
+                    "hostname": {
+                        "type": "keyword"
+                    }
                 }
             }
         }
-    }
-})
-
+    })
+except Exception as e:
+    print(e)
+    
 def task_action():
 
     task_buf = {}
