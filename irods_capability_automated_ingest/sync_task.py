@@ -1,4 +1,11 @@
-from os import scandir, listdir
+# Use the built-in version of scandir/walk if possible, otherwise
+# use the scandir module version
+try:
+    from os import scandir
+except ImportError:
+    from scandir import scandir
+
+from os import listdir
 import os
 from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir
 from datetime import datetime
