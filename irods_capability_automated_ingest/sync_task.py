@@ -215,8 +215,8 @@ def sync_path(self, meta):
             for n in itr:
                 meta = meta.copy()
                 meta["path"] = n.path
-                meta["isfile"] = n.is_file()
-                meta["isdir"] = n.is_dir()
+                meta["is_file"] = n.is_file()
+                meta["is_dir"] = n.is_dir()
                 meta["ctime"] = n.stat().st_ctime
                 meta["mtime"] = n.stat().st_mtime
                 async(r, logger, sync_path, meta, path_q_name)
