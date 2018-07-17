@@ -99,13 +99,13 @@ start celery worker(s)
 
 `fish`
 ```
-set -xl CELERY_BROKER_URL <redis>
+set -xl CELERY_BROKER_URL <redis or rabbitmq>
 set -xl PYTHONPATH (pwd)
 ```
 
 `bash`
 ```
-export CELERY_BROKER_URL=<redis>
+export CELERY_BROKER_URL=<redis or rabbitmq>
 export PYTHONPATH=`pwd`
 ```
 
@@ -142,16 +142,31 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 
 #### start
 ```
-python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --all ] [ --synchronous ]
+python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --ignore_cache ] [ --synchronous ] [ --progress ] [ --list_dir ] [ --scan_dir_list ] [ --log_filename ] [ --log_level ] [ --profile ] [ --profile_filename ] [ --profile_level ]
 ```
 
-If `-i` is not present, then only sync once
+If `-i` is not present, then only sync once.
 
-The `--append_json` is stored in `job.meta["append_json"]`
+The `--append_json` is stored in `job.meta["append_json"]`.
 
-The `--all` ignores cached last sync time.
+The `--ignore_cahce` ignores cached last sync time.
 
-The `--synchronous` will block until job is done and show progress bar
+The `--synchronous` will block until job is done.
+
+The `--progress` will show progress bar when `--synchronous`.
+
+The `--list_dir` will use cause the tasks to `listdir` instead of `scandir`.
+
+The `--log_filename` specify profile file name.
+
+The `--log_level` specify the profile level, currently should specify `INFO`
+
+The `--profile` will use enable profiling.
+
+The `--profile_filename` specify profile file name.
+
+The `--profile_level` specify the profile level, currently should specify `INFO`
+
 
 #### list jobs
 ```
