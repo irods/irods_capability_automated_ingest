@@ -61,7 +61,8 @@ def handle_start(args):
         "config": get_config(args),
         "synchronous": args.synchronous,
         "progress": args.progress,
-        "profile": args.profile
+        "profile": args.profile,
+        "list_dir": args.list_dir
     })
 
 
@@ -101,6 +102,7 @@ def main():
     parser_start.add_argument('--synchronous', action="store_true", default=False, help='synchronous')
     parser_start.add_argument('--progress', action="store_true", default=False, help='progress')
     parser_start.add_argument('--profile', action="store_true", default=False, help='profile')
+    parser_start.add_argument('--list_dir', action="store_true", default=False, help='list')
     add_arguments(parser_start)
 
     parser_start.set_defaults(func=handle_start)

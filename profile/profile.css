@@ -18,3 +18,8 @@
     background-color: grey;
     border-color: yellow;
 }
+
+.vis-item.list_dir {
+    background-color: #ff8800;
+    border-color: orange;
+}

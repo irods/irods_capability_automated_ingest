@@ -169,6 +169,7 @@ function showTable(startDate, finishDate, hits){
     colorMap["irods_capability_automated_ingest.sync_task.sync_dir"] = 'sync_dir';
     colorMap["irods_capability_automated_ingest.sync_task.sync_path"] = 'sync_path';
     colorMap["irods_capability_automated_ingest.sync_task.restart"] = 'restart';
+    colorMap["list_dir"] = 'list_dir';
 
     let count = hits.length
     document.getElementById("numEvents").innerHTML = count

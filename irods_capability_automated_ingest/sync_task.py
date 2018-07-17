@@ -177,6 +177,7 @@ def sync_path(self, meta):
     file_q_name = meta["file_queue"]
     config = meta["config"]
     logging_config = config["log"]
+    list_dir = meta["list_dir"]
     cached_is_file = meta.get("is_file")
     cached_is_dir = meta.get("is_dir")
 
@@ -197,7 +198,21 @@ def sync_path(self, meta):
             meta = meta.copy()
             meta["task"] = "sync_dir"
             async(r, logger, sync_dir, meta, file_q_name)
-            for n in scandir(path):
+            if list_dir:
+                if meta["profile"]:
+                    config = meta["config"]
+                    profile_log = config.get("profile")
+                    profile_logger = sync_logging.get_sync_logger(profile_log)
+                    task_id = self.request.id
+                    profile_logger.info("list_dir_prerun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
+
+            itr = scandir(path)
+            if list_dir:
+                itr = list(itr)
+                if meta["profile"]:
+                    profile_logger.info("list_dir_postrun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
+
+            for n in itr:
                 meta = meta.copy()
                 meta["path"] = n.path
                 meta["isfile"] = n.is_file()
