@@ -1,4 +1,4 @@
-from os import scandir
+from os import scandir, listdir
 import os
 from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir
 from datetime import datetime
@@ -178,6 +178,7 @@ def sync_path(self, meta):
     config = meta["config"]
     logging_config = config["log"]
     list_dir = meta["list_dir"]
+    dir_list = meta["scan_dir_list"]
     cached_is_file = meta.get("is_file")
     cached_is_dir = meta.get("is_dir")
 
@@ -198,7 +199,7 @@ def sync_path(self, meta):
             meta = meta.copy()
             meta["task"] = "sync_dir"
             async(r, logger, sync_dir, meta, file_q_name)
-            if list_dir:
+            if dir_list:
                 if meta["profile"]:
                     config = meta["config"]
                     profile_log = config.get("profile")
@@ -206,19 +207,26 @@ def sync_path(self, meta):
                     task_id = self.request.id
                     profile_logger.info("list_dir_prerun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
 
-            itr = scandir(path)
             if list_dir:
+                itr = listdir(path)
+            else:
+                itr = scandir(path)
+                
+            if dir_list:
                 itr = list(itr)
                 if meta["profile"]:
                     profile_logger.info("list_dir_postrun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
 
             for n in itr:
                 meta = meta.copy()
-                meta["path"] = n.path
-                meta["is_file"] = n.is_file()
-                meta["is_dir"] = n.is_dir()
-                meta["ctime"] = n.stat().st_ctime
-                meta["mtime"] = n.stat().st_mtime
+                if list_dir:
+                    meta["path"] = os.path.join(path, n)
+                else:
+                    meta["path"] = n.path
+                    meta["is_file"] = n.is_file()
+                    meta["is_dir"] = n.is_dir()
+                    meta["ctime"] = n.stat().st_ctime
+                    meta["mtime"] = n.stat().st_mtime
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
         else:
