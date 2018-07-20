@@ -180,13 +180,15 @@ function showTable(startDate, finishDate, hits){
         let task_name = obj["event_name"]
         let start=obj["start"]
         let finish=obj["finish"]
+	let path=obj["path"]
+	let target=obj["target"]
         let taskStartDate = new Date(start)
         let taskEndDate = new Date(finish)
         items.add({
             id: index,
             group: groupMap[groupName(obj)],
             content: task_id,
-	    title: `${task_id}<br/>start: ${taskStartDate}<br/>finish: ${taskEndDate}`,
+	    title: `${task_id}<br/>path: ${path}<br/>target: ${target}<br/>start: ${taskStartDate}<br/>finish: ${taskEndDate}`,
             start: taskStartDate,
             end: taskEndDate,
             className: colorMap[task_name]
