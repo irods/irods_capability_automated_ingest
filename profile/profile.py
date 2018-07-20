@@ -71,7 +71,9 @@ def task_action():
                     "hostname": obj["hostname"],
                     "index": obj["index"],
                     "event_name": event_name,
-                    "event_id": obj["event_id"]
+                    "event_id": obj["event_id"],
+                    "path": obj.get("path"),
+                    "target": obj.get("target")
                 }
 
                 for key in keys:

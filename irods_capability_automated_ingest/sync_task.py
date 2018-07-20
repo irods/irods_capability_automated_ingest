@@ -30,7 +30,7 @@ def task_prerun(task_id=None, task=None, args=None, kwargs=None, **kw):
         config = meta["config"]
         profile_log = config.get("profile")
         logger = sync_logging.get_sync_logger(profile_log)
-        logger.info("task_prerun", event_id=task_id, event_name=task.name, hostname=task.request.hostname, index=current_process().index)
+        logger.info("task_prerun", event_id=task_id, event_name=task.name, path=meta.get("path"), target=meta.get("target"), hostname=task.request.hostname, index=current_process().index)
 
 
 @task_postrun.connect()
@@ -40,7 +40,7 @@ def task_postrun(task_id=None, task=None, args=None, kwargs=None, retval=None, s
         config = meta["config"]
         profile_log = config.get("profile")
         logger = sync_logging.get_sync_logger(profile_log)
-        logger.info("task_postrun", event_id=task_id, event_name=task.name, hostname=task.request.hostname, index=current_process().index,state=state)
+        logger.info("task_postrun", event_id=task_id, event_name=task.name, path=meta.get("path"), target=meta.get("target"), hostname=task.request.hostname, index=current_process().index,state=state)
 
 class IrodsTask(app.Task):
 
@@ -104,7 +104,7 @@ def async(r, logger, task, meta, queue):
     if get_with_key(r, stop_key, job_name, str) is None:
         logger.info('incr_job_name', task=meta["task"], path=meta["path"], job_name=job_name)
         incr_with_key(r, tasks_key, job_name)
-        task_id = task.name+":"+meta["path"]+":"+meta["target"]+":"+str(time.time())+":"+job_name
+        task_id = str(uuid1())
         timeout = get_timeout(logger, meta)
         r.rpush(count_key(job_name), task_id)
         task.s(meta).apply_async(queue=queue, task_id=task_id, soft_time_limit=timeout)
