@@ -107,7 +107,7 @@ def async(r, logger, task, meta, queue):
         task_id = task.name+":"+meta["path"]+":"+meta["target"]+":"+str(time.time())+":"+job_name
         timeout = get_timeout(logger, meta)
         r.rpush(count_key(job_name), task_id)
-        task.s(meta).apply_async(queue=queue, task_id=task_id, time_limit=timeout)
+        task.s(meta).apply_async(queue=queue, task_id=task_id, soft_time_limit=timeout)
     else:
         logger.info('async_job_name_stopping', task=meta["task"], path=meta["path"], job_name=job_name)
 
