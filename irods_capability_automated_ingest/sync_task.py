@@ -234,23 +234,33 @@ def sync_path(self, meta):
             for n in itr:
                 meta = meta.copy()
 
-                file_abspath = os.path.abspath(n.path)
+                if list_dir:
+                    full_path = os.path.join(path, n)
+                    logger.info('PROCESSING: full_path['+full_path+']', task=task, path=path)
+                    if islink(full_path):
+                        logger.info('PROCESSING: ['+full_path+'] is a LINK', task=task, path=path)
 
-                if islink(file_abspath):
-                    logger.info('PROCESSING: ['+n.name+'] is a LINK', task=task, path=path)
-
-                    meta["is_file"] = False
-                    meta["is_dir"] = False
-                    meta["is_link"] = True
-                    meta["path"] = file_abspath
-                    meta["ctime"] = os.lstat(file_abspath).st_ctime
-                    meta["mtime"] = os.lstat(file_abspath).st_mtime
-
-                else:
-                    if list_dir:
-                        meta["path"] = os.path.join(path, n)
+                        meta["is_file"] = False
+                        meta["is_dir"] = False
+                        meta["is_link"] = True
+                        meta["path"] = full_path
+                        meta["ctime"] = os.lstat(full_path).st_ctime
+                        meta["mtime"] = os.lstat(full_path).st_mtime
+                    else: 
+                        meta["path"] = full_path
                         meta["is_link"] = False
-                    else:
+                else:
+                    file_abspath = os.path.abspath(n.path)
+                    if islink(file_abspath):
+                        logger.info('PROCESSING: ['+n.name+'] is a LINK', task=task, path=path)
+
+                        meta["is_file"] = False
+                        meta["is_dir"] = False
+                        meta["is_link"] = True
+                        meta["path"] = file_abspath
+                        meta["ctime"] = os.lstat(file_abspath).st_ctime
+                        meta["mtime"] = os.lstat(file_abspath).st_mtime
+                    else: 
                         meta["path"] = n.path
                         meta["is_file"] = n.is_file()
                         meta["is_dir"] = n.is_dir()
