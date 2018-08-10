@@ -372,7 +372,7 @@ def register_link(hdlr_mod, logger, session, meta, **options):
     tgt = os.path.abspath(os.readlink(meta['path']))
     obj.metadata.add('link_target', tgt, 'automated_ingest')
 
-    session.data_objects.modDataObjMeta(data_obj_info, {"dataModify":mtime}, **options)
+    session.data_objects.modDataObjMeta(data_obj_info, {"dataModify":mtime, "filePath":path}, **options)
 
     logger.info("succeeded", task="register_link", path = path)
 
@@ -391,11 +391,12 @@ def update_link_metadata(hdlr_mod, logger, session, meta, **options):
     resc_name = get_resource_name(hdlr_mod, session, meta, **options)
     outdated_repl_nums = []
     found = False
+
     if resc_name is None:
         found = True
     else:
         for row in session.query(Resource.name, DataObject.path, DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
-            if row[DataObject.path] == target_path:
+            if row[DataObject.path] == path:
                 if child_of(session, row[Resource.name], resc_name):
                     found = True
                     repl_num = row[DataObject.replica_number]
