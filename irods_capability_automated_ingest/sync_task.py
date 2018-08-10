@@ -7,7 +7,7 @@ except ImportError:
 
 from os import listdir
 import os
-from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir
+from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir, islink
 from datetime import datetime
 import redis_lock
 from . import sync_logging, sync_irods
@@ -188,6 +188,7 @@ def sync_path(self, meta):
     dir_list = meta["scan_dir_list"]
     cached_is_file = meta.get("is_file")
     cached_is_dir = meta.get("is_dir")
+    cached_is_link = meta.get("is_link")
 
     logger = sync_logging.get_sync_logger(logging_config)
 
@@ -195,7 +196,13 @@ def sync_path(self, meta):
 
     try:
         r = get_redis(config)
-        if (cached_is_file is not None and cached_is_file) or isfile(path):
+        if (cached_is_link is not None and cached_is_link) or islink(path):
+            logger.info("enqueue link path", path=path)
+            meta = meta.copy()
+            meta["task"] = "sync_link"
+            async(r, logger, sync_link, meta, file_q_name)
+            logger.info("succeeded", task=task, path=path)
+        elif (cached_is_file is not None and cached_is_file) or isfile(path):
             logger.info("enqueue file path", path=path)
             meta = meta.copy()
             meta["task"] = "sync_file"
@@ -226,14 +233,30 @@ def sync_path(self, meta):
 
             for n in itr:
                 meta = meta.copy()
-                if list_dir:
-                    meta["path"] = os.path.join(path, n)
+
+                file_abspath = os.path.abspath(n.path)
+
+                if islink(file_abspath):
+                    logger.info('PROCESSING: ['+n.name+'] is a LINK', task=task, path=path)
+
+                    meta["is_file"] = False
+                    meta["is_dir"] = False
+                    meta["is_link"] = True
+                    meta["path"] = file_abspath
+                    meta["ctime"] = os.lstat(file_abspath).st_ctime
+                    meta["mtime"] = os.lstat(file_abspath).st_mtime
+
                 else:
-                    meta["path"] = n.path
-                    meta["is_file"] = n.is_file()
-                    meta["is_dir"] = n.is_dir()
-                    meta["ctime"] = n.stat().st_ctime
-                    meta["mtime"] = n.stat().st_mtime
+                    if list_dir:
+                        meta["path"] = os.path.join(path, n)
+                        meta["is_link"] = False
+                    else:
+                        meta["path"] = n.path
+                        meta["is_file"] = n.is_file()
+                        meta["is_dir"] = n.is_dir()
+                        meta["is_link"] = False
+                        meta["ctime"] = n.stat().st_ctime
+                        meta["mtime"] = n.stat().st_mtime
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
         else:
@@ -248,11 +271,13 @@ def sync_path(self, meta):
 def sync_file(self, meta):
     sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
 
+@app.task(bind=True, base=IrodsTask)
+def sync_link(self, meta):
+    sync_entry(self, meta, "link", sync_irods.sync_data_from_link, sync_irods.sync_metadata_from_link)
 
 @app.task(bind=True, base=IrodsTask)
 def sync_dir(self, meta):
     sync_entry(self, meta, "dir", sync_irods.sync_data_from_dir, sync_irods.sync_metadata_from_dir)
-
 
 def sync_entry(self, meta, cls, datafunc, metafunc):
     hdlr = meta["event_handler"]

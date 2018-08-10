@@ -1,5 +1,5 @@
 import os
-from os.path import dirname, getsize, getmtime, basename
+from os.path import dirname, getsize, getmtime, basename, abspath
 from irods.session import iRODSSession
 from irods.models import Resource, DataObject, Collection
 from .sync_utils import size, get_redis, call, get_hdlr_mod
@@ -343,3 +343,117 @@ def sync_data_from_dir(meta, logger, content, **options):
 
 def sync_metadata_from_dir(meta, logger, **options):
     sync_data_from_dir(meta, logger, False, **options)
+
+def register_link(hdlr_mod, logger, session, meta, **options):
+    target = meta["target"]
+    path = meta["path"]
+    target_path = get_target_path(hdlr_mod, session, meta, **options)
+    if target_path is None:
+        target_path = path
+
+    resc_name = get_resource_name(hdlr_mod, session, meta, **options)
+
+    if resc_name is not None:
+        options["destRescName"] = resc_name
+
+    logger.info("registering link " + target + ", options = " + str(options))
+
+    mtime = int(meta['mtime'])
+
+    data_obj_info = {"objPath": target}
+    if resc_name is not None:
+        del options["destRescName"]
+        for row in session.query(DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target), DataObject.resource_name == resc_name):
+            data_obj_info["replNum"] = int(row[DataObject.replica_number])
+
+    logger.info('PROCESSING: in register_link', task='register_link', path=path)
+    obj = session.data_objects.create(target, resc_name, **options)
+
+    tgt = os.path.abspath(os.readlink(meta['path']))
+    obj.metadata.add('link_target', tgt, 'automated_ingest')
+
+    session.data_objects.modDataObjMeta(data_obj_info, {"dataModify":mtime}, **options)
+
+    logger.info("succeeded", task="register_link", path = path)
+
+def update_link_metadata(hdlr_mod, logger, session, meta, **options):
+    target = meta["target"]
+    path = meta["path"]
+    target_path = get_target_path(hdlr_mod, session, meta, **options)
+    if target_path is None:
+        target_path = path
+
+    mtime = int(meta['mtime'])
+    logger.info("updating link: " + target + ", options = " + str(options))
+
+    data_obj_info = {"objPath": target}
+
+    resc_name = get_resource_name(hdlr_mod, session, meta, **options)
+    outdated_repl_nums = []
+    found = False
+    if resc_name is None:
+        found = True
+    else:
+        for row in session.query(Resource.name, DataObject.path, DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
+            if row[DataObject.path] == target_path:
+                if child_of(session, row[Resource.name], resc_name):
+                    found = True
+                    repl_num = row[DataObject.replica_number]
+                    data_obj_info["replNum"] = repl_num
+                    continue
+
+    if not found:
+        logger.error("updating object: wrong resource or path, target = " + target + ", path = " + path + ", target_path = " + target_path + ", options = " + str(options))
+        raise Exception("wrong resource or path")
+
+    session.data_objects.modDataObjMeta(data_obj_info, {"dataModify":mtime, "allReplStatus":1}, **options)
+
+    logger.info("succeeded", task="irods_update_link_metadata", path = path)
+
+
+def sync_data_from_link(meta, logger, content, **options):
+    target = meta["target"]
+    path = meta["path"]
+    hdlr_mod = get_hdlr_mod(meta)
+    init = meta["initial_ingest"]
+
+    session = irods_session(hdlr_mod, meta, **options)
+
+    if init:
+        exists = False
+    else:
+        if session.data_objects.exists(target):
+            exists = True
+        elif session.collections.exists(target):
+            raise Exception("sync: cannot syncing link " + path + " to collection " + target)
+        else:
+            exists = False
+
+    if hasattr(hdlr_mod, "operation"):
+        op = hdlr_mod.operation(session, meta, **options)
+    else:
+        op = Operation.REGISTER_SYNC
+
+    if op == Operation.NO_OP:
+        if not exists:
+            call(hdlr_mod, "on_data_obj_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
+        else:
+            call(hdlr_mod, "on_data_obj_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
+    else:
+        if not exists:
+            meta2 = meta.copy()
+            meta2["target"] = dirname(target)
+            meta2["path"] = dirname(path)
+            create_dirs(hdlr_mod, logger, session, meta2, **options)
+
+            call(hdlr_mod, "on_data_obj_create", register_link, logger, hdlr_mod, logger, session, meta, **options)
+        else:
+            call(hdlr_mod, "on_data_obj_modify", update_link_metadata, logger, hdlr_mod, logger, session, meta, **options)
+
+
+def sync_metadata_from_link(meta, logger, **options):
+    sync_data_from_link(meta, logger, False, **options)
+
+
+
+
