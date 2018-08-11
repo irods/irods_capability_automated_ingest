@@ -190,7 +190,7 @@ def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
     pass
 
 
-#irods_session_map = {}
+irods_session_map = {}
 
 
 def irods_session(hdlr_mod, meta, **options):
@@ -226,15 +226,14 @@ def irods_session(hdlr_mod, meta, **options):
 
     key = json.dumps(kwargs) # todo add timestamp of env file to key
 
-    #sess = irods_session_map.get(key)
+    sess = irods_session_map.get(key)
 
-    #if sess is None:
-    #    sess = iRODSSession(**kwargs)
-    #    irods_session_map[key] = sess
+    if sess is None:
+        sess = iRODSSession(**kwargs)
+        irods_session_map[key] = sess
 
-    #return sess
+    return sess
 
-    return iRODSSession(**kwargs)
 
 def sync_data_from_file(meta, logger, content, **options):
     target = meta["target"]
@@ -311,7 +310,6 @@ def sync_data_from_file(meta, logger, content, **options):
         else:
             call(hdlr_mod, "on_data_obj_modify", sync_file_meta, logger, hdlr_mod, logger, session, meta, **options)
 
-    session.cleanup()
 
 def sync_metadata_from_file(meta, logger, **options):
     sync_data_from_file(meta, logger, False, **options)
@@ -341,8 +339,6 @@ def sync_data_from_dir(meta, logger, content, **options):
             create_dirs(hdlr_mod, logger, session, meta, **options)
         else:
             call(hdlr_mod, "on_collection_modify", sync_dir_meta, logger, hdlr_mod, logger, session, meta, **options)
-
-    session.cleanup()
 
 
 def sync_metadata_from_dir(meta, logger, **options):
@@ -455,7 +451,6 @@ def sync_data_from_link(meta, logger, content, **options):
         else:
             call(hdlr_mod, "on_data_obj_modify", update_link_metadata, logger, hdlr_mod, logger, session, meta, **options)
 
-    session.cleanup()
 
 def sync_metadata_from_link(meta, logger, **options):
     sync_data_from_link(meta, logger, False, **options)
