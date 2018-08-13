@@ -369,8 +369,11 @@ def register_link(hdlr_mod, logger, session, meta, **options):
     logger.info('PROCESSING: in register_link', task='register_link', path=path)
     obj = session.data_objects.create(target, resc_name, **options)
 
-    tgt = os.path.abspath(os.readlink(meta['path']))
-    obj.metadata.add('link_target', tgt, 'automated_ingest')
+    if meta['is_socket']:
+        obj.metadata.add('socket_target', 'socket', 'automated_ingest')
+    elif meta['is_link']:
+        tgt = os.path.abspath(os.readlink(meta['path']))
+        obj.metadata.add('link_target', tgt, 'automated_ingest')
 
     session.data_objects.modDataObjMeta(data_obj_info, {"dataModify":mtime, "filePath":path}, **options)
 
