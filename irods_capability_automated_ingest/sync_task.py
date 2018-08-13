@@ -5,6 +5,7 @@ try:
 except ImportError:
     from scandir import scandir
 
+import stat
 from os import listdir
 import os
 from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir, islink
@@ -243,30 +244,56 @@ def sync_path(self, meta):
                         meta["is_file"] = False
                         meta["is_dir"] = False
                         meta["is_link"] = True
+                        meta["is_socket"] = False
                         meta["path"] = full_path
                         meta["ctime"] = os.lstat(full_path).st_ctime
                         meta["mtime"] = os.lstat(full_path).st_mtime
                     else: 
-                        meta["path"] = full_path
-                        meta["is_link"] = False
+                        mode = os.stat(full_path).st_mode
+                        if stat.S_ISSOCK(mode):
+                            logger.info('PROCESSING: ['+full_path+'] is a SOCKET', task=task, path=path)
+
+                            meta["is_file"] = False
+                            meta["is_dir"] = False
+                            meta["is_link"] = True
+                            meta["is_socket"] = True
+                            meta["path"] = full_path
+                            meta["ctime"] = os.stat(full_path).st_ctime
+                            meta["mtime"] = os.stat(full_path).st_mtime
+                        else:
+                            meta["path"] = full_path
+                            meta["is_link"] = False
                 else:
-                    file_abspath = os.path.abspath(n.path)
-                    if islink(file_abspath):
+                    full_path = os.path.abspath(n.path)
+
+                    if islink(full_path):
                         logger.info('PROCESSING: ['+n.name+'] is a LINK', task=task, path=path)
 
                         meta["is_file"] = False
                         meta["is_dir"] = False
                         meta["is_link"] = True
-                        meta["path"] = file_abspath
-                        meta["ctime"] = os.lstat(file_abspath).st_ctime
-                        meta["mtime"] = os.lstat(file_abspath).st_mtime
+                        meta["is_socket"] = False
+                        meta["path"] = full_path
+                        meta["ctime"] = os.lstat(full_path).st_ctime
+                        meta["mtime"] = os.lstat(full_path).st_mtime
                     else: 
-                        meta["path"] = n.path
-                        meta["is_file"] = n.is_file()
-                        meta["is_dir"] = n.is_dir()
-                        meta["is_link"] = False
-                        meta["ctime"] = n.stat().st_ctime
-                        meta["mtime"] = n.stat().st_mtime
+                        mode = os.stat(full_path).st_mode
+                        if stat.S_ISSOCK(mode):
+                            meta["is_file"] = False
+                            meta["is_dir"] = False
+                            meta["is_link"] = True
+                            meta["is_socket"] = True
+                            meta["path"] = full_path
+                            meta["ctime"] = os.stat(full_path).st_ctime
+                            meta["mtime"] = os.stat(full_path).st_mtime
+                        else:
+                            meta["path"] = full_path
+                            meta["is_file"] = n.is_file() or not n.is_dir()
+                            meta["is_dir"] = n.is_dir()
+                            meta["is_link"] = False
+                            meta["is_socket"] = False
+                            meta["ctime"] = n.stat().st_ctime
+                            meta["mtime"] = n.stat().st_mtime
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
         else:
