@@ -46,6 +46,13 @@ def add_arguments(parser):
 
 
 def handle_start(args):
+
+    ex_file_arg = args.exclude_file_type
+    if ex_file_arg != None:
+        ex_arg_list = [x.strip() for x in ex_file_arg[0].split(',')]
+
+    print(ex_arg_list)
+
     return start_synchronization({
         "restart_queue": args.restart_queue,
         "path_queue": args.path_queue,
@@ -63,7 +70,8 @@ def handle_start(args):
         "progress": args.progress,
         "profile": args.profile,
         "list_dir": args.list_dir,
-        "scan_dir_list": args.scan_dir_list
+        "scan_dir_list": args.scan_dir_list,
+        "exclude_file_type": ex_arg_list
     })
 
 
@@ -105,6 +113,7 @@ def main():
     parser_start.add_argument('--profile', action="store_true", default=False, help='profile')
     parser_start.add_argument('--list_dir', action="store_true", default=False, help='list dir')
     parser_start.add_argument('--scan_dir_list', action="store_true", default=False, help='scan dir list')
+    parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none', help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
     add_arguments(parser_start)
 
     parser_start.set_defaults(func=handle_start)
