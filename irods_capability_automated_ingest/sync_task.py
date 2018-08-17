@@ -175,6 +175,43 @@ def periodic(r, job_name):
     periodic = r.lrange("periodic", 0, -1)
     return job_name.encode("utf-8") in periodic
 
+def exclude_file(ex_list, full_path, logger):
+    if len(ex_list) <= 0:
+        return False
+
+    ret_val = False
+    mode    = None
+
+    try:
+        mode = os.lstat(full_path).st_mode
+    except FileNotFoundError:
+        return False
+
+    for t in ex_list:
+        if 'regular' == t:
+            if stat.S_ISREG(mode):
+                ret_val = True
+        elif 'directory' == t:
+            if stat.S_ISDIR(mode):
+                ret_val = True
+        elif 'character' == t:
+            if stat.S_ISCHR(mode):
+                ret_val = True
+        elif 'block' == t:
+            if stat.S_ISBLK(mode):
+                ret_val = True
+        elif 'socket' == t:
+            if stat.S_ISSOCK(mode):
+                ret_val = True
+            pass
+        elif 'pipe' == t:
+            if stat.S_ISFIFO(mode):
+                ret_val = True
+        elif 'link' == t:
+            if stat.S_ISLNK(mode):
+                ret_val = True
+
+    return ret_val
 
 @app.task(bind=True, base=IrodsTask)
 def sync_path(self, meta):
@@ -190,6 +227,7 @@ def sync_path(self, meta):
     cached_is_file = meta.get("is_file")
     cached_is_dir = meta.get("is_dir")
     cached_is_link = meta.get("is_link")
+    exclude_type_list = meta['exclude_file_type']
 
     logger = sync_logging.get_sync_logger(logging_config)
 
@@ -234,9 +272,12 @@ def sync_path(self, meta):
 
             for n in itr:
                 meta = meta.copy()
-
                 if list_dir:
                     full_path = os.path.join(path, n)
+
+                    if exclude_file(exclude_type_list, full_path, logger):
+                        continue
+
                     logger.info('PROCESSING: full_path['+full_path+']', task=task, path=path)
                     if islink(full_path):
                         logger.info('PROCESSING: ['+full_path+'] is a LINK', task=task, path=path)
@@ -265,6 +306,9 @@ def sync_path(self, meta):
                             meta["is_link"] = False
                 else:
                     full_path = os.path.abspath(n.path)
+
+                    if exclude_file(exclude_type_list, full_path, logger):
+                        continue
 
                     if islink(full_path):
                         logger.info('PROCESSING: ['+n.name+'] is a LINK', task=task, path=path)
