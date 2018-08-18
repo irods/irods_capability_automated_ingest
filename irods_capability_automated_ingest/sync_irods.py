@@ -6,6 +6,7 @@ from .sync_utils import size, get_redis, call, get_hdlr_mod
 from .utils import Operation
 import redis_lock
 import json
+import irods.keywords as kw
 
 
 def child_of(session, child_resc_name, resc_name):
@@ -81,18 +82,14 @@ def register_file(hdlr_mod, logger, session, meta, **options):
     if resc_name is not None:
         options["destRescName"] = resc_name
 
-    logger.info("registering object " + target + ", options = " + str(options))
-    session.data_objects.register(target_path, target, **options)
     size = getsize(path)
     mtime = int(getmtime(path))
+    options[kw.DATA_SIZE_KW] = str(size)
+    options[kw.DATA_MODIFY_KW] = str(mtime)
 
-    data_obj_info = {"objPath": target}
-    if resc_name is not None:
-        del options["destRescName"]
-        for row in session.query(DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target), DataObject.resource_name == resc_name):
-            data_obj_info["replNum"] = int(row[DataObject.replica_number])
+    logger.info("registering object " + target + ", options = " + str(options))
+    session.data_objects.register(target_path, target, **options)
 
-    session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime}, **options)
     logger.info("succeeded", task="irods_register_file", path = path)
 
 
