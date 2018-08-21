@@ -8,6 +8,7 @@ import redis_lock
 import json
 import irods.keywords as kw
 
+from .irods_connection_pool import irods_connection_pool
 
 def child_of(session, child_resc_name, resc_name):
     if child_resc_name == resc_name:
@@ -186,52 +187,44 @@ def sync_file_meta(hdlr_mod, logger, session, meta, **options):
 def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
     pass
 
+connection_pool = {}
 
-#irods_session_map = {}
+def irods_session(logger, hdlr_mod, meta, **options):
+    if not 'thekey' in connection_pool:
+        env_irods_host = os.environ.get("IRODS_HOST")
+        env_irods_port = os.environ.get("IRODS_PORT")
+        env_irods_user_name = os.environ.get("IRODS_USER_NAME")
+        env_irods_zone_name = os.environ.get("IRODS_ZONE_NAME")
+        env_irods_password = os.environ.get("IRODS_PASSWORD")
 
+        env_file = os.environ.get('IRODS_ENVIRONMENT_FILE')
 
-def irods_session(hdlr_mod, meta, **options):
-    env_irods_host = os.environ.get("IRODS_HOST")
-    env_irods_port = os.environ.get("IRODS_PORT")
-    env_irods_user_name = os.environ.get("IRODS_USER_NAME")
-    env_irods_zone_name = os.environ.get("IRODS_ZONE_NAME")
-    env_irods_password = os.environ.get("IRODS_PASSWORD")
+        kwargs = {}
+        if env_irods_host is None or \
+                env_irods_port is None or \
+                env_irods_user_name is None or \
+                env_irods_zone_name is None or \
+                env_irods_password is None:
+            if env_file is None:
+                env_file = os.path.expanduser('~/.irods/irods_environment.json')
 
-    env_file = os.environ.get('IRODS_ENVIRONMENT_FILE')
+            kwargs["irods_env_file"] = env_file
+        else:
+            kwargs["host"] = env_irods_host
+            kwargs["port"] = env_irods_port
+            kwargs["user"] = env_irods_user_name
+            kwargs["zone"] = env_irods_zone_name
+            kwargs["password"] = env_irods_password
 
-    kwargs = {}
-    if env_irods_host is None or \
-            env_irods_port is None or \
-            env_irods_user_name is None or \
-            env_irods_zone_name is None or \
-            env_irods_password is None:
-        if env_file is None:
-            env_file = os.path.expanduser('~/.irods/irods_environment.json')
+        if hasattr(hdlr_mod, "as_user"):
+            client_zone, client_user = hdlr_mod.as_user(meta, **options)
+            kwargs["client_user"] = client_user
+            kwargs["client_zone"] = client_zone
 
-        kwargs["irods_env_file"] = env_file
-    else:
-        kwargs["host"] = env_irods_host
-        kwargs["port"] = env_irods_port
-        kwargs["user"] = env_irods_user_name
-        kwargs["zone"] = env_irods_zone_name
-        kwargs["password"] = env_irods_password
+        pool = irods_connection_pool(logger, kwargs, 2)
+        connection_pool['thekey'] = pool
 
-    if hasattr(hdlr_mod, "as_user"):
-        client_zone, client_user = hdlr_mod.as_user(meta, **options)
-        kwargs["client_user"] = client_user
-        kwargs["client_zone"] = client_zone
-
-    key = json.dumps(kwargs) # todo add timestamp of env file to key
-
-    #sess = irods_session_map.get(key)
-
-    #if sess is None:
-    #    sess = iRODSSession(**kwargs)
-    #    irods_session_map[key] = sess
-
-    #return sess
-
-    return iRODSSession(**kwargs)
+    return connection_pool['thekey'].get()
 
 def sync_data_from_file(meta, logger, content, **options):
     target = meta["target"]
@@ -239,7 +232,7 @@ def sync_data_from_file(meta, logger, content, **options):
     hdlr_mod = get_hdlr_mod(meta)
     init = meta["initial_ingest"]
 
-    session = irods_session(hdlr_mod, meta, **options)
+    session = irods_session(logger, hdlr_mod, meta, **options)
 
     if init:
         exists = False
@@ -319,7 +312,7 @@ def sync_data_from_dir(meta, logger, content, **options):
     path = meta["path"]
     hdlr_mod = get_hdlr_mod(meta)
 
-    session = irods_session(hdlr_mod, meta, **options)
+    session = irods_session(logger, hdlr_mod, meta, **options)
 
     exists = session.collections.exists(target)
 
@@ -422,7 +415,7 @@ def sync_data_from_link(meta, logger, content, **options):
     hdlr_mod = get_hdlr_mod(meta)
     init = meta["initial_ingest"]
 
-    session = irods_session(hdlr_mod, meta, **options)
+    session = irods_session(logger, hdlr_mod, meta, **options)
 
     if init:
         exists = False
