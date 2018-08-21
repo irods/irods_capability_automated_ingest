@@ -24,6 +24,8 @@ import traceback
 from celery.signals import before_task_publish, after_task_publish, task_prerun, task_postrun, task_retry, task_success, task_failure, task_revoked, task_unknown, task_rejected
 from billiard import current_process
 
+import re
+
 @task_prerun.connect()
 def task_prerun(task_id=None, task=None, args=None, kwargs=None, **kw):
     meta = args[0]
@@ -175,8 +177,8 @@ def periodic(r, job_name):
     periodic = r.lrange("periodic", 0, -1)
     return job_name.encode("utf-8") in periodic
 
-def exclude_file(ex_list, full_path, logger):
-    if len(ex_list) <= 0:
+def exclude_file_type(ex_list, dir_regex, file_regex, full_path, logger):
+    if len(ex_list) <= 0 and None == dir_regex and None == file_regex:
         return False
 
     ret_val = False
@@ -187,31 +189,30 @@ def exclude_file(ex_list, full_path, logger):
     except FileNotFoundError:
         return False
 
-    for t in ex_list:
-        if 'regular' == t:
-            if stat.S_ISREG(mode):
-                ret_val = True
-        elif 'directory' == t:
-            if stat.S_ISDIR(mode):
-                ret_val = True
-        elif 'character' == t:
-            if stat.S_ISCHR(mode):
-                ret_val = True
-        elif 'block' == t:
-            if stat.S_ISBLK(mode):
-                ret_val = True
-        elif 'socket' == t:
-            if stat.S_ISSOCK(mode):
-                ret_val = True
-            pass
-        elif 'pipe' == t:
-            if stat.S_ISFIFO(mode):
-                ret_val = True
-        elif 'link' == t:
-            if stat.S_ISLNK(mode):
-                ret_val = True
+    if stat.S_ISREG(mode):
+        if 'regular' in ex_list or (None != file_regex and file_regex.match(full_path)):
+            ret_val = True
+    elif stat.S_ISDIR(mode):
+        if 'directory' in ex_list or (None != dir_regex and dir_regex.match(full_path)):
+            ret_val = True
+    elif stat.S_ISCHR(mode):
+        if 'character' in ex_list or (None != file_regex and file_regex.match(full_path)):
+            ret_val = True
+    elif stat.S_ISBLK(mode):
+        if 'block' in ex_list or (None != file_regex and file_regex.match(full_path)):
+            ret_val = True
+    elif stat.S_ISSOCK(mode):
+        if 'socket' in ex_list or (None != file_regex and file_regex.match(full_path)):
+            ret_val = True
+    elif stat.S_ISFIFO(mode):
+        if 'pipe' in ex_list or (None != file_regex and file_regex.match(full_path)):
+            ret_val = True
+    elif stat.S_ISLNK(mode):
+        if 'link' in ex_list or (None != file_regex and file_regex.match(full_path)):
+            ret_val = True
 
     return ret_val
+
 
 @app.task(bind=True, base=IrodsTask)
 def sync_path(self, meta):
@@ -228,8 +229,18 @@ def sync_path(self, meta):
     cached_is_dir = meta.get("is_dir")
     cached_is_link = meta.get("is_link")
     exclude_type_list = meta['exclude_file_type']
+    exclude_file_name = meta['exclude_file_name']
+    exclude_directory_name = meta['exclude_directory_name']
 
     logger = sync_logging.get_sync_logger(logging_config)
+
+    file_regex = None
+    if None != exclude_file_name:
+        file_regex = re.compile(exclude_file_name)
+
+    dir_regex = None
+    if None != exclude_directory_name:
+        dir_regex = re.compile(exclude_directory_name)
 
     max_retries = get_max_retries(logger, meta)
 
@@ -275,7 +286,7 @@ def sync_path(self, meta):
                 if list_dir:
                     full_path = os.path.join(path, n)
 
-                    if exclude_file(exclude_type_list, full_path, logger):
+                    if exclude_file_type(exclude_type_list, dir_regex, file_regex, full_path, logger):
                         continue
 
                     logger.info('PROCESSING: full_path['+full_path+']', task=task, path=path)
@@ -307,7 +318,7 @@ def sync_path(self, meta):
                 else:
                     full_path = os.path.abspath(n.path)
 
-                    if exclude_file(exclude_type_list, full_path, logger):
+                    if exclude_file_type(exclude_type_list, dir_regex, file_regex, full_path, logger):
                         continue
 
                     if islink(full_path):
