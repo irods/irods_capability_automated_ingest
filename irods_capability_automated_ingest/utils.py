@@ -23,6 +23,6 @@ def retry(logger, func, *args, max_retries=MAX_RETRIES):
         except Exception as err:
             retries += 1
 
-            logger.log('failed', func=func, args=args, err=err, stacktrace=traceback.extract_tb(err.__traceback__))
+            logger.info('Retrying. retries=' + str(retries), max_retries=max_retries, func=func, args=args, err=err, stacktrace=traceback.extract_tb(err.__traceback__))
             time.sleep(1)
     raise RuntimeError("max retries")
