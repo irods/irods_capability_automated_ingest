@@ -71,7 +71,9 @@ def handle_start(args):
         "profile": args.profile,
         "list_dir": args.list_dir,
         "scan_dir_list": args.scan_dir_list,
-        "exclude_file_type": ex_arg_list
+        "exclude_file_type": ex_arg_list,
+        "exclude_file_name": args.exclude_file_name[0],
+        "exclude_directory_name": args.exclude_directory_name[0]
     })
 
 
@@ -114,6 +116,8 @@ def main():
     parser_start.add_argument('--list_dir', action="store_true", default=False, help='list dir')
     parser_start.add_argument('--scan_dir_list', action="store_true", default=False, help='scan dir list')
     parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none', help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
+    parser_start.add_argument('--exclude_file_name', nargs=1, action="store", default='none', help='a regular expression defining the file names to exclude')
+    parser_start.add_argument('--exclude_directory_name', nargs=1, action="store", default='none', help='a regular expression defining the directory names to exclude')
     add_arguments(parser_start)
 
     parser_start.set_defaults(func=handle_start)
