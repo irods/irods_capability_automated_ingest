@@ -51,31 +51,31 @@ def handle_start(args):
     if ex_file_arg != None:
         ex_arg_list = [x.strip() for x in ex_file_arg[0].split(',')]
 
-    print(ex_arg_list)
+    data = {}
+    data["restart_queue"] = args.restart_queue
+    data["path_queue"] = args.path_queue
+    data["file_queue"] = args.file_queue
+    data["target"] = args.target
+    data["root"] = args.root
+    data["interval"] = args.interval
+    data["job_name"] = args.job_name
+    data["append_json"] = args.append_json
+    data["ignore_cache"] = args.ignore_cache
+    data["initial_ingest"] = args.initial_ingest
+    data["event_handler"] = args.event_handler
+    data["config"] = get_config(args)
+    data["synchronous"] = args.synchronous
+    data["progress"] = args.progress
+    data["profile"] = args.profile
+    data["list_dir"] = args.list_dir
+    data["scan_dir_list"] = args.scan_dir_list
+    data["exclude_file_type"] = ex_arg_list
+    data['exclude_file_name'] = [ ''.join(r) for r in args.exclude_file_name ]
+    data['exclude_directory_name'] = [ ''.join(r) for r in args.exclude_directory_name ]
+    print(data['exclude_file_name'])
+    print(data['exclude_directory_name'])
 
-    return start_synchronization({
-        "restart_queue": args.restart_queue,
-        "path_queue": args.path_queue,
-        "file_queue": args.file_queue,
-        "target": args.target,
-        "root": args.root,
-        "interval": args.interval,
-        "job_name": args.job_name,
-        "append_json": args.append_json,
-        "ignore_cache": args.ignore_cache,
-        "initial_ingest": args.initial_ingest,
-        "event_handler": args.event_handler,
-        "config": get_config(args),
-        "synchronous": args.synchronous,
-        "progress": args.progress,
-        "profile": args.profile,
-        "list_dir": args.list_dir,
-        "scan_dir_list": args.scan_dir_list,
-        "exclude_file_type": ex_arg_list,
-        "exclude_file_name": args.exclude_file_name[0],
-        "exclude_directory_name": args.exclude_directory_name[0]
-    })
-
+    return start_synchronization(data)
 
 def handle_stop(args):
     stop_synchronization(args.job_name, get_config(args))
@@ -116,8 +116,8 @@ def main():
     parser_start.add_argument('--list_dir', action="store_true", default=False, help='list dir')
     parser_start.add_argument('--scan_dir_list', action="store_true", default=False, help='scan dir list')
     parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none', help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
-    parser_start.add_argument('--exclude_file_name', nargs=1, action="store", default='none', help='a regular expression defining the file names to exclude')
-    parser_start.add_argument('--exclude_directory_name', nargs=1, action="store", default='none', help='a regular expression defining the directory names to exclude')
+    parser_start.add_argument('--exclude_file_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the file names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
+    parser_start.add_argument('--exclude_directory_name', type=list, nargs='+', action="store", default='none', help='a list of space separated python regular expression defining the directory names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
     add_arguments(parser_start)
 
     parser_start.set_defaults(func=handle_start)
