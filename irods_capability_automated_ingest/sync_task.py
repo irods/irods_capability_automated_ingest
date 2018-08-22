@@ -184,31 +184,43 @@ def exclude_file_type(ex_list, dir_regex, file_regex, full_path, logger):
     ret_val = False
     mode    = None
 
+    dir_match = None
+    for d in dir_regex:
+        dir_match = None != d.match(full_path)
+        if(dir_match == True):
+            break
+
+    file_match = None
+    for f in file_regex:
+        file_match = None != f.match(full_path)
+        if(file_match == True):
+            break
+
     try:
         mode = os.lstat(full_path).st_mode
     except FileNotFoundError:
         return False
 
     if stat.S_ISREG(mode):
-        if 'regular' in ex_list or (None != file_regex and file_regex.match(full_path)):
+        if 'regular' in ex_list or file_match:
             ret_val = True
     elif stat.S_ISDIR(mode):
-        if 'directory' in ex_list or (None != dir_regex and dir_regex.match(full_path)):
+        if 'directory' in ex_list or dir_match:
             ret_val = True
     elif stat.S_ISCHR(mode):
-        if 'character' in ex_list or (None != file_regex and file_regex.match(full_path)):
+        if 'character' in ex_list or file_match:
             ret_val = True
     elif stat.S_ISBLK(mode):
-        if 'block' in ex_list or (None != file_regex and file_regex.match(full_path)):
+        if 'block' in ex_list or file_match:
             ret_val = True
     elif stat.S_ISSOCK(mode):
-        if 'socket' in ex_list or (None != file_regex and file_regex.match(full_path)):
+        if 'socket' in ex_list or file_match:
             ret_val = True
     elif stat.S_ISFIFO(mode):
-        if 'pipe' in ex_list or (None != file_regex and file_regex.match(full_path)):
+        if 'pipe' in ex_list or file_match:
             ret_val = True
     elif stat.S_ISLNK(mode):
-        if 'link' in ex_list or (None != file_regex and file_regex.match(full_path)):
+        if 'link' in ex_list or file_match:
             ret_val = True
 
     return ret_val
@@ -234,13 +246,8 @@ def sync_path(self, meta):
 
     logger = sync_logging.get_sync_logger(logging_config)
 
-    file_regex = None
-    if None != exclude_file_name:
-        file_regex = re.compile(exclude_file_name)
-
-    dir_regex = None
-    if None != exclude_directory_name:
-        dir_regex = re.compile(exclude_directory_name)
+    file_regex = [ re.compile(r) for r in exclude_file_name ]
+    dir_regex  = [ re.compile(r) for r in exclude_directory_name ]
 
     max_retries = get_max_retries(logger, meta)
 
