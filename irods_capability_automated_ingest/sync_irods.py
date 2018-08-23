@@ -307,6 +307,7 @@ def sync_data_from_file(meta, logger, content, **options):
         else:
             call(hdlr_mod, "on_data_obj_modify", sync_file_meta, logger, hdlr_mod, logger, session, meta, **options)
 
+    session.cleanup()
 
 def sync_metadata_from_file(meta, logger, **options):
     sync_data_from_file(meta, logger, False, **options)
@@ -336,6 +337,8 @@ def sync_data_from_dir(meta, logger, content, **options):
             create_dirs(hdlr_mod, logger, session, meta, **options)
         else:
             call(hdlr_mod, "on_collection_modify", sync_dir_meta, logger, hdlr_mod, logger, session, meta, **options)
+
+    session.cleanup()
 
 
 def sync_metadata_from_dir(meta, logger, **options):
@@ -451,6 +454,7 @@ def sync_data_from_link(meta, logger, content, **options):
         else:
             call(hdlr_mod, "on_data_obj_modify", update_link_metadata, logger, hdlr_mod, logger, session, meta, **options)
 
+    session.cleanup()
 
 def sync_metadata_from_link(meta, logger, **options):
     sync_data_from_link(meta, logger, False, **options)
