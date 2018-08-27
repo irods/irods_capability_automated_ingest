@@ -226,8 +226,16 @@ def irods_session(hdlr_mod, meta, **options):
     sess = irods_session_map.get(key)
 
     if sess is None:
-        sess = iRODSSession(**kwargs)
-        irods_session_map[key] = sess
+        for i in range(10):
+            try:
+                sess = iRODSSession(**kwargs)
+                irods_session_map[key] = sess
+                break
+            except NetworkException:
+                if i < 10:
+                    time.sleep(0.1)
+                else:
+                    raise
 
     return sess
 
