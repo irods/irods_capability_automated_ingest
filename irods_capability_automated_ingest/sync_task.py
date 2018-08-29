@@ -21,6 +21,7 @@ import time
 import progressbar
 import json
 import traceback
+import base64
 from celery.signals import before_task_publish, after_task_publish, task_prerun, task_postrun, task_retry, task_success, task_failure, task_revoked, task_unknown, task_rejected
 from billiard import current_process
 
@@ -392,10 +393,27 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
     max_retries = get_max_retries(logger, meta)
 
     lock = None
+    logger.info("synchronizing " + cls + ". path = " + path)
+    r = get_redis(config)
+    sync_key = str(uuid1())
     try:
-        logger.info("synchronizing " + cls + ". path = " + path)
-        r = get_redis(config)
-        sync_key = path + ":" + target
+        # Attempt to encode full physical path on local filesystem
+        # Special handling required for non-encodable strings which raise UnicodeEncodeError
+        utf8_encode_test = path.encode('utf8')
+    except UnicodeEncodeError:
+        abspath = os.path.abspath(path)
+        path = os.path.dirname(abspath)
+        utf8_abspath = abspath.encode('utf8', 'surrogateescape')
+        b64_path_str = base64.b64encode(utf8_abspath)
+        unicode_error_filename = 'irods_UnicodeEncodeError_' + sync_key
+
+        logger.warning('sync_entry raised UnicodeEncodeError while syncing path:' + str(utf8_abspath))
+
+        meta['path'] = path
+        meta['b64_path_str'] = b64_path_str
+        meta['unicode_error_filename'] = unicode_error_filename
+
+    try:
         lock = redis_lock.Lock(r, "sync_" + cls + ":"+sync_key)
         lock.acquire()
         t = datetime.now().timestamp()
@@ -415,7 +433,10 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
         if sync_time is None or mtime >= sync_time:
             logger.info("synchronizing " + cls, path=path, t0=sync_time, t=t, mtime=mtime)
             if path == root:
-                target2 = target
+                if 'unicode_error_filename' in meta:
+                    target2 = join(target, meta['unicode_error_filename'])
+                else:
+                    target2 = target
             else:
                 target2 = join(target, relpath(path, start=root))
             meta2 = meta.copy()
@@ -426,7 +447,10 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
         elif ctime >= sync_time:
             logger.info("synchronizing dir", path=path, t0=sync_time, t=t, ctime=ctime)
             if path == root:
-                target2 = target
+                if 'unicode_error_filename' in meta:
+                    target2 = join(target, meta['unicode_error_filename'])
+                else:
+                    target2 = target
             else:
                 target2 = join(target, relpath(path, start=root))
             meta2 = meta.copy()

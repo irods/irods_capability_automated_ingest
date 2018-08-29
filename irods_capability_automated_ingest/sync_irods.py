@@ -7,6 +7,7 @@ from .utils import Operation
 import redis_lock
 import json
 import irods.keywords as kw
+import base64, random
 
 
 def child_of(session, child_resc_name, resc_name):
@@ -71,39 +72,51 @@ def get_resource_name(hdlr_mod, session, meta, **options):
 
 
 def register_file(hdlr_mod, logger, session, meta, **options):
-    target = meta["target"]
-    path = meta["path"]
-    target_path = get_target_path(hdlr_mod, session, meta, **options)
-    if target_path is None:
-        target_path = path
+    dest_data_obj_path = meta["target"]
+    source_file_path = meta["path"]
+
+    phypath_to_register = get_target_path(hdlr_mod, session, meta, **options)
+    if phypath_to_register is None:
+        if 'unicode_error_filename' in meta:
+            phypath_to_register = os.path.join(source_file_path, meta['unicode_error_filename'])
+        else:
+            phypath_to_register = source_file_path
 
     resc_name = get_resource_name(hdlr_mod, session, meta, **options)
 
     if resc_name is not None:
         options["destRescName"] = resc_name
 
-    size = getsize(path)
-    mtime = int(getmtime(path))
+    if 'b64_path_str' in meta:
+        b64str = meta['b64_path_str']
+        b64decoded_utf8_bstr = base64.b64decode(b64str)
+        source_file_path = b64decoded_utf8_bstr
+
+    size = getsize(source_file_path)
+    mtime = int(getmtime(source_file_path))
     options[kw.DATA_SIZE_KW] = str(size)
     options[kw.DATA_MODIFY_KW] = str(mtime)
 
-    logger.info("registering object " + target + ", options = " + str(options))
-    session.data_objects.register(target_path, target, **options)
+    logger.info("registering object " + dest_data_obj_path + ", options = " + str(options))
+    session.data_objects.register(phypath_to_register, dest_data_obj_path, **options)
 
-    logger.info("succeeded", task="irods_register_file", path = path)
+    logger.info("succeeded", task="irods_register_file", path = source_file_path)
 
+    if 'b64_path_str' in meta:
+        obj = session.data_objects.get(meta['target'])
+        obj.metadata.add("irods::automated_ingest::UnicodeEncodeError", meta['b64_path_str'], 'python3.base64.b64encode(full_path_of_source_file)')
 
 def upload_file(hdlr_mod, logger, session, meta, **options):
-    target = meta["target"]
-    path = meta["path"]
+    dest_data_obj_path = meta["target"]
+    source_file_path = meta["path"]
     resc_name = get_resource_name(hdlr_mod, session, meta, **options)
 
     if resc_name is not None:
         options["destRescName"] = resc_name
 
-    logger.info("uploading object " + target + ", options = " + str(options))
-    session.data_objects.put(path, target, **options)
-    logger.info("succeeded", task="irods_upload_file", path = path)
+    logger.info("uploading object " + dest_data_obj_path + ", options = " + str(options))
+    session.data_objects.put(source_file_path, dest_data_obj_path, **options)
+    logger.info("succeeded", task="irods_upload_file", path = source_file_path)
 
 
 def no_op(hdlr_mod, logger, session, meta, **options):
@@ -113,6 +126,7 @@ def no_op(hdlr_mod, logger, session, meta, **options):
 def sync_file(hdlr_mod, logger, session, meta, **options):
     target = meta["target"]
     path = meta["path"]
+    logger.info("ZZZZ - path:" + path)
     logger.info("syncing object " + target + ", options = " + str(options))
 
     resc_name = get_resource_name(hdlr_mod, session, meta, **options)
@@ -226,6 +240,7 @@ def irods_session(hdlr_mod, meta, **options):
     sess = irods_session_map.get(key)
 
     if sess is None:
+        # TODO: #42 - pull out 10 into configuration
         for i in range(10):
             try:
                 sess = iRODSSession(**kwargs)
@@ -295,7 +310,8 @@ def sync_data_from_file(meta, logger, content, **options):
         if not exists:
             meta2 = meta.copy()
             meta2["target"] = dirname(target)
-            meta2["path"] = dirname(path)
+            if 'b64_path_str' not in meta2:
+                meta2["path"] = dirname(path)
             create_dirs(hdlr_mod, logger, session, meta2, **options)
 
             if put:
@@ -314,7 +330,6 @@ def sync_data_from_file(meta, logger, content, **options):
                 call(hdlr_mod, "on_data_obj_modify", update_metadata, logger, hdlr_mod, logger, session, meta, **options)
         else:
             call(hdlr_mod, "on_data_obj_modify", sync_file_meta, logger, hdlr_mod, logger, session, meta, **options)
-
 
 def sync_metadata_from_file(meta, logger, **options):
     sync_data_from_file(meta, logger, False, **options)
