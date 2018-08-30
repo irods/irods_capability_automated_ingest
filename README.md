@@ -51,109 +51,114 @@ Event handlers can use `logger` to write logs. See `structlog` for available log
 
 ### Basic: manual redis, rq-scheduler, pip
 
-#### setting up irods environment file
+#### Starting Redis Server
+Install redis-server:
+```
+sudo yum install redis-server
+```
+```
+sudo apt-get install redis-server
+```
+Or, build it yourself: https://redis.io/topics/quickstart
 
-#### redis
-https://redis.io/topics/quickstart
-
-start redis
-
+Start redis:
 ```
 redis-server
 ```
-
-#### virtualenv
+Or, dameonized:
 ```
-pip3 install virtualenv
+sudo service redis-server start
 ```
-
-You may need to upgrade pip
 ```
-pip3 install --upgrade pip
+sudo systemctl start redis
 ```
 
+**Note:** If running on different computers, make sure Redis server accepts connections by editing the `bind` line in /etc/redis/redis.conf or /etc/redis.conf.
+
+#### Setting up virtual environment
+You may need to upgrade pip:
 ```
-virtualenv rodssync
+pip install --upgrade pip
 ```
 
+Install virtualenv:
+```
+pip install virtualenv
+```
+
+Create a virtualenv with python3:
+```
+virtualenv -p python3 rodssync
+```
+**Note:** You will need python version >= 3.5 to run the test suite
+
+Activate virtual environment:
 ```
 source rodssync/bin/activate
 ```
 
-#### clone repo
+#### Clone this repo
+```
+git clone https://github.com/irods/irods_capability_automated_ingest --branch icai-celery
+```
 
-#### celery
+#### Installing and configuring Celery
  * celery[redis]
  * progressbar2
  * python-redis-lock
+ * python-irodsclient
+ * scandir
+ * structlog
 ```
-pip install celery[redis] progressbar2 python-redis-lock
+pip install celery[redis] progressbar2 python-redis-lock scandir python-irodsclient structlog
 ```
 
-make sure you are in the repo for the following commands
+Make sure you are in the repo and on the icai-celery branchfor the following commands:
 ```
 cd <repo dir>
 ```
 
-start celery worker(s)
-
+Set up environment for Celery:
 `fish`
 ```
-set -xl CELERY_BROKER_URL <redis or rabbitmq>
+set -xl CELERY_BROKER_URL redis://<ip or hostname of redis server (default: localhost)>:<redis port (default:6379)>/<redis db number (default:0)>
 set -xl PYTHONPATH (pwd)
 ```
-
 `bash`
 ```
-export CELERY_BROKER_URL=<redis or rabbitmq>
+export CELERY_BROKER_URL=redis://<ip or hostname of redis server (default: localhost)>:<redis port (default:6379)>/<redis db number (default:0)>
 export PYTHONPATH=`pwd`
 ```
 
+Start celery worker(s):
 ```
-celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart,path,file -c <n> 
-```
-
-#### job monitoring
-```
-pip install rq-dashboard
-```
-```
-rq-dashboard
-```
-or alternately, just use rq to monitor progress
-```
-rq info
-```
-#### irods prc
-```
-pip install python-irodsclient==0.8.0
+celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart,path,file -c <num workers> 
 ```
 
-tested with python 3.4+
-
-#### run test
-
-
-The tests should be run without running rq workers.
-
+#### Run tests
+**Note:** The tests should be run without running Celery workers.
 ```
 python -m irods_capability_automated_ingest.test.test_irods_sync
 ```
 
-#### start
+#### Start sync job
 ```
-python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --ignore_cache ] [ --synchronous ] [ --progress ] [ --list_dir ] [ --scan_dir_list ] [ --log_filename ] [ --log_level ] [ --profile ] [ --profile_filename ] [ --profile_level ]
+python -m irods_capability_automated_ingest.irods_sync start <source dir> <destination collection>
+```
+Usage:
+```
+python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --ignore_cache ] [ --synchronous ] [ --progress ] [ --list_dir ] [ --scan_dir_list ] [ --log_filename ] [ --log_level ] [ --profile ] [ --profile_filename ] [ --profile_level ] [ --redis_host <hostname or ip> ] [ --redis_port <port> ] [ --redis_db <num> ]
 ```
 
 If `-i` is not present, then only sync once.
 
 The `--append_json` is stored in `job.meta["append_json"]`.
 
-The `--ignore_cahce` ignores cached last sync time.
+The `--ignore_cache` ignores cached last sync time.
 
 The `--synchronous` will block until job is done.
 
-The `--progress` will show progress bar when `--synchronous`.
+The `--progress` will show progress bar when `--synchronous` is enabled.
 
 The `--list_dir` will use cause the tasks to `listdir` instead of `scandir`.
 
@@ -167,18 +172,20 @@ The `--profile_filename` specify profile file name.
 
 The `--profile_level` specify the profile level, currently should specify `INFO`
 
+The `--redis_host`, `--redis_port`, and `--redis_db` specify information about your Redis server (default values used if unspecified).
 
-#### list jobs
+
+#### List jobs
 ```
 python -m irods_capability_automated_ingest.irods_sync list
 ```
 
-#### stop
+#### Stop jobs
 ```
 python -m irods_capability_automated_ingest.irods_sync stop <job name>
 ```
 
-#### watch
+#### Watch jobs (same as using `--progress`)
 ```
 python -m irods_capability_automated_ingest.irods_sync watch <job name>
 ```
