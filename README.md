@@ -49,7 +49,7 @@ Event handlers can use `logger` to write logs. See `structlog` for available log
 
 ## Deployment
 
-### Basic: manual redis, rq-scheduler, pip
+### Basic: manual redis, Celery, pip
 
 #### Starting Redis Server
 Install redis-server:
@@ -121,12 +121,12 @@ cd <repo dir>
 Set up environment for Celery:
 `fish`
 ```
-set -xl CELERY_BROKER_URL redis://<ip or hostname of redis server (default: localhost)>:<redis port (default:6379)>/<redis db number (default:0)>
+set -xl CELERY_BROKER_URL redis://<redis host>:<redis port>/<redis db> # e.g. redis://127.0.0.1:6379/0
 set -xl PYTHONPATH (pwd)
 ```
 `bash`
 ```
-export CELERY_BROKER_URL=redis://<ip or hostname of redis server (default: localhost)>:<redis port (default:6379)>/<redis db number (default:0)>
+export CELERY_BROKER_URL=redis://<redis host>:<redis port>/<redis db> # e.g. redis://127.0.0.1:6379/0
 export PYTHONPATH=`pwd`
 ```
 
@@ -145,9 +145,90 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 ```
 python -m irods_capability_automated_ingest.irods_sync start <source dir> <destination collection>
 ```
+
 Usage:
 ```
-python -m irods_capability_automated_ingest.irods_sync start <local_dir> <collection> [-i <restart interval>] [ --event_handler <module name> ] [ --job_name <job name> ] [ --append_json <json> ] [ --ignore_cache ] [ --synchronous ] [ --progress ] [ --list_dir ] [ --scan_dir_list ] [ --log_filename ] [ --log_level ] [ --profile ] [ --profile_filename ] [ --profile_level ] [ --redis_host <hostname or ip> ] [ --redis_port <port> ] [ --redis_db <num> ]
+irods_sync.py start [-h] [-i INTERVAL] [--file_queue FILE QUEUE]
+                           [--path_queue PATH QUEUE]
+                           [--restart_queue RESTART QUEUE]
+                           [--event_handler EVENT HANDLER]
+                           [--job_name JOB NAME] [--append_json APPEND JSON]
+                           [--ignore_cache] [--initial_ingest] [--synchronous]
+                           [--progress] [--profile] [--list_dir]
+                           [--scan_dir_list]
+                           [--exclude_file_type EXCLUDE_FILE_TYPE]
+                           [--exclude_file_name EXCLUDE_FILE_NAME [EXCLUDE_FILE_NAME ...]]
+                           [--exclude_directory_name EXCLUDE_DIRECTORY_NAME [EXCLUDE_DIRECTORY_NAME ...]]
+                           [--redis_host REDIS HOST]
+                           [--redis_port REDIS PORT]
+                           [--redis_db REDIS DB]
+                           [--log_filename LOG FILE]
+                           [--log_when LOG WHEN]
+                           [--log_interval LOG INTERVAL]
+                           [--log_level LOG LEVEL]
+                           [--profile_filename PROFILE FILE]
+                           [--profile_when PROFILE WHEN]
+                           [--profile_interval PROFILE INTERVAL]
+                           [--profile_level PROFILE LEVEL]
+                           ROOT TARGET
+
+positional arguments:
+  ROOT                  root directory
+  TARGET                target collection
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INTERVAL, --interval INTERVAL
+                        restart interval (in seconds)
+  --file_queue FILE QUEUE
+                        file queue
+  --path_queue PATH QUEUE
+                        path queue
+  --restart_queue RESTART QUEUE
+                        restart queue
+  --event_handler EVENT HANDLER
+                        event handler
+  --job_name JOB NAME   job name
+  --append_json APPEND JSON
+                        append json
+  --ignore_cache        ignore cache
+  --initial_ingest      initial ingest
+  --synchronous         synchronous
+  --progress            progress
+  --profile             profile
+  --list_dir            list dir
+  --scan_dir_list       scan dir list
+  --exclude_file_type EXCLUDE_FILE_TYPE
+                        types of files to exclude: regular, directory,
+                        character, block, socket, pipe, link
+  --exclude_file_name EXCLUDE_FILE_NAME [EXCLUDE_FILE_NAME ...]
+                        a list of space-separated python regular expressions
+                        defining the file names to exclude such as
+                        "(\S+)exclude" "(\S+)\.hidden"
+  --exclude_directory_name EXCLUDE_DIRECTORY_NAME [EXCLUDE_DIRECTORY_NAME ...]
+                        a list of space separated python regular expression
+                        defining the directory names to exclude such as
+                        "(\S+)exclude" "(\S+)\.hidden"
+  --redis_host REDIS HOST
+                        redis host
+  --redis_port REDIS PORT
+                        redis port
+  --redis_db REDIS DB   redis db
+  --log_filename LOG FILE
+                        log filename
+  --log_when LOG WHEN   log when
+  --log_interval LOG INTERVAL
+                        log interval
+  --log_level LOG LEVEL
+                        log level
+  --profile_filename PROFILE FILE
+                        profile filename
+  --profile_when PROFILE WHEN
+                        profile when
+  --profile_interval PROFILE INTERVAL
+                        profile interval
+  --profile_level PROFILE LEVEL
+                        profile level
 ```
 
 If `-i` is not present, then only sync once.
