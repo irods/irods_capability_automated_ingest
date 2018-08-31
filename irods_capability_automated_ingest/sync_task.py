@@ -22,6 +22,7 @@ import progressbar
 import json
 import traceback
 import base64
+import socket
 from celery.signals import before_task_publish, after_task_publish, task_prerun, task_postrun, task_retry, task_success, task_failure, task_revoked, task_unknown, task_rejected
 from billiard import current_process
 
@@ -402,10 +403,13 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
         utf8_encode_test = path.encode('utf8')
     except UnicodeEncodeError:
         abspath = os.path.abspath(path)
+        hostname = socket.getfqdn()
         path = os.path.dirname(abspath)
         utf8_abspath = abspath.encode('utf8', 'surrogateescape')
         b64_path_str = base64.b64encode(utf8_abspath)
-        unicode_error_filename = 'irods_UnicodeEncodeError_' + sync_key
+
+        file_unique_id = hostname + ':' + str(utf8_abspath)
+        unicode_error_filename = 'irods_UnicodeEncodeError_' + str(base64.b64encode(file_unique_id.encode('utf8')).decode('utf8'))
 
         logger.warning('sync_entry raised UnicodeEncodeError while syncing path:' + str(utf8_abspath))
 

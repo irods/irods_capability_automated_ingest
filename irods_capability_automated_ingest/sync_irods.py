@@ -164,6 +164,12 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
     target_path = get_target_path(hdlr_mod, session, meta, **options)
     if target_path is None:
         target_path = path
+
+    if 'b64_path_str' in meta:
+        b64str = meta['b64_path_str']
+        b64decoded_utf8_bstr = base64.b64decode(b64str)
+        path = b64decoded_utf8_bstr
+
     size = getsize(path)
     mtime = int(getmtime(path))
     logger.info("updating object: " + target + ", options = " + str(options))
