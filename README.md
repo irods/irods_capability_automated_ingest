@@ -2,7 +2,7 @@
 
 The automated ingest framework gives iRODS an enterprise solution that solves two major use cases: getting existing data under management and ingesting incoming data hitting a landing zone.
 
-Based on the Python iRODS Client and RedisQueue, this framework can scale up to match the demands of data coming off instruments, satellites, or parallel filesystems.
+Based on the Python iRODS Client and Celery, this framework can scale up to match the demands of data coming off instruments, satellites, or parallel filesystems.
 
 The example diagrams below show a filesystem scanner and a landing zone.
 
@@ -271,7 +271,7 @@ python -m irods_capability_automated_ingest.irods_sync stop <job name>
 python -m irods_capability_automated_ingest.irods_sync watch <job name>
 ```
 
-### Intermediate: dockerize, manually config
+### Intermediate: dockerize, manually config (needs to be updated for Celery)
 
 `/tmp/event_handler.py`
 
@@ -311,7 +311,7 @@ docker run --rm --link some-redis:redis -v /tmp/host/event_handler.py:/event_han
 ```
 docker run --rm --link some-redis:redis --env-file icommands.env -v /tmp/host/data:/data -v /tmp/host/event_handler.py:/event_handler.py irods_rq:0.1.0 worker -u redis://redis:6379/0 restart path file
 ```
-### Advanced: kubernetes
+### Advanced: kubernetes (needs to be updated for Celery)
 
 This does not assume that your iRODS installation is in kubernetes.
 
