@@ -72,8 +72,7 @@ def handle_start(args):
     data["exclude_file_type"] = ex_arg_list
     data['exclude_file_name'] = [ ''.join(r) for r in args.exclude_file_name ]
     data['exclude_directory_name'] = [ ''.join(r) for r in args.exclude_directory_name ]
-    print(data['exclude_file_name'])
-    print(data['exclude_directory_name'])
+    data['idle_disconnect_seconds'] = args.irods_idle_disconnect_seconds
 
     return start_synchronization(data)
 
@@ -118,6 +117,7 @@ def main():
     parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none', help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
     parser_start.add_argument('--exclude_file_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the file names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
     parser_start.add_argument('--exclude_directory_name', type=list, nargs='+', action="store", default='none', help='a list of space separated python regular expression defining the directory names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
+    parser_start.add_argument('--irods_idle_disconnect_seconds', action="store", metavar='DISCONNECT IN SECONDS', type=int, default=None, help='irods disconnect time in seconds')
     add_arguments(parser_start)
 
     parser_start.set_defaults(func=handle_start)

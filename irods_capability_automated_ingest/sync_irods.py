@@ -8,7 +8,7 @@ import redis_lock
 import json
 import irods.keywords as kw
 import base64, random
-
+import threading
 
 def child_of(session, child_resc_name, resc_name):
     if child_resc_name == resc_name:
@@ -218,7 +218,35 @@ def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
 
 
 irods_session_map = {}
+irods_session_timer_map = {}
 
+class disconnect_timer(object):
+    def __init__(self, logger, interval, sess_map):
+        self.logger = logger
+        self.interval = interval
+        self.timer = None
+        self.sess_map = sess_map
+
+    def callback(self):
+        for k, v in self.sess_map.items():
+            self.logger.info('Cleaning up session ['+k+']')
+            v.cleanup()
+        self.sess_map.clear()
+
+    def cancel(self):
+        self.timer.cancel()
+
+    def start(self):
+        self.timer = threading.Timer(self.interval, self.callback)
+        self.timer.start()
+
+def stop_timer():
+    for k, v in irods_session_timer_map.items():
+        v.cancel();
+
+def start_timer():
+    for k, v in irods_session_timer_map.items():
+        v.start();
 
 def irods_session(hdlr_mod, meta, **options):
     env_irods_host = os.environ.get("IRODS_HOST")
@@ -253,9 +281,8 @@ def irods_session(hdlr_mod, meta, **options):
 
     key = json.dumps(kwargs) # todo add timestamp of env file to key
 
-    sess = irods_session_map.get(key)
 
-    if sess is None:
+    if not key in irods_session_map:
         # TODO: #42 - pull out 10 into configuration
         for i in range(10):
             try:
@@ -267,6 +294,23 @@ def irods_session(hdlr_mod, meta, **options):
                     time.sleep(0.1)
                 else:
                     raise
+    else:
+        sess = irods_session_map.get(key)
+
+    # =-=-=-=-=-=-=-
+    # diconnect timer
+    if key in irods_session_timer_map:
+        timer = irods_session_timer_map[key]
+        timer.cancel()
+        irods_session_timer_map.pop(key, None)
+    idle_sec = 60
+    if None != meta['idle_disconnect_seconds']:
+        idle_sec = meta['idle_disconnect_seconds']
+    logger.info("iRODS Idle Time set to: "+str(idle_sec))
+
+    timer = disconnect_timer(logger, idle_sec, irods_session_map)
+    irods_session_timer_map[key] = timer
+    # =-=-=-=-=-=-=-
 
     return sess
 
@@ -347,6 +391,8 @@ def sync_data_from_file(meta, logger, content, **options):
         else:
             call(hdlr_mod, "on_data_obj_modify", sync_file_meta, logger, hdlr_mod, logger, session, meta, **options)
 
+    start_timer()
+
 def sync_metadata_from_file(meta, logger, **options):
     sync_data_from_file(meta, logger, False, **options)
 
@@ -375,6 +421,8 @@ def sync_data_from_dir(meta, logger, content, **options):
             create_dirs(hdlr_mod, logger, session, meta, **options)
         else:
             call(hdlr_mod, "on_collection_modify", sync_dir_meta, logger, hdlr_mod, logger, session, meta, **options)
+
+    start_timer()
 
 
 def sync_metadata_from_dir(meta, logger, **options):
@@ -489,6 +537,8 @@ def sync_data_from_link(meta, logger, content, **options):
             call(hdlr_mod, "on_data_obj_create", register_link, logger, hdlr_mod, logger, session, meta, **options)
         else:
             call(hdlr_mod, "on_data_obj_modify", update_link_metadata, logger, hdlr_mod, logger, session, meta, **options)
+
+    start_timer()
 
 
 def sync_metadata_from_link(meta, logger, **options):
