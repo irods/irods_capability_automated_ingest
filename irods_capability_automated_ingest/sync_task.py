@@ -396,11 +396,11 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
     lock = None
     logger.info("synchronizing " + cls + ". path = " + path)
     r = get_redis(config)
-    sync_key = str(uuid1())
     try:
         # Attempt to encode full physical path on local filesystem
         # Special handling required for non-encodable strings which raise UnicodeEncodeError
         utf8_encode_test = path.encode('utf8')
+        sync_key = path + ":" + target
     except UnicodeEncodeError:
         abspath = os.path.abspath(path)
         hostname = socket.getfqdn()
@@ -417,6 +417,7 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
         meta['b64_path_str'] = b64_path_str
         meta['unicode_error_filename'] = unicode_error_filename
 
+        sync_key = file_unique_id + ":" + target
     try:
         lock = redis_lock.Lock(r, "sync_" + cls + ":"+sync_key)
         lock.acquire()
