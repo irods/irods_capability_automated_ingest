@@ -159,6 +159,7 @@ irods_sync.py start [-h] [-i INTERVAL] [--file_queue FILE QUEUE]
                            [--exclude_file_type EXCLUDE_FILE_TYPE]
                            [--exclude_file_name EXCLUDE_FILE_NAME [EXCLUDE_FILE_NAME ...]]
                            [--exclude_directory_name EXCLUDE_DIRECTORY_NAME [EXCLUDE_DIRECTORY_NAME ...]]
+                           [--irods_idle_disconnect_seconds DISCONNECT IN SECONDS]
                            [--redis_host REDIS HOST]
                            [--redis_port REDIS PORT]
                            [--redis_db REDIS DB]
@@ -209,6 +210,8 @@ optional arguments:
                         a list of space separated python regular expression
                         defining the directory names to exclude such as
                         "(\S+)exclude" "(\S+)\.hidden"
+  --irods_idle_disconnect_seconds DISCONNECT IN SECONDS
+                        irods disconnect time in seconds
   --redis_host REDIS HOST
                         redis host
   --redis_port REDIS PORT

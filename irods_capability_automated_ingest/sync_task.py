@@ -131,7 +131,7 @@ failures_key | restart | init
 retries_key | restart | init
 cleanup_key | job | cleanup
 event_handlers | job | cleanup
-singlepass | job | cleanup 
+singlepass | job | cleanup
 periodic | job | cleanup
 '''
 
@@ -284,7 +284,7 @@ def sync_path(self, meta):
                 itr = listdir(path)
             else:
                 itr = scandir(path)
-                
+
             if dir_list:
                 itr = list(itr)
                 if meta["profile"]:
@@ -309,7 +309,7 @@ def sync_path(self, meta):
                         meta["path"] = full_path
                         meta["ctime"] = os.lstat(full_path).st_ctime
                         meta["mtime"] = os.lstat(full_path).st_mtime
-                    else: 
+                    else:
                         mode = os.stat(full_path).st_mode
                         if stat.S_ISSOCK(mode):
                             logger.info('PROCESSING: ['+full_path+'] is a SOCKET', task=task, path=path)
@@ -340,7 +340,7 @@ def sync_path(self, meta):
                         meta["path"] = full_path
                         meta["ctime"] = os.lstat(full_path).st_ctime
                         meta["mtime"] = os.lstat(full_path).st_mtime
-                    else: 
+                    else:
                         mode = os.stat(full_path).st_mode
                         if stat.S_ISSOCK(mode):
                             meta["is_file"] = False
@@ -361,7 +361,7 @@ def sync_path(self, meta):
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
         else:
-            raise RuntimeError("path not exists")
+            raise RuntimeError("path does not exist")
 
     except Exception as err:
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
@@ -581,8 +581,8 @@ def monitor_synchronization(job_name, progress, config):
 
     r = get_redis(config)
     if get_with_key(r, cleanup_key, job_name, str) is None:
-        logger.error("job not exists")
-        raise Exception("job not exists")
+        logger.error("job [{0}] does not exist".format(job_name))
+        raise Exception("job [{0}] does not exist".format(job_name))
 
     if progress:
 
@@ -619,15 +619,14 @@ def monitor_synchronization(job_name, progress, config):
     else:
         while not done(r, job_name) or periodic(r, job_name):
             time.sleep(1)
-        
+
     failures = get_with_key(r, failures_key, job_name, int)
     if failures != 0:
         return -1
     else:
         return 0
-    
 
-                
+
 def stop_synchronization(job_name, config):
     logger = sync_logging.get_sync_logger(config["log"])
 
@@ -635,8 +634,8 @@ def stop_synchronization(job_name, config):
 
     with redis_lock.Lock(r, "lock:periodic"):
         if get_with_key(r, cleanup_key, job_name, str) is None:
-            logger.error("job not exists")
-            raise Exception("job not exists")
+            logger.error("job [{0}] does not exist".format(job_name))
+            raise Exception("job [{0}] does not exist".format(job_name))
         else:
             interrupt(r, job_name)
             cleanup(r, job_name)
