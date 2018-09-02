@@ -298,7 +298,7 @@ def irods_session(hdlr_mod, meta, logger, **options):
         sess = irods_session_map.get(key)
 
     # =-=-=-=-=-=-=-
-    # diconnect timer
+    # disconnect timer
     if key in irods_session_timer_map:
         timer = irods_session_timer_map[key]
         timer.cancel()
@@ -543,7 +543,3 @@ def sync_data_from_link(meta, logger, content, **options):
 
 def sync_metadata_from_link(meta, logger, **options):
     sync_data_from_link(meta, logger, False, **options)
-
-
-
-
