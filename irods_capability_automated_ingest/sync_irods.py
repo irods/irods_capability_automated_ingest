@@ -248,7 +248,7 @@ def start_timer():
     for k, v in irods_session_timer_map.items():
         v.start();
 
-def irods_session(hdlr_mod, meta, **options):
+def irods_session(hdlr_mod, meta, logger, **options):
     env_irods_host = os.environ.get("IRODS_HOST")
     env_irods_port = os.environ.get("IRODS_PORT")
     env_irods_user_name = os.environ.get("IRODS_USER_NAME")
@@ -321,7 +321,7 @@ def sync_data_from_file(meta, logger, content, **options):
     hdlr_mod = get_hdlr_mod(meta)
     init = meta["initial_ingest"]
 
-    session = irods_session(hdlr_mod, meta, **options)
+    session = irods_session(hdlr_mod, meta, logger, **options)
 
     if init:
         exists = False
@@ -402,7 +402,7 @@ def sync_data_from_dir(meta, logger, content, **options):
     path = meta["path"]
     hdlr_mod = get_hdlr_mod(meta)
 
-    session = irods_session(hdlr_mod, meta, **options)
+    session = irods_session(hdlr_mod, meta, logger, **options)
 
     exists = session.collections.exists(target)
 
@@ -505,7 +505,7 @@ def sync_data_from_link(meta, logger, content, **options):
     hdlr_mod = get_hdlr_mod(meta)
     init = meta["initial_ingest"]
 
-    session = irods_session(hdlr_mod, meta, **options)
+    session = irods_session(hdlr_mod, meta, logger, **options)
 
     if init:
         exists = False
