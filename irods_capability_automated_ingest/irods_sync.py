@@ -98,8 +98,8 @@ def main():
     subparsers = parser.add_subparsers(help="subcommand help")
 
     parser_start = subparsers.add_parser("start", help="start help")
-    parser_start.add_argument('root', metavar='ROOT', type=str, help='root directory')
-    parser_start.add_argument('target', metavar='TARGET', type=str, help='target collection')
+    parser_start.add_argument('root', metavar='SOURCE_DIRECTORY', type=str, help='source_directory')
+    parser_start.add_argument('target', metavar='TARGET_COLLECTION', type=str, help='target_collection')
     parser_start.add_argument('-i', '--interval', action="store", metavar='INTERVAL', type=int, default=None, help='restart interval (in seconds)')
     parser_start.add_argument('--file_queue', action="store", metavar='FILE QUEUE', type=str, default="file", help='file queue')
     parser_start.add_argument('--path_queue', action="store", metavar='PATH QUEUE', type=str, default="path", help='path queue')
@@ -116,7 +116,7 @@ def main():
     parser_start.add_argument('--scan_dir_list', action="store_true", default=False, help='scan dir list')
     parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none', help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
     parser_start.add_argument('--exclude_file_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the file names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
-    parser_start.add_argument('--exclude_directory_name', type=list, nargs='+', action="store", default='none', help='a list of space separated python regular expression defining the directory names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
+    parser_start.add_argument('--exclude_directory_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the directory names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
     parser_start.add_argument('--irods_idle_disconnect_seconds', action="store", metavar='DISCONNECT IN SECONDS', type=int, default=None, help='irods disconnect time in seconds')
     add_arguments(parser_start)
 

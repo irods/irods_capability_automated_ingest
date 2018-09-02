@@ -64,7 +64,7 @@ class IrodsTask(app.Task):
         job_name = meta["job_name"]
         logger = sync_logging.get_sync_logger(config["log"])
         r = get_redis(config)
-        logger.warn('retry_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo, traceback=traceback.extract_tb(exc.__traceback__))
+        logger.warning('retry_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo, traceback=traceback.extract_tb(exc.__traceback__))
         incr_with_key(r, retries_key, job_name)
 
     def on_success(self, retval, task_id, args, kwargs):

@@ -207,7 +207,7 @@ optional arguments:
                         defining the file names to exclude such as
                         "(\S+)exclude" "(\S+)\.hidden"
   --exclude_directory_name EXCLUDE_DIRECTORY_NAME [EXCLUDE_DIRECTORY_NAME ...]
-                        a list of space separated python regular expression
+                        a list of space-separated python regular expressions
                         defining the directory names to exclude such as
                         "(\S+)exclude" "(\S+)\.hidden"
   --irods_idle_disconnect_seconds DISCONNECT IN SECONDS
