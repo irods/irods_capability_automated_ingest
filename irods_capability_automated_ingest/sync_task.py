@@ -582,7 +582,7 @@ def monitor_synchronization(job_name, progress, config):
     r = get_redis(config)
     if get_with_key(r, cleanup_key, job_name, str) is None:
         logger.error("job [{0}] does not exist".format(job_name))
-        raise Exception(""job [{0}] does not exist".format(job_name))
+        raise Exception("job [{0}] does not exist".format(job_name))
 
     if progress:
 
