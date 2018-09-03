@@ -1,6 +1,12 @@
 # iRODS Automated Ingest Framework
 
-The automated ingest framework gives iRODS an enterprise solution that solves two major use cases: getting existing data under management and ingesting incoming data hitting a landing zone.
+The automated ingest framework gives iRODS an enterprise solution that solves two major use cases:
+
+1) Filesystem Scanner: Getting existing data under management (where it will remain at rest and be the source of Truth)
+
+and
+
+2) Landing Zone: Ingesting incoming data hitting a mounted location (where it will be cleaned and moved, becoming the source of Truth).
 
 Based on the Python iRODS Client and Celery, this framework can scale up to match the demands of data coming off instruments, satellites, or parallel filesystems.
 
@@ -49,6 +55,16 @@ Event handlers can use `logger` to write logs. See `structlog` for available log
 
 ## Deployment
 
+The Automated Ingest Framework is designed to be deployed in one of three ways:
+ - Basic: Manual setup and configuration
+ - Intermediate: Docker and manual configuration
+ - Advanced: Helm and Kubernetes for configuration
+
+At this time, we recommend Basic/Manual deployment.
+
+Intermediate and Advanced deployments are still experimental.
+ 
+
 ### Basic: manual redis, Celery, pip
 
 #### Starting Redis Server
@@ -59,13 +75,8 @@ sudo yum install redis-server
 ```
 sudo apt-get install redis-server
 ```
-Or, build it yourself: https://redis.io/topics/quickstart
 
-Start redis:
-```
-redis-server
-```
-Or, dameonized:
+Confirm redis-server is running:
 ```
 sudo service redis-server start
 ```
@@ -73,7 +84,7 @@ sudo service redis-server start
 sudo systemctl start redis
 ```
 
-**Note:** If running on different computers, make sure Redis server accepts connections by editing the `bind` line in /etc/redis/redis.conf or /etc/redis.conf.
+**Note:** If running on different computers, make sure Redis server accepts remote connections by editing the `bind` line in `/etc/redis/redis.conf` or `/etc/redis.conf`.
 
 #### Setting up virtual environment
 You may need to upgrade pip:
@@ -113,18 +124,12 @@ git clone https://github.com/irods/irods_capability_automated_ingest --branch ic
 pip install celery[redis] progressbar2 python-redis-lock scandir python-irodsclient structlog
 ```
 
-Make sure you are in the repo and on the icai-celery branchfor the following commands:
+Make sure you are in the repo and on the icai-celery branch for the following commands:
 ```
 cd <repo dir>
 ```
 
-Set up environment for Celery:
-`fish`
-```
-set -xl CELERY_BROKER_URL redis://<redis host>:<redis port>/<redis db> # e.g. redis://127.0.0.1:6379/0
-set -xl PYTHONPATH (pwd)
-```
-`bash`
+Set up bash environment for Celery:
 ```
 export CELERY_BROKER_URL=redis://<redis host>:<redis port>/<redis db> # e.g. redis://127.0.0.1:6379/0
 export PYTHONPATH=`pwd`
@@ -143,12 +148,12 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 
 #### Start sync job
 ```
-python -m irods_capability_automated_ingest.irods_sync start <source dir> <destination collection>
+python -m irods_capability_automated_ingest.irods_sync start <source_directory> <target_collection>
 ```
 
 Usage:
 ```
-irods_sync.py start [-h] [-i INTERVAL] [--file_queue FILE QUEUE]
+usage: irods_sync.py start [-h] [-i INTERVAL] [--file_queue FILE QUEUE]
                            [--path_queue PATH QUEUE]
                            [--restart_queue RESTART QUEUE]
                            [--event_handler EVENT HANDLER]
@@ -160,22 +165,19 @@ irods_sync.py start [-h] [-i INTERVAL] [--file_queue FILE QUEUE]
                            [--exclude_file_name EXCLUDE_FILE_NAME [EXCLUDE_FILE_NAME ...]]
                            [--exclude_directory_name EXCLUDE_DIRECTORY_NAME [EXCLUDE_DIRECTORY_NAME ...]]
                            [--irods_idle_disconnect_seconds DISCONNECT IN SECONDS]
-                           [--redis_host REDIS HOST]
-                           [--redis_port REDIS PORT]
-                           [--redis_db REDIS DB]
-                           [--log_filename LOG FILE]
-                           [--log_when LOG WHEN]
-                           [--log_interval LOG INTERVAL]
+                           [--redis_host REDIS HOST] [--redis_port REDIS PORT]
+                           [--redis_db REDIS DB] [--log_filename LOG FILE]
+                           [--log_when LOG WHEN] [--log_interval LOG INTERVAL]
                            [--log_level LOG LEVEL]
                            [--profile_filename PROFILE FILE]
                            [--profile_when PROFILE WHEN]
                            [--profile_interval PROFILE INTERVAL]
                            [--profile_level PROFILE LEVEL]
-                           ROOT TARGET
+                           SOURCE_DIRECTORY TARGET_COLLECTION
 
 positional arguments:
-  ROOT                  root directory
-  TARGET                target collection
+  SOURCE_DIRECTORY      source_directory
+  TARGET_COLLECTION     target_collection
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -246,13 +248,13 @@ The `--progress` will show progress bar when `--synchronous` is enabled.
 
 The `--list_dir` will use cause the tasks to `listdir` instead of `scandir`.
 
-The `--log_filename` specify profile file name.
+The `--log_filename` specify log filename.
 
-The `--log_level` specify the profile level, currently should specify `INFO`
+The `--log_level` specify the profile level, one of DEBUG, INFO, WARNING, ERROR
 
-The `--profile` will use enable profiling.
+The `--profile` will enable profiling.
 
-The `--profile_filename` specify profile file name.
+The `--profile_filename` specify profile filename.
 
 The `--profile_level` specify the profile level, currently should specify `INFO`
 
