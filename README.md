@@ -103,8 +103,6 @@ pip install irods_capability_automated_ingest
 
 Set up environment for Celery:
 ```
-`bash`
-```
 export CELERY_BROKER_URL=redis://<redis host>:<redis port>/<redis db> # e.g. redis://127.0.0.1:6379/0
 export PYTHONPATH=`pwd`
 ```
