@@ -234,7 +234,8 @@ class disconnect_timer(object):
         self.sess_map.clear()
 
     def cancel(self):
-        self.timer.cancel()
+        if self.timer is not None:
+            self.timer.cancel()
 
     def start(self):
         self.timer = threading.Timer(self.interval, self.callback)
