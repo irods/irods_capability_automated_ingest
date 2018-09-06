@@ -90,39 +90,18 @@ Create a virtualenv with python3:
 ```
 virtualenv -p python3 rodssync
 ```
-**Note:** You will need python version >= 3.5 to run the test suite
 
 Activate virtual environment:
 ```
 source rodssync/bin/activate
 ```
 
-#### Clone this repo
+#### Install this package
 ```
-git clone https://github.com/irods/irods_capability_automated_ingest --branch icai-celery
-```
-
-#### Installing and configuring Celery
- * celery[redis]
- * progressbar2
- * python-redis-lock
- * python-irodsclient
- * scandir
- * structlog
-```
-pip install celery[redis] progressbar2 python-redis-lock scandir python-irodsclient structlog
-```
-
-Make sure you are in the repo and on the icai-celery branchfor the following commands:
-```
-cd <repo dir>
+pip install irods_capability_automated_ingest
 ```
 
 Set up environment for Celery:
-`fish`
-```
-set -xl CELERY_BROKER_URL redis://<redis host>:<redis port>/<redis db> # e.g. redis://127.0.0.1:6379/0
-set -xl PYTHONPATH (pwd)
 ```
 `bash`
 ```
@@ -136,6 +115,7 @@ celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart
 ```
 
 #### Run tests
+**Note:** The test suite requires Python version >=3.5.
 **Note:** The tests should be run without running Celery workers.
 ```
 python -m irods_capability_automated_ingest.test.test_irods_sync
