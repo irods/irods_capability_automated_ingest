@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v0.2.1] - 2018-09-06
+
+- [#45] check permission before enqueueing a file/dir
+- [#46] add missing scandir dependency
+- [#47] only call cancel if timer is instantiated
+
 ## [v0.2.0] - 2018-09-03
 
 - Swap queueing technology to Celery from RedisQueue
@@ -18,6 +24,7 @@
 - Includes logging
 - Nascent support for Docker, Kubernetes, and Helm
 
-[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.0...HEAD
-[v0.1.0]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.1.0...v0.2.0
+[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.1...HEAD
+[v0.2.1]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.0...v0.2.1
+[v0.2.0]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.1.0...v0.2.0
 [v0.1.0]: https://github.com/irods/irods_capability_automated_ingest/compare/11f9825df721a19dd25dad70aa94e5aa73d1d941...v0.1.0
