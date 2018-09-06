@@ -293,6 +293,7 @@ def sync_path(self, meta):
             for n in itr:
                 meta = meta.copy()
                 if list_dir:
+                # listdir
                     full_path = os.path.join(path, n)
 
                     if exclude_file_type(exclude_type_list, dir_regex, file_regex, full_path, logger):
@@ -311,6 +312,10 @@ def sync_path(self, meta):
                         meta["mtime"] = os.lstat(full_path).st_mtime
                     else:
                         mode = os.stat(full_path).st_mode
+                        readable = os.access(full_path, os.R_OK)
+                        if not readable:
+                            logger.error('physical path is not readable [{0}]'.format(full_path))
+                            continue
                         if stat.S_ISSOCK(mode):
                             logger.info('PROCESSING: ['+full_path+'] is a SOCKET', task=task, path=path)
 
@@ -325,6 +330,7 @@ def sync_path(self, meta):
                             meta["path"] = full_path
                             meta["is_link"] = False
                 else:
+                # scandir
                     full_path = os.path.abspath(n.path)
 
                     if exclude_file_type(exclude_type_list, dir_regex, file_regex, full_path, logger):
@@ -342,6 +348,10 @@ def sync_path(self, meta):
                         meta["mtime"] = os.lstat(full_path).st_mtime
                     else:
                         mode = os.stat(full_path).st_mode
+                        readable = os.access(full_path, os.R_OK)
+                        if not readable:
+                            logger.error('physical path is not readable [{0}]'.format(full_path))
+                            continue
                         if stat.S_ISSOCK(mode):
                             meta["is_file"] = False
                             meta["is_dir"] = False
