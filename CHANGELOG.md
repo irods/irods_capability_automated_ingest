@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v0.2.2] - 2018-09-10
+
+- [#50] fixed invocation used for collection events
+
 ## [v0.2.1] - 2018-09-06
 
 - [#45] check permission before enqueueing a file/dir
@@ -24,7 +28,8 @@
 - Includes logging
 - Nascent support for Docker, Kubernetes, and Helm
 
-[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.2...HEAD
+[v0.2.2]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.1...v0.2.2
 [v0.2.1]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.0...v0.2.1
 [v0.2.0]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.1.0...v0.2.0
 [v0.1.0]: https://github.com/irods/irods_capability_automated_ingest/compare/11f9825df721a19dd25dad70aa94e5aa73d1d941...v0.1.0
