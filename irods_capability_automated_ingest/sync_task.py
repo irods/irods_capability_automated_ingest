@@ -17,10 +17,10 @@ from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key
     count_key, stop_key, dequeue_key, get_hdlr_mod
 from .utils import retry
 from uuid import uuid1
-import boto3
 import time
 import progressbar
 import json
+from minio import Minio
 import traceback
 import base64
 import socket
@@ -239,10 +239,9 @@ def sync_path(self, meta):
     config = meta["config"]
     logging_config = config["log"]
     list_dir = meta["list_dir"]
-    dir_list = meta["scan_dir_list"]
     scan_bucket = meta["scan_bucket"]
     cached_is_bucket_root = meta["is_bucket_root"]
-    the_bucket = meta["the_bucket"]
+    cached_is_bucket_chunk = meta["is_bucket_chunk"]
     cached_is_bucket_file = meta["is_bucket_file"]
     cached_is_file = meta.get("is_file")
     cached_is_dir = meta.get("is_dir")
@@ -260,7 +259,7 @@ def sync_path(self, meta):
 
     try:
         r = get_redis(config)
-        if None is scan_bucket and ((cached_is_link is not None and cached_is_link) or islink(path)):
+        if (cached_is_link is not None and cached_is_link) or islink(path):
             logger.info("enqueue link path", path=path)
             meta = meta.copy()
             meta["task"] = "sync_link"
@@ -272,12 +271,18 @@ def sync_path(self, meta):
             meta["task"] = "sync_file"
             async(r, logger, sync_file, meta, file_q_name)
             logger.info("succeeded", task=task, path=path)
+        elif (cached_is_bucket_chunk is not None and cached_is_bucket_chunk):
+            logger.info("iterate s3 chunk", path=path)
+            meta = meta.copy()
+            meta["task"] = "sync_s3_chunk"
+            async(r, logger, sync_s3_chunk, meta, file_q_name)
+            logger.info("succeeded", task=task, path=path)
         elif (cached_is_bucket_root is not None and cached_is_bucket_root) or (cached_is_dir is not None and cached_is_dir) or isdir(path):
             logger.info("walk dir", path=path)
             meta = meta.copy()
             meta["task"] = "sync_dir"
             async(r, logger, sync_dir, meta, file_q_name)
-            if dir_list:
+            if list_dir:
                 if meta["profile"]:
                     config = meta["config"]
                     profile_log = config.get("profile")
@@ -286,13 +291,40 @@ def sync_path(self, meta):
                     profile_logger.info("list_dir_prerun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
 
             if scan_bucket:
-                itr = the_bucket.objects.all()
-            elif scan_dir:
-                itr = scandir(path)
+                # instantiate s3 client
+                if proxy_url is None:
+                    httpClient = None
+                else:
+                    import urllib3
+                    httpClient = urllib3.ProxyManager(
+                                            proxy_url,
+                                            timeout=urllib3.Timeout.DEFAULT_TIMEOUT,
+                                            cert_reqs='CERT_REQUIRED',
+                                            retries=urllib3.Retry(
+                                                total=5,
+                                                backoff_factor=0.2,
+                                                status_forcelist=[500, 502, 503, 504]
+                                            )
+                                 )
+                client = Minio(
+                             endpoint_domain,
+                             access_key=aws_access_key,
+                             secret_key=aws_secret_key,
+                             http_client=httpClient
+                         )
+
+                itr = client.list_objects_v2(path, prefix=prefix, recursive=True)
+                # initialize s3 counters
+                objcount = 0
+                folders = set()
+                folder_mtimes = {}
+                chunk = {}
+
             else:
+                print(meta)
                 itr = listdir(path)
 
-            if dir_list:
+            if list_dir:
                 itr = list(itr)
                 if meta["profile"]:
                     profile_logger.info("list_dir_postrun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
@@ -336,18 +368,47 @@ def sync_path(self, meta):
                             meta["path"] = full_path
                             meta["is_link"] = False
                 elif cached_is_bucket_root:
-                    logger.info('PROCESSING: ['+itr.name+'] is a BUCKET OBJECT', task=task, path=path)
+                    logger.info('PROCESSING: ['+itr.name+'] is a BUCKET ROOT', task=task, path=path)
 
                     full_path = itr.name
                     meta["is_file"] = False
                     meta["is_dir"] = False
                     meta["is_link"] = False
                     meta["is_socket"] = False
-                    meta["cached_is_bucket_file"] = True
+                    meta["is_bucket_chunk"] = False
                     meta["path"] = full_path
-                    meta["ctime"] = itr.last_modified
-                    meta["mtime"] = itr.last_modified
-                    meta["size"] = itr.size
+
+
+                    obj = n
+#                    print(obj)
+                    # check this item isn't an s3 folder (returned by the minio client)
+                    if (obj.object_name.endswith('/')):
+                        folder_mtimes[obj.object_name[:-1]] = str(obj.last_modified)
+                    else:
+                        objcount += 1
+                        # add this object's parent to folders map
+                        parent = os.path.dirname(obj.object_name)
+                        folders.add([parent,folder_mtimes[parent]])
+                        # add this object to the chunk
+                        chunk[obj.object_name] = [str(obj.size),str(obj.last_modified)]
+                        # if it's time to launch the async jobs
+                    if objcount >= max_objects_in_chunk:
+                        # sending folders to async
+                        for f in folders:
+                            meta["is_dir"] = True
+                            meta["path"] = f[0]
+                            meta["ctime"] = f[1]
+                            meta["mtime"] = f[1]
+                            async(r, logger, sync_path, meta, f[0])
+                        # sending chunk to async sync_s3_chunk
+                        meta["is_dir"] = False
+                        meta["is_bucket_chunk"] = True
+                        async(r, logger, sync_path, meta, chunk)
+                        # reset counts
+                        objcount = 0
+                        folders.clear()
+                        chunk.clear()
+
                 else:
                     full_path = os.path.abspath(n.path)
 
@@ -384,7 +445,23 @@ def sync_path(self, meta):
                             meta["is_link"] = False
                             meta["is_socket"] = False
                             meta["path"] = full_path
-                async(r, logger, sync_path, meta, path_q_name)
+
+                if scan_bucket:
+                    if objcount > 0:
+                        # sending folders to async
+                        for f in folders:
+                            meta["is_dir"] = True
+                            meta["path"] = f[0]
+                            meta["ctime"] = f[1]
+                            meta["mtime"] = f[1]
+                            async(r, logger, sync_path, meta, f[0])
+                        # sending chunk to async sync_s3_chunk
+                        meta["is_dir"] = False
+                        meta["is_bucket_chunk"] = True
+                        async(r, logger, sync_s3_chunk, meta, chunk)
+                else:
+                    async(r, logger, sync_path, meta, path_q_name)
+
             logger.info("succeeded_dir", task=task, path=path)
         else:
             raise RuntimeError("path does not exist")
@@ -405,6 +482,19 @@ def sync_link(self, meta):
 @app.task(bind=True, base=IrodsTask)
 def sync_dir(self, meta):
     sync_entry(self, meta, "dir", sync_irods.sync_data_from_dir, sync_irods.sync_metadata_from_dir)
+
+@app.task(bind=True, base=IrodsTask)
+def sync_s3_chunk(self, meta):
+    chunk = meta["file_queue"]
+    meta = meta.copy()
+    meta["is_bucket_chunk"] = False
+    for o in chunk:
+        meta["is_bucket_file"] = True
+        meta["path"] = o.object_name
+        meta["ctime"] = o.last_modified
+        meta["mtime"] = o.last_modified
+        meta["size"] = o.size
+        sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
 
 def sync_entry(self, meta, cls, datafunc, metafunc):
     hdlr = meta["event_handler"]
@@ -558,13 +648,17 @@ def start_synchronization(data):
     data_copy = data.copy()
 
     if scan_bucket is not None:
-        # chop s3 URL into bits
+        data_copy['is_bucket_root'] = True
+        data_copy['is_bucket_chunk'] = False
+        data_copy['is_bucket_file'] = False
+        data_copy['s3_region_name'] = s3_region_name
+        data_copy['s3_endpoint_url'] = s3_endpoint_url
+        data_copy['s3_keypair'] = s3_keypair
+        # parse s3 keypair
         if s3_keypair is not None:
             with open(s3_keypair) as f:
-                aws_access_key = f.readline().rstrip()
-                aws_secret_key = f.readline().rstrip()
-        # create connection
-        s3client = boto3.client('s3', region_name=s3_region_name, endpoint_url=s3_endpoint_url, aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+                data_copy['aws_access_key'] = f.readline().rstrip()
+                data_copy['aws_secret_key'] = f.readline().rstrip()
         # set root
         root_abs = root
     else:
@@ -592,8 +686,8 @@ def start_synchronization(data):
     r = get_redis(config)
     with redis_lock.Lock(r, "lock:periodic"):
         if get_with_key(r, cleanup_key, job_name, str) is not None:
-            logger.error("job exists")
-            raise Exception("job exists")
+            logger.error("job {0} already exists".format(job_name))
+            raise Exception("job {0} already exists".format(job_name))
 
         store_event_handler(data_copy)
 

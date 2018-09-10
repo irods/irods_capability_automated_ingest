@@ -328,7 +328,7 @@ def sync_data_from_file(meta, logger, content, **options):
         if session.data_objects.exists(target):
             exists = True
         elif session.collections.exists(target):
-            raise Exception("sync: cannot syncing file " + path + " to collection " + target)
+            raise Exception("sync: cannot sync file " + path + " to collection " + target)
         else:
             exists = False
 
@@ -512,7 +512,7 @@ def sync_data_from_link(meta, logger, content, **options):
         if session.data_objects.exists(target):
             exists = True
         elif session.collections.exists(target):
-            raise Exception("sync: cannot syncing link " + path + " to collection " + target)
+            raise Exception("sync: cannot sync link " + path + " to collection " + target)
         else:
             exists = False
 

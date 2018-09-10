@@ -68,7 +68,6 @@ def handle_start(args):
     data["progress"] = args.progress
     data["profile"] = args.profile
     data["list_dir"] = args.list_dir
-    data["scan_dir_list"] = args.scan_dir_list
     data["scan_bucket"] = args.scan_bucket
     data["s3_endpoint_url"] = args.s3_endpoint_url
     data["s3_region_name"] = args.s3_region_name
@@ -117,9 +116,8 @@ def main():
     parser_start.add_argument('--progress', action="store_true", default=False, help='progress')
     parser_start.add_argument('--profile', action="store_true", default=False, help='profile')
     parser_start.add_argument('--list_dir', action="store_true", default=False, help='list dir')
-    parser_start.add_argument('--scan_dir_list', action="store_true", default=False, help='scan dir list')
     parser_start.add_argument('--scan_bucket', action="store_true", default=False, help='scan bucket')
-    parser_start.add_argument('--s3_endpoint_url', action="store", metavar="S3 ENDPOINT URL", type=str, default='s3.amazonaws.com', help='s3 endpoint url')
+    parser_start.add_argument('--s3_endpoint_url', action="store", metavar="S3 ENDPOINT URL", type=str, default='https://s3.amazonaws.com', help='s3 endpoint url')
     parser_start.add_argument('--s3_region_name', action="store", metavar="S3 REGION NAME", type=str, default='us-east-1', help='s3 region name')
     parser_start.add_argument('--s3_keypair', action="store", metavar="S3 KEYPAIR FILE", type=str, default=None, help='s3 keypair file')
     parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none', help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
