@@ -67,8 +67,11 @@ def handle_start(args):
     data["synchronous"] = args.synchronous
     data["progress"] = args.progress
     data["profile"] = args.profile
-    data["list_dir"] = args.list_dir
-    data["scan_dir_list"] = args.scan_dir_list
+    data["files_per_task"] = args.files_per_task
+    data["s3_endpoint_domain"] = args.s3_endpoint_domain
+    data["s3_region_name"] = args.s3_region_name
+    data["s3_keypair"] = args.s3_keypair
+    data["s3_proxy_url"] = args.s3_proxy_url
     data["exclude_file_type"] = ex_arg_list
     data['exclude_file_name'] = [ ''.join(r) for r in args.exclude_file_name ]
     data['exclude_directory_name'] = [ ''.join(r) for r in args.exclude_directory_name ]
@@ -112,8 +115,11 @@ def main():
     parser_start.add_argument('--synchronous', action="store_true", default=False, help='synchronous')
     parser_start.add_argument('--progress', action="store_true", default=False, help='progress')
     parser_start.add_argument('--profile', action="store_true", default=False, help='profile')
-    parser_start.add_argument('--list_dir', action="store_true", default=False, help='list dir')
-    parser_start.add_argument('--scan_dir_list', action="store_true", default=False, help='scan dir list')
+    parser_start.add_argument('--files_per_task', action="store", metavar="FILES PER TASK", type=int, default='50', help='number of paths to process in a given task on the queue')
+    parser_start.add_argument('--s3_endpoint_domain', action="store", metavar="S3 ENDPOINT DOMAIN", type=str, default='s3.amazonaws.com', help='s3 endpoint domain (e.g. s3.amazonaws.com)')
+    parser_start.add_argument('--s3_region_name', action="store", metavar="S3 REGION NAME", type=str, default='us-east-1', help='s3 region name')
+    parser_start.add_argument('--s3_keypair', action="store", metavar="S3 KEYPAIR FILE", type=str, default=None, help='s3 keypair file')
+    parser_start.add_argument('--s3_proxy_url', action="store", metavar="S3 PROXY URL", type=str, default=None, help='URL to proxy for S3 access')
     parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none', help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
     parser_start.add_argument('--exclude_file_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the file names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
     parser_start.add_argument('--exclude_directory_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the directory names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
