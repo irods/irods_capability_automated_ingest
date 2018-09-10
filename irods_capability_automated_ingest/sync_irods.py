@@ -414,14 +414,14 @@ def sync_data_from_dir(meta, logger, content, **options):
 
     if op == Operation.NO_OP:
         if not exists:
-            call(hdlr_mod, "on_collection_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
+            call(hdlr_mod, "on_coll_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
         else:
-            call(hdlr_mod, "on_collection_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
+            call(hdlr_mod, "on_coll_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
     else:
         if not exists:
             create_dirs(hdlr_mod, logger, session, meta, **options)
         else:
-            call(hdlr_mod, "on_collection_modify", sync_dir_meta, logger, hdlr_mod, logger, session, meta, **options)
+            call(hdlr_mod, "on_coll_modify", sync_dir_meta, logger, hdlr_mod, logger, session, meta, **options)
 
     start_timer()
 
