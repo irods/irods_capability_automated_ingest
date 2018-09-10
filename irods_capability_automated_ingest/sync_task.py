@@ -17,6 +17,7 @@ from .sync_utils import get_redis, app, get_with_key, get_max_retries, tasks_key
     count_key, stop_key, dequeue_key, get_hdlr_mod
 from .utils import retry
 from uuid import uuid1
+import boto3
 import time
 import progressbar
 import json
@@ -239,6 +240,10 @@ def sync_path(self, meta):
     logging_config = config["log"]
     list_dir = meta["list_dir"]
     dir_list = meta["scan_dir_list"]
+    scan_bucket = meta["scan_bucket"]
+    cached_is_bucket_root = meta["is_bucket_root"]
+    the_bucket = meta["the_bucket"]
+    cached_is_bucket_file = meta["is_bucket_file"]
     cached_is_file = meta.get("is_file")
     cached_is_dir = meta.get("is_dir")
     cached_is_link = meta.get("is_link")
@@ -255,19 +260,19 @@ def sync_path(self, meta):
 
     try:
         r = get_redis(config)
-        if (cached_is_link is not None and cached_is_link) or islink(path):
+        if None is scan_bucket and ((cached_is_link is not None and cached_is_link) or islink(path)):
             logger.info("enqueue link path", path=path)
             meta = meta.copy()
             meta["task"] = "sync_link"
             async(r, logger, sync_link, meta, file_q_name)
             logger.info("succeeded", task=task, path=path)
-        elif (cached_is_file is not None and cached_is_file) or isfile(path):
+        elif (cached_is_bucket_file is not None and cached_is_bucket_file) or (cached_is_file is not None and cached_is_file) or isfile(path):
             logger.info("enqueue file path", path=path)
             meta = meta.copy()
             meta["task"] = "sync_file"
             async(r, logger, sync_file, meta, file_q_name)
             logger.info("succeeded", task=task, path=path)
-        elif (cached_is_dir is not None and cached_is_dir) or isdir(path):
+        elif (cached_is_bucket_root is not None and cached_is_bucket_root) or (cached_is_dir is not None and cached_is_dir) or isdir(path):
             logger.info("walk dir", path=path)
             meta = meta.copy()
             meta["task"] = "sync_dir"
@@ -280,10 +285,12 @@ def sync_path(self, meta):
                     task_id = self.request.id
                     profile_logger.info("list_dir_prerun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
 
-            if list_dir:
-                itr = listdir(path)
-            else:
+            if scan_bucket:
+                itr = the_bucket.objects.all()
+            elif scan_dir:
                 itr = scandir(path)
+            else:
+                itr = listdir(path)
 
             if dir_list:
                 itr = list(itr)
@@ -302,28 +309,45 @@ def sync_path(self, meta):
                     if islink(full_path):
                         logger.info('PROCESSING: ['+full_path+'] is a LINK', task=task, path=path)
 
+                        statinfo = os.lstat(full_path)
                         meta["is_file"] = False
                         meta["is_dir"] = False
                         meta["is_link"] = True
                         meta["is_socket"] = False
                         meta["path"] = full_path
-                        meta["ctime"] = os.lstat(full_path).st_ctime
-                        meta["mtime"] = os.lstat(full_path).st_mtime
+                        meta["ctime"] = statinfo.st_ctime
+                        meta["mtime"] = statinfo.st_mtime
+                        meta["size"] = statinfo.st_size
                     else:
                         mode = os.stat(full_path).st_mode
                         if stat.S_ISSOCK(mode):
                             logger.info('PROCESSING: ['+full_path+'] is a SOCKET', task=task, path=path)
 
+                            statinfo = os.stat(full_path)
                             meta["is_file"] = False
                             meta["is_dir"] = False
                             meta["is_link"] = True
                             meta["is_socket"] = True
                             meta["path"] = full_path
-                            meta["ctime"] = os.stat(full_path).st_ctime
-                            meta["mtime"] = os.stat(full_path).st_mtime
+                            meta["ctime"] = statinfo.st_ctime
+                            meta["mtime"] = statinfo.st_mtime
+                            meta["size"] = statinfo.st_size
                         else:
                             meta["path"] = full_path
                             meta["is_link"] = False
+                elif cached_is_bucket_root:
+                    logger.info('PROCESSING: ['+itr.name+'] is a BUCKET OBJECT', task=task, path=path)
+
+                    full_path = itr.name
+                    meta["is_file"] = False
+                    meta["is_dir"] = False
+                    meta["is_link"] = False
+                    meta["is_socket"] = False
+                    meta["cached_is_bucket_file"] = True
+                    meta["path"] = full_path
+                    meta["ctime"] = itr.last_modified
+                    meta["mtime"] = itr.last_modified
+                    meta["size"] = itr.size
                 else:
                     full_path = os.path.abspath(n.path)
 
@@ -333,31 +357,33 @@ def sync_path(self, meta):
                     if islink(full_path):
                         logger.info('PROCESSING: ['+n.name+'] is a LINK', task=task, path=path)
 
+                        statinfo = os.lstat(full_path)
                         meta["is_file"] = False
                         meta["is_dir"] = False
                         meta["is_link"] = True
                         meta["is_socket"] = False
                         meta["path"] = full_path
-                        meta["ctime"] = os.lstat(full_path).st_ctime
-                        meta["mtime"] = os.lstat(full_path).st_mtime
+                        meta["ctime"] = statinfo.st_ctime
+                        meta["mtime"] = statinfo.st_mtime
+                        meta["size"] = statinfo.st_size
                     else:
-                        mode = os.stat(full_path).st_mode
+                        statinfo = os.stat(full_path)
+                        mode = statinfo.st_mode
+                        meta["ctime"] = statinfo.st_ctime
+                        meta["mtime"] = statinfo.st_mtime
+                        meta["size"] = statinfo.st_size
                         if stat.S_ISSOCK(mode):
                             meta["is_file"] = False
                             meta["is_dir"] = False
                             meta["is_link"] = True
                             meta["is_socket"] = True
                             meta["path"] = full_path
-                            meta["ctime"] = os.stat(full_path).st_ctime
-                            meta["mtime"] = os.stat(full_path).st_mtime
                         else:
-                            meta["path"] = full_path
                             meta["is_file"] = n.is_file() or not n.is_dir()
                             meta["is_dir"] = n.is_dir()
                             meta["is_link"] = False
                             meta["is_socket"] = False
-                            meta["ctime"] = n.stat().st_ctime
-                            meta["mtime"] = n.stat().st_mtime
+                            meta["path"] = full_path
                 async(r, logger, sync_path, meta, path_q_name)
             logger.info("succeeded_dir", task=task, path=path)
         else:
@@ -523,11 +549,27 @@ def start_synchronization(data):
     restart_queue = data["restart_queue"]
     sychronous = data["synchronous"]
     progress = data["progress"]
+    scan_bucket = data["scan_bucket"]
+    s3_region_name = data["s3_region_name"]
+    s3_endpoint_url = data["s3_endpoint_url"]
+    s3_keypair = data["s3_keypair"]
 
     logger = sync_logging.get_sync_logger(logging_config)
-
     data_copy = data.copy()
-    root_abs = realpath(root)
+
+    if scan_bucket is not None:
+        # chop s3 URL into bits
+        if s3_keypair is not None:
+            with open(s3_keypair) as f:
+                aws_access_key = f.readline().rstrip()
+                aws_secret_key = f.readline().rstrip()
+        # create connection
+        s3client = boto3.client('s3', region_name=s3_region_name, endpoint_url=s3_endpoint_url, aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+        # set root
+        root_abs = root
+    else:
+        root_abs = realpath(root)
+
     data_copy["root"] = root_abs
     data_copy["path"] = root_abs
 

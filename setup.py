@@ -31,6 +31,7 @@ setup(
     keywords='irods automated ingest landingzone filesystem',
     packages=find_packages(),
     install_requires=[
+        'boto3',
         'flask',
         'flask-restful',
         'python-irodsclient>=0.8.0',

@@ -92,8 +92,8 @@ def register_file(hdlr_mod, logger, session, meta, **options):
         b64decoded_utf8_bstr = base64.b64decode(b64str)
         source_physical_fullpath = b64decoded_utf8_bstr
 
-    size = getsize(source_physical_fullpath)
-    mtime = int(getmtime(source_physical_fullpath))
+    size = int(meta['size'])
+    mtime = int(meta['mtime'])
     options[kw.DATA_SIZE_KW] = str(size)
     options[kw.DATA_MODIFY_KW] = str(mtime)
 
@@ -126,7 +126,6 @@ def no_op(hdlr_mod, logger, session, meta, **options):
 def sync_file(hdlr_mod, logger, session, meta, **options):
     target = meta["target"]
     path = meta["path"]
-    logger.info("ZZZZ - path:" + path)
     logger.info("syncing object " + target + ", options = " + str(options))
 
     resc_name = get_resource_name(hdlr_mod, session, meta, **options)
