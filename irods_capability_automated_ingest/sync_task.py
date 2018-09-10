@@ -6,9 +6,8 @@ except ImportError:
     from scandir import scandir
 
 import stat
-from os import listdir
 import os
-from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir, islink
+from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir
 from datetime import datetime
 import redis_lock
 from . import sync_logging, sync_irods
@@ -20,6 +19,7 @@ from uuid import uuid1
 import time
 import progressbar
 import json
+from minio import Minio
 import traceback
 import base64
 import socket
@@ -179,7 +179,7 @@ def periodic(r, job_name):
     periodic = r.lrange("periodic", 0, -1)
     return job_name.encode("utf-8") in periodic
 
-def exclude_file_type(ex_list, dir_regex, file_regex, full_path, logger):
+def exclude_file_type(ex_list, dir_regex, file_regex, full_path, logger, mode=None):
     if len(ex_list) <= 0 and None == dir_regex and None == file_regex:
         return False
 
@@ -199,7 +199,8 @@ def exclude_file_type(ex_list, dir_regex, file_regex, full_path, logger):
             break
 
     try:
-        mode = os.lstat(full_path).st_mode
+        if mode is None:
+            mode = os.lstat(full_path).st_mode
     except FileNotFoundError:
         return False
 
@@ -237,14 +238,11 @@ def sync_path(self, meta):
     file_q_name = meta["file_queue"]
     config = meta["config"]
     logging_config = config["log"]
-    list_dir = meta["list_dir"]
-    dir_list = meta["scan_dir_list"]
-    cached_is_file = meta.get("is_file")
-    cached_is_dir = meta.get("is_dir")
-    cached_is_link = meta.get("is_link")
     exclude_type_list = meta['exclude_file_type']
     exclude_file_name = meta['exclude_file_name']
     exclude_directory_name = meta['exclude_directory_name']
+
+    s3_keypair = meta.get('s3_keypair')
 
     logger = sync_logging.get_sync_logger(logging_config)
 
@@ -255,124 +253,106 @@ def sync_path(self, meta):
 
     try:
         r = get_redis(config)
-        if (cached_is_link is not None and cached_is_link) or islink(path):
-            logger.info("enqueue link path", path=path)
-            meta = meta.copy()
-            meta["task"] = "sync_link"
-            async(r, logger, sync_link, meta, file_q_name)
-            logger.info("succeeded", task=task, path=path)
-        elif (cached_is_file is not None and cached_is_file) or isfile(path):
-            logger.info("enqueue file path", path=path)
-            meta = meta.copy()
-            meta["task"] = "sync_file"
-            async(r, logger, sync_file, meta, file_q_name)
-            logger.info("succeeded", task=task, path=path)
-        elif (cached_is_dir is not None and cached_is_dir) or isdir(path):
-            logger.info("walk dir", path=path)
-            meta = meta.copy()
-            meta["task"] = "sync_dir"
-            async(r, logger, sync_dir, meta, file_q_name)
-            if dir_list:
-                if meta["profile"]:
-                    config = meta["config"]
-                    profile_log = config.get("profile")
-                    profile_logger = sync_logging.get_sync_logger(profile_log)
-                    task_id = self.request.id
-                    profile_logger.info("list_dir_prerun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
 
-            if list_dir:
-                itr = listdir(path)
+        logger.info("walk dir", path=path)
+        meta = meta.copy()
+        meta["task"] = "sync_dir"
+
+        if s3_keypair:
+            # instantiate s3 client
+            proxy_url = meta.get('s3_proxy_url')
+            if proxy_url is None:
+                httpClient = None
             else:
-                itr = scandir(path)
+                import urllib3
+                httpClient = urllib3.ProxyManager(
+                                        proxy_url,
+                                        timeout=urllib3.Timeout.DEFAULT_TIMEOUT,
+                                        cert_reqs='CERT_REQUIRED',
+                                        retries=urllib3.Retry(
+                                            total=5,
+                                            backoff_factor=0.2,
+                                            status_forcelist=[500, 502, 503, 504]
+                                        )
+                             )
+            endpoint_domain = meta.get('s3_endpoint_domain')
+            s3_access_key = meta.get('s3_access_key')
+            s3_secret_key = meta.get('s3_secret_key')
+            client = Minio(
+                         endpoint_domain,
+                         access_key=s3_access_key,
+                         secret_key=s3_secret_key,
+                         http_client=httpClient)
 
-            if dir_list:
-                itr = list(itr)
-                if meta["profile"]:
-                    profile_logger.info("list_dir_postrun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
+            # Split provided path into bucket and source folder "prefix"
+            path_list = path.strip('/').split('/', 1)
+            bucket_name = path_list[0]
+            if len(path_list) == 1:
+                prefix = ''
+            else:
+                prefix = path_list[1]
+            meta['root'] = bucket_name
+            itr = client.list_objects_v2(bucket_name, prefix=prefix, recursive=True)
+            chunk = {}
 
-            for n in itr:
-                meta = meta.copy()
-                if list_dir:
-                # listdir
-                    full_path = os.path.join(path, n)
-
-                    if exclude_file_type(exclude_type_list, dir_regex, file_regex, full_path, logger):
-                        continue
-
-                    logger.info('PROCESSING: full_path['+full_path+']', task=task, path=path)
-                    if islink(full_path):
-                        logger.info('PROCESSING: ['+full_path+'] is a LINK', task=task, path=path)
-
-                        meta["is_file"] = False
-                        meta["is_dir"] = False
-                        meta["is_link"] = True
-                        meta["is_socket"] = False
-                        meta["path"] = full_path
-                        meta["ctime"] = os.lstat(full_path).st_ctime
-                        meta["mtime"] = os.lstat(full_path).st_mtime
-                    else:
-                        mode = os.stat(full_path).st_mode
-                        readable = os.access(full_path, os.R_OK)
-                        if not readable:
-                            logger.error('physical path is not readable [{0}]'.format(full_path))
-                            continue
-                        if stat.S_ISSOCK(mode):
-                            logger.info('PROCESSING: ['+full_path+'] is a SOCKET', task=task, path=path)
-
-                            meta["is_file"] = False
-                            meta["is_dir"] = False
-                            meta["is_link"] = True
-                            meta["is_socket"] = True
-                            meta["path"] = full_path
-                            meta["ctime"] = os.stat(full_path).st_ctime
-                            meta["mtime"] = os.stat(full_path).st_mtime
-                        else:
-                            meta["path"] = full_path
-                            meta["is_link"] = False
-                else:
-                # scandir
-                    full_path = os.path.abspath(n.path)
-
-                    if exclude_file_type(exclude_type_list, dir_regex, file_regex, full_path, logger):
-                        continue
-
-                    if islink(full_path):
-                        logger.info('PROCESSING: ['+n.name+'] is a LINK', task=task, path=path)
-
-                        meta["is_file"] = False
-                        meta["is_dir"] = False
-                        meta["is_link"] = True
-                        meta["is_socket"] = False
-                        meta["path"] = full_path
-                        meta["ctime"] = os.lstat(full_path).st_ctime
-                        meta["mtime"] = os.lstat(full_path).st_mtime
-                    else:
-                        mode = os.stat(full_path).st_mode
-                        readable = os.access(full_path, os.R_OK)
-                        if not readable:
-                            logger.error('physical path is not readable [{0}]'.format(full_path))
-                            continue
-                        if stat.S_ISSOCK(mode):
-                            meta["is_file"] = False
-                            meta["is_dir"] = False
-                            meta["is_link"] = True
-                            meta["is_socket"] = True
-                            meta["path"] = full_path
-                            meta["ctime"] = os.stat(full_path).st_ctime
-                            meta["mtime"] = os.stat(full_path).st_mtime
-                        else:
-                            meta["path"] = full_path
-                            meta["is_file"] = n.is_file() or not n.is_dir()
-                            meta["is_dir"] = n.is_dir()
-                            meta["is_link"] = False
-                            meta["is_socket"] = False
-                            meta["ctime"] = n.stat().st_ctime
-                            meta["mtime"] = n.stat().st_mtime
-                async(r, logger, sync_path, meta, path_q_name)
-            logger.info("succeeded_dir", task=task, path=path)
         else:
-            raise RuntimeError("path does not exist")
+            itr = scandir(path)
 
+        if meta["profile"]:
+            config = meta["config"]
+            profile_log = config.get("profile")
+            profile_logger = sync_logging.get_sync_logger(profile_log)
+            task_id = self.request.id
+
+            profile_logger.info("list_dir_prerun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
+            itr = list(itr)
+            if meta["profile"]:
+                profile_logger.info("list_dir_postrun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
+
+        for n in itr:
+            meta = meta.copy()
+            if s3_keypair:
+                obj = n
+                meta["is_link"] = False
+                meta["is_socket"] = False
+
+                # add this object to the chunk
+                chunk[obj.object_name] = obj.size, obj.last_modified.timestamp()
+
+                # Launch async job when enough objects are ready to be sync'd
+                files_per_task = meta.get('files_per_task')
+                if len(chunk) >= files_per_task:
+                    meta['s3_chunk'] = chunk
+                    async(r, logger, sync_s3_chunk, meta, file_q_name)
+                    chunk.clear()
+
+            else:
+                full_path = os.path.abspath(n.path)
+                mode = n.stat(follow_symlinks=False).st_mode
+
+                if exclude_file_type(exclude_type_list, dir_regex, file_regex, full_path, logger, mode):
+                    continue
+
+                if not n.is_symlink():
+                    readable = os.access(full_path, os.R_OK)
+                    if not readable:
+                        logger.error('physical path is not readable [{0}]'.format(full_path))
+                        continue
+
+                meta["path"] = full_path
+                meta["is_link"] = n.is_symlink()
+                meta["is_socket"] = stat.S_ISSOCK(mode)
+                meta["ctime"] = n.stat(follow_symlinks=False).st_ctime
+                meta["mtime"] = n.stat(follow_symlinks=False).st_mtime
+                meta["size"] = n.stat(follow_symlinks=False).st_size
+                if n.is_file() or not n.is_dir():
+                    async(r, logger, sync_file, meta, file_q_name)
+                else:
+                    async(r, logger, sync_path, meta, path_q_name)
+
+        if s3_keypair and len(chunk) > 0:
+            meta['s3_chunk'] = chunk
+            async(r, logger, sync_s3_chunk, meta, file_q_name)
     except Exception as err:
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
@@ -383,12 +363,18 @@ def sync_file(self, meta):
     sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
 
 @app.task(bind=True, base=IrodsTask)
-def sync_link(self, meta):
-    sync_entry(self, meta, "link", sync_irods.sync_data_from_link, sync_irods.sync_metadata_from_link)
-
-@app.task(bind=True, base=IrodsTask)
-def sync_dir(self, meta):
-    sync_entry(self, meta, "dir", sync_irods.sync_data_from_dir, sync_irods.sync_metadata_from_dir)
+def sync_s3_chunk(self, meta):
+    chunk = meta["s3_chunk"]
+    meta = meta.copy()
+    config = meta["config"]
+    logging_config = config["log"]
+    logger = sync_logging.get_sync_logger(logging_config)
+    for obj_name, obj_attrs in chunk.items():
+        meta["path"] = obj_name
+        meta["size"] = obj_attrs[0]
+        meta["ctime"] = obj_attrs[1]
+        meta["mtime"] = obj_attrs[1]
+        sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
 
 def sync_entry(self, meta, cls, datafunc, metafunc):
     hdlr = meta["event_handler"]
@@ -405,6 +391,7 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
 
     lock = None
     logger.info("synchronizing " + cls + ". path = " + path)
+
     r = get_redis(config)
     try:
         # Attempt to encode full physical path on local filesystem
@@ -445,36 +432,30 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
         if ctime is None:
             ctime = getctime(path)
 
-        if sync_time is None or mtime >= sync_time:
-            logger.info("synchronizing " + cls, path=path, t0=sync_time, t=t, mtime=mtime)
+        if sync_time is not None and mtime < sync_time and ctime < sync_time:
+            logger.info("succeeded_" + cls + "_has_not_changed", task=task, path=path)
+        else:
+            logger.info("synchronizing " + cls, path=path, t0=sync_time, t=t, ctime=ctime)
+            meta2 = meta.copy()
             if path == root:
                 if 'unicode_error_filename' in meta:
                     target2 = join(target, meta['unicode_error_filename'])
                 else:
                     target2 = target
             else:
-                target2 = join(target, relpath(path, start=root))
-            meta2 = meta.copy()
-            meta2["target"] = target2
-            datafunc(meta2, logger, True)
-            set_with_key(r, sync_time_key, sync_key, str(t))
-            logger.info("succeeded", task=task, path=path)
-        elif ctime >= sync_time:
-            logger.info("synchronizing dir", path=path, t0=sync_time, t=t, ctime=ctime)
-            if path == root:
-                if 'unicode_error_filename' in meta:
-                    target2 = join(target, meta['unicode_error_filename'])
+                if meta.get('s3_keypair') is not None:
+                    # S3 path should be represented as /bucket/objectname
+                    target2 = join(target, path)
+                    meta2['path'] = '/' + join(root, path)
                 else:
-                    target2 = target
-            else:
-                target2 = join(target, relpath(path, start=root))
-            meta2 = meta.copy()
+                    target2 = join(target, relpath(path, start=root))
             meta2["target"] = target2
-            metafunc(meta2, logger)
+            if sync_time is None or mtime >= sync_time:
+                datafunc(meta2, logger, True)
+            else:
+                metafunc(meta2, logger)
             set_with_key(r, sync_time_key, sync_key, str(t))
             logger.info("succeeded_metadata_only", task=task, path=path)
-        else:
-            logger.info("succeeded_" + cls + "_has_not_changed", task=task, path=path)
     except Exception as err:
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
@@ -533,11 +514,27 @@ def start_synchronization(data):
     restart_queue = data["restart_queue"]
     sychronous = data["synchronous"]
     progress = data["progress"]
+    s3_region_name = data["s3_region_name"]
+    s3_endpoint_domain = data["s3_endpoint_domain"]
+    s3_keypair = data["s3_keypair"]
 
     logger = sync_logging.get_sync_logger(logging_config)
-
     data_copy = data.copy()
-    root_abs = realpath(root)
+
+    if s3_keypair is not None:
+        data_copy['s3_region_name'] = s3_region_name
+        data_copy['s3_endpoint_domain'] = s3_endpoint_domain
+        data_copy['s3_keypair'] = s3_keypair
+        # parse s3 keypair
+        if s3_keypair is not None:
+            with open(s3_keypair) as f:
+                data_copy['s3_access_key'] = f.readline().rstrip()
+                data_copy['s3_secret_key'] = f.readline().rstrip()
+        # set root
+        root_abs = root
+    else:
+        root_abs = realpath(root)
+
     data_copy["root"] = root_abs
     data_copy["path"] = root_abs
 
@@ -560,8 +557,8 @@ def start_synchronization(data):
     r = get_redis(config)
     with redis_lock.Lock(r, "lock:periodic"):
         if get_with_key(r, cleanup_key, job_name, str) is not None:
-            logger.error("job exists")
-            raise Exception("job exists")
+            logger.error("job {0} already exists".format(job_name))
+            raise Exception("job {0} already exists".format(job_name))
 
         store_event_handler(data_copy)
 

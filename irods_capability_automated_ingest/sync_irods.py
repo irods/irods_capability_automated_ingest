@@ -1,5 +1,5 @@
 import os
-from os.path import dirname, getsize, getmtime, basename, abspath
+from os.path import dirname, basename
 from irods.session import iRODSSession
 from irods.models import Resource, DataObject, Collection
 from .sync_utils import size, get_redis, call, get_hdlr_mod
@@ -47,7 +47,7 @@ def create_dirs(hdlr_mod, logger, session, meta, **options):
 
                     call(hdlr_mod, "on_coll_create", create_dir, logger, hdlr_mod, logger, session, meta, **options)
     else:
-        raise Exception("create_dirs: relative path")
+        raise Exception("create_dirs: relative path; target:[" + target + ']; path:[' + path + ']')
 
 
 def create_dir(hdlr_mod, logger, session, meta, **options):
@@ -74,10 +74,11 @@ def get_resource_name(hdlr_mod, session, meta, **options):
 def register_file(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
+    b64_path_str = meta.get('b64_path_str')
 
     phypath_to_register_in_catalog = get_target_path(hdlr_mod, session, meta, **options)
     if phypath_to_register_in_catalog is None:
-        if 'unicode_error_filename' in meta:
+        if b64_path_str is not None:
             phypath_to_register_in_catalog = os.path.join(source_physical_fullpath, meta['unicode_error_filename'])
         else:
             phypath_to_register_in_catalog = source_physical_fullpath
@@ -87,24 +88,28 @@ def register_file(hdlr_mod, logger, session, meta, **options):
     if resc_name is not None:
         options["destRescName"] = resc_name
 
-    if 'b64_path_str' in meta:
-        b64str = meta['b64_path_str']
-        b64decoded_utf8_bstr = base64.b64decode(b64str)
-        source_physical_fullpath = b64decoded_utf8_bstr
+    if b64_path_str is not None:
+        source_physical_fullpath = base64.b64decode(b64_path_str)
 
-    size = getsize(source_physical_fullpath)
-    mtime = int(getmtime(source_physical_fullpath))
-    options[kw.DATA_SIZE_KW] = str(size)
-    options[kw.DATA_MODIFY_KW] = str(mtime)
+    options[kw.DATA_SIZE_KW] = str(meta['size'])
+    options[kw.DATA_MODIFY_KW] = str(int(meta['mtime']))
 
     logger.info("registering object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
     session.data_objects.register(phypath_to_register_in_catalog, dest_dataobj_logical_fullpath, **options)
 
     logger.info("succeeded", task="irods_register_file", path = source_physical_fullpath)
 
-    if 'b64_path_str' in meta:
+    if b64_path_str is not None:
         obj = session.data_objects.get(meta['target'])
         obj.metadata.add("irods::automated_ingest::UnicodeEncodeError", meta['b64_path_str'], 'python3.base64.b64encode(full_path_of_source_file)')
+
+    if meta['is_socket']:
+        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
+        obj.metadata.add('socket_target', 'socket', 'automated_ingest')
+    elif meta['is_link']:
+        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
+        link_target = os.path.join(os.path.dirname(source_physical_fullpath), os.readlink(source_physical_fullpath))
+        obj.metadata.add('link_target', link_target, 'automated_ingest')
 
 def upload_file(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
@@ -126,7 +131,6 @@ def no_op(hdlr_mod, logger, session, meta, **options):
 def sync_file(hdlr_mod, logger, session, meta, **options):
     target = meta["target"]
     path = meta["path"]
-    logger.info("ZZZZ - path:" + path)
     logger.info("syncing object " + target + ", options = " + str(options))
 
     resc_name = get_resource_name(hdlr_mod, session, meta, **options)
@@ -162,20 +166,19 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
     phypath_to_register_in_catalog = get_target_path(hdlr_mod, session, meta, **options)
+    b64_path_str = meta.get('b64_path_str')
     if phypath_to_register_in_catalog is None:
-        if 'unicode_error_filename' in meta:
+        if b64_path_str is not None:
             # Append generated filename to truncated fullpath because it failed to encode
             phypath_to_register_in_catalog = os.path.join(source_physical_fullpath, meta['unicode_error_filename'])
         else:
             phypath_to_register_in_catalog = source_physical_fullpath
 
-    if 'b64_path_str' in meta:
-        b64str = meta['b64_path_str']
-        b64decoded_utf8_bstr = base64.b64decode(b64str)
-        source_physical_fullpath = b64decoded_utf8_bstr
+    if b64_path_str is not None:
+        source_physical_fullpath = base64.b64decode(b64_path_str)
 
-    size = getsize(source_physical_fullpath)
-    mtime = int(getmtime(source_physical_fullpath))
+    size = int(meta['size'])
+    mtime = int(meta['mtime'])
     logger.info("updating object: " + dest_dataobj_logical_fullpath + ", options = " + str(options))
 
     data_obj_info = {"objPath": dest_dataobj_logical_fullpath}
@@ -195,7 +198,7 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
                     continue
 
     if not found:
-        if 'unicode_error_filename' in meta:
+        if b64_path_str is not None:
             logger.error("updating object: wrong resource or path, dest_dataobj_logical_fullpath = " + dest_dataobj_logical_fullpath + ", phypath_to_register_in_catalog = " + phypath_to_register_in_catalog + ", phypath_to_register_in_catalog = " + phypath_to_register_in_catalog + ", options = " + str(options))
         else:
             logger.error("updating object: wrong resource or path, dest_dataobj_logical_fullpath = " + dest_dataobj_logical_fullpath + ", source_physical_fullpath = " + source_physical_fullpath + ", phypath_to_register_in_catalog = " + phypath_to_register_in_catalog + ", options = " + str(options))
@@ -203,7 +206,7 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
 
     session.data_objects.modDataObjMeta(data_obj_info, {"dataSize":size, "dataModify":mtime, "allReplStatus":1}, **options)
 
-    if 'unicode_error_filename' in meta:
+    if b64_path_str is not None:
         logger.info("succeeded", task="irods_update_metadata", path = phypath_to_register_in_catalog)
     else:
         logger.info("succeeded", task="irods_update_metadata", path = source_physical_fullpath)
@@ -211,11 +214,6 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
 
 def sync_file_meta(hdlr_mod, logger, session, meta, **options):
     pass
-
-
-def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
-    pass
-
 
 irods_session_map = {}
 irods_session_timer_map = {}
@@ -330,7 +328,7 @@ def sync_data_from_file(meta, logger, content, **options):
         if session.data_objects.exists(target):
             exists = True
         elif session.collections.exists(target):
-            raise Exception("sync: cannot syncing file " + path + " to collection " + target)
+            raise Exception("sync: cannot sync file " + path + " to collection " + target)
         else:
             exists = False
 
@@ -397,150 +395,3 @@ def sync_data_from_file(meta, logger, content, **options):
 def sync_metadata_from_file(meta, logger, **options):
     sync_data_from_file(meta, logger, False, **options)
 
-
-def sync_data_from_dir(meta, logger, content, **options):
-    target = meta["target"]
-    path = meta["path"]
-    hdlr_mod = get_hdlr_mod(meta)
-
-    session = irods_session(hdlr_mod, meta, logger, **options)
-
-    exists = session.collections.exists(target)
-
-    if hasattr(hdlr_mod, "operation"):
-        op = hdlr_mod.operation(session, meta, **options)
-    else:
-        op = Operation.REGISTER_SYNC
-
-    if op == Operation.NO_OP:
-        if not exists:
-            call(hdlr_mod, "on_coll_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
-        else:
-            call(hdlr_mod, "on_coll_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
-    else:
-        if not exists:
-            create_dirs(hdlr_mod, logger, session, meta, **options)
-        else:
-            call(hdlr_mod, "on_coll_modify", sync_dir_meta, logger, hdlr_mod, logger, session, meta, **options)
-
-    start_timer()
-
-
-def sync_metadata_from_dir(meta, logger, **options):
-    sync_data_from_dir(meta, logger, False, **options)
-
-def register_link(hdlr_mod, logger, session, meta, **options):
-    target = meta["target"]
-    path = meta["path"]
-    target_path = get_target_path(hdlr_mod, session, meta, **options)
-    if target_path is None:
-        target_path = path
-
-    resc_name = get_resource_name(hdlr_mod, session, meta, **options)
-
-    if resc_name is not None:
-        options["destRescName"] = resc_name
-
-    logger.info("registering link " + target + ", options = " + str(options))
-
-    mtime = int(meta['mtime'])
-
-    data_obj_info = {"objPath": target}
-    if resc_name is not None:
-        del options["destRescName"]
-        for row in session.query(DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target), DataObject.resource_name == resc_name):
-            data_obj_info["replNum"] = int(row[DataObject.replica_number])
-
-    logger.info('PROCESSING: in register_link', task='register_link', path=path)
-    obj = session.data_objects.create(target, resc_name, **options)
-
-    if meta['is_socket']:
-        obj.metadata.add('socket_target', 'socket', 'automated_ingest')
-    elif meta['is_link']:
-        tgt = os.path.abspath(os.readlink(meta['path']))
-        obj.metadata.add('link_target', tgt, 'automated_ingest')
-
-    session.data_objects.modDataObjMeta(data_obj_info, {"dataModify":mtime, "filePath":path}, **options)
-
-    logger.info("succeeded", task="register_link", path = path)
-
-def update_link_metadata(hdlr_mod, logger, session, meta, **options):
-    target = meta["target"]
-    path = meta["path"]
-    target_path = get_target_path(hdlr_mod, session, meta, **options)
-    if target_path is None:
-        target_path = path
-
-    mtime = int(meta['mtime'])
-    logger.info("updating link: " + target + ", options = " + str(options))
-
-    data_obj_info = {"objPath": target}
-
-    resc_name = get_resource_name(hdlr_mod, session, meta, **options)
-    outdated_repl_nums = []
-    found = False
-
-    if resc_name is None:
-        found = True
-    else:
-        for row in session.query(Resource.name, DataObject.path, DataObject.replica_number).filter(DataObject.name == basename(target), Collection.name == dirname(target)):
-            if row[DataObject.path] == path:
-                if child_of(session, row[Resource.name], resc_name):
-                    found = True
-                    repl_num = row[DataObject.replica_number]
-                    data_obj_info["replNum"] = repl_num
-                    continue
-
-    if not found:
-        logger.error("updating object: wrong resource or path, target = " + target + ", path = " + path + ", target_path = " + target_path + ", options = " + str(options))
-        raise Exception("wrong resource or path")
-
-    session.data_objects.modDataObjMeta(data_obj_info, {"dataModify":mtime, "allReplStatus":1}, **options)
-
-    logger.info("succeeded", task="irods_update_link_metadata", path = path)
-
-
-def sync_data_from_link(meta, logger, content, **options):
-    target = meta["target"]
-    path = meta["path"]
-    hdlr_mod = get_hdlr_mod(meta)
-    init = meta["initial_ingest"]
-
-    session = irods_session(hdlr_mod, meta, logger, **options)
-
-    if init:
-        exists = False
-    else:
-        if session.data_objects.exists(target):
-            exists = True
-        elif session.collections.exists(target):
-            raise Exception("sync: cannot syncing link " + path + " to collection " + target)
-        else:
-            exists = False
-
-    if hasattr(hdlr_mod, "operation"):
-        op = hdlr_mod.operation(session, meta, **options)
-    else:
-        op = Operation.REGISTER_SYNC
-
-    if op == Operation.NO_OP:
-        if not exists:
-            call(hdlr_mod, "on_data_obj_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
-        else:
-            call(hdlr_mod, "on_data_obj_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
-    else:
-        if not exists:
-            meta2 = meta.copy()
-            meta2["target"] = dirname(target)
-            meta2["path"] = dirname(path)
-            create_dirs(hdlr_mod, logger, session, meta2, **options)
-
-            call(hdlr_mod, "on_data_obj_create", register_link, logger, hdlr_mod, logger, session, meta, **options)
-        else:
-            call(hdlr_mod, "on_data_obj_modify", update_link_metadata, logger, hdlr_mod, logger, session, meta, **options)
-
-    start_timer()
-
-
-def sync_metadata_from_link(meta, logger, **options):
-    sync_data_from_link(meta, logger, False, **options)
