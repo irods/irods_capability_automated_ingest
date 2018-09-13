@@ -7,7 +7,7 @@ except ImportError:
 
 import stat
 import os
-from os.path import isfile, join, getmtime, realpath, relpath, getctime, isdir
+from os.path import join, getmtime, realpath, relpath, getctime
 from datetime import datetime
 import redis_lock
 from . import sync_logging, sync_irods
@@ -228,7 +228,6 @@ def exclude_file_type(ex_list, dir_regex, file_regex, full_path, logger, mode=No
 
     return ret_val
 
-
 @app.task(bind=True, base=IrodsTask)
 def sync_path(self, meta):
 
@@ -241,7 +240,6 @@ def sync_path(self, meta):
     exclude_type_list = meta['exclude_file_type']
     exclude_file_name = meta['exclude_file_name']
     exclude_directory_name = meta['exclude_directory_name']
-
     s3_keypair = meta.get('s3_keypair')
 
     logger = sync_logging.get_sync_logger(logging_config)
@@ -257,6 +255,7 @@ def sync_path(self, meta):
         logger.info("walk dir", path=path)
         meta = meta.copy()
         meta["task"] = "sync_dir"
+        chunk = {}
 
         if s3_keypair:
             # instantiate s3 client
@@ -293,7 +292,6 @@ def sync_path(self, meta):
                 prefix = path_list[1]
             meta['root'] = bucket_name
             itr = client.list_objects_v2(bucket_name, prefix=prefix, recursive=True)
-            chunk = {}
 
         else:
             itr = scandir(path)
@@ -309,71 +307,86 @@ def sync_path(self, meta):
             if meta["profile"]:
                 profile_logger.info("list_dir_postrun", event_id=task_id + ":list_dir", event_name="list_dir", hostname=self.request.hostname, index=current_process().index)
 
-        for n in itr:
+        empty_dir = True
+        for obj in itr:
+            empty_dir = False
             meta = meta.copy()
+            obj_stats = {}
             if s3_keypair:
-                obj = n
-                meta["is_link"] = False
-                meta["is_socket"] = False
-
-                # add this object to the chunk
-                chunk[obj.object_name] = obj.size, obj.last_modified.timestamp()
-
-                # Launch async job when enough objects are ready to be sync'd
-                files_per_task = meta.get('files_per_task')
-                if len(chunk) >= files_per_task:
-                    meta['s3_chunk'] = chunk
-                    async(r, logger, sync_s3_chunk, meta, file_q_name)
-                    chunk.clear()
+                full_path = obj.object_name
+                obj_stats['is_link'] = False
+                obj_stats['is_socket'] = False
+                obj_stats['mtime'] = obj.last_modified.timestamp()
+                obj_stats['ctime'] = obj.last_modified.timestamp()
+                obj_stats['size'] = obj.size
 
             else:
-                full_path = os.path.abspath(n.path)
-                mode = n.stat(follow_symlinks=False).st_mode
+                full_path = os.path.abspath(obj.path)
+                mode = obj.stat(follow_symlinks=False).st_mode
 
                 if exclude_file_type(exclude_type_list, dir_regex, file_regex, full_path, logger, mode):
                     continue
 
-                if not n.is_symlink():
-                    readable = os.access(full_path, os.R_OK)
-                    if not readable:
-                        logger.error('physical path is not readable [{0}]'.format(full_path))
-                        continue
+                if not obj.is_symlink() and not bool(mode & stat.S_IRGRP):
+                    logger.error('physical path is not readable [{0}]'.format(full_path))
+                    continue
 
-                meta["path"] = full_path
-                meta["is_link"] = n.is_symlink()
-                meta["is_socket"] = stat.S_ISSOCK(mode)
-                meta["ctime"] = n.stat(follow_symlinks=False).st_ctime
-                meta["mtime"] = n.stat(follow_symlinks=False).st_mtime
-                meta["size"] = n.stat(follow_symlinks=False).st_size
-                if n.is_file() or not n.is_dir():
-                    async(r, logger, sync_file, meta, file_q_name)
-                else:
+                if obj.is_dir() and not obj.is_file():
+                    meta['path'] = full_path
                     async(r, logger, sync_path, meta, path_q_name)
+                    continue
 
-        if s3_keypair and len(chunk) > 0:
-            meta['s3_chunk'] = chunk
-            async(r, logger, sync_s3_chunk, meta, file_q_name)
+                obj_stats['is_link'] = obj.is_symlink()
+                obj_stats['is_socket'] = stat.S_ISSOCK(mode)
+                obj_stats['mtime'] = obj.stat(follow_symlinks=False).st_mtime
+                obj_stats['ctime'] = obj.stat(follow_symlinks=False).st_ctime
+                obj_stats['size'] = obj.stat(follow_symlinks=False).st_size
+
+            # add object stat dict to the chunk dict
+            chunk[full_path] = obj_stats
+
+            # Launch async job when enough objects are ready to be sync'd
+            files_per_task = meta.get('files_per_task')
+            if len(chunk) >= files_per_task:
+                meta['chunk'] = chunk
+                async(r, logger, sync_files, meta, file_q_name)
+                chunk.clear()
+
+        if len(chunk) > 0:
+            meta['chunk'] = chunk
+            async(r, logger, sync_files, meta, file_q_name)
+            chunk.clear()
+
+        if empty_dir:
+            logger.info('registering empty collection:[' + path + ']')
+            obj_stats = {}
+            obj_stats['is_empty_dir'] = True
+            obj_stats['is_link'] = False
+            obj_stats['is_socket'] = False
+            obj_stats['mtime'] = None
+            obj_stats['ctime'] = None
+            obj_stats['size'] = 0
+            chunk[path] = obj_stats
+            meta['chunk'] = chunk
+            async(r, logger, sync_files, meta, file_q_name)
+
     except Exception as err:
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
 
 
 @app.task(bind=True, base=IrodsTask)
-def sync_file(self, meta):
-    sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
-
-@app.task(bind=True, base=IrodsTask)
-def sync_s3_chunk(self, meta):
-    chunk = meta["s3_chunk"]
-    meta = meta.copy()
-    config = meta["config"]
-    logging_config = config["log"]
-    logger = sync_logging.get_sync_logger(logging_config)
-    for obj_name, obj_attrs in chunk.items():
-        meta["path"] = obj_name
-        meta["size"] = obj_attrs[0]
-        meta["ctime"] = obj_attrs[1]
-        meta["mtime"] = obj_attrs[1]
+def sync_files(self, _meta):
+    chunk = _meta["chunk"]
+    meta = _meta.copy()
+    for path, obj_stats in chunk.items():
+        meta['path'] = path
+        meta["is_empty_dir"] = obj_stats.get('is_empty_dir')
+        meta["is_link"] = obj_stats.get('is_link')
+        meta["is_socket"] = obj_stats.get('is_socket')
+        meta["mtime"] = obj_stats.get('mtime')
+        meta["ctime"] = obj_stats.get('ctime')
+        meta["size"] = obj_stats.get('size')
         sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
 
 def sync_entry(self, meta, cls, datafunc, metafunc):
@@ -452,10 +465,11 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
             meta2["target"] = target2
             if sync_time is None or mtime >= sync_time:
                 datafunc(meta2, logger, True)
+                logger.info("succeeded", task=task, path=path)
             else:
                 metafunc(meta2, logger)
+                logger.info("succeeded_metadata_only", task=task, path=path)
             set_with_key(r, sync_time_key, sync_key, str(t))
-            logger.info("succeeded_metadata_only", task=task, path=path)
     except Exception as err:
         retry_countdown = get_delay(logger, meta, self.request.retries + 1)
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)

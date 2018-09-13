@@ -368,15 +368,16 @@ def sync_data_from_file(meta, logger, content, **options):
 
         if not exists:
             meta2 = meta.copy()
-            meta2["target"] = dirname(target)
+            if not meta2.get('is_empty_dir'):
+                meta2["target"] = dirname(target)
             if 'b64_path_str' not in meta2:
                 meta2["path"] = dirname(path)
             create_dirs(hdlr_mod, logger, session, meta2, **options)
-
-            if put:
-                call(hdlr_mod, "on_data_obj_create", upload_file, logger, hdlr_mod, logger, session, meta, **options)
-            else:
-                call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, meta, **options)
+            if not meta2.get('is_empty_dir'):
+                if put:
+                    call(hdlr_mod, "on_data_obj_create", upload_file, logger, hdlr_mod, logger, session, meta, **options)
+                else:
+                    call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, meta, **options)
         elif createRepl:
             options["regRepl"] = ""
 
