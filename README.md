@@ -126,116 +126,116 @@ python -m irods_capability_automated_ingest.irods_sync start <source dir> <desti
 
 Usage:
 ```
-irods_sync.py start [-h] [-i INTERVAL] [--file_queue FILE QUEUE]
-                           [--path_queue PATH QUEUE]
-                           [--restart_queue RESTART QUEUE]
-                           [--event_handler EVENT HANDLER]
-                           [--job_name JOB NAME] [--append_json APPEND JSON]
+usage: irods_sync.py start [-h] [-i INTERVAL] [--file_queue FILE_QUEUE]
+                           [--path_queue PATH_QUEUE]
+                           [--restart_queue RESTART_QUEUE]
+                           [--event_handler EVENT_HANDLER]
+                           [--job_name JOB_NAME] [--append_json APPEND_JSON]
                            [--ignore_cache] [--initial_ingest] [--synchronous]
-                           [--progress] [--profile] [--list_dir]
-                           [--scan_dir_list]
+                           [--progress] [--profile]
+                           [--files_per_task FILES_PER_TASK]
+                           [--s3_endpoint_domain S3_ENDPOINT_DOMAIN]
+                           [--s3_region_name S3_REGION_NAME]
+                           [--s3_keypair S3_KEYPAIR]
+                           [--s3_proxy_url S3_PROXY_URL]
                            [--exclude_file_type EXCLUDE_FILE_TYPE]
                            [--exclude_file_name EXCLUDE_FILE_NAME [EXCLUDE_FILE_NAME ...]]
                            [--exclude_directory_name EXCLUDE_DIRECTORY_NAME [EXCLUDE_DIRECTORY_NAME ...]]
-                           [--irods_idle_disconnect_seconds DISCONNECT IN SECONDS]
-                           [--redis_host REDIS HOST]
-                           [--redis_port REDIS PORT]
-                           [--redis_db REDIS DB]
-                           [--log_filename LOG FILE]
-                           [--log_when LOG WHEN]
-                           [--log_interval LOG INTERVAL]
-                           [--log_level LOG LEVEL]
-                           [--profile_filename PROFILE FILE]
-                           [--profile_when PROFILE WHEN]
-                           [--profile_interval PROFILE INTERVAL]
-                           [--profile_level PROFILE LEVEL]
-                           ROOT TARGET
+                           [--irods_idle_disconnect_seconds IRODS_IDLE_DISCONNECT_SECONDS]
+                           [--log_filename LOG_FILENAME] [--log_when LOG_WHEN]
+                           [--log_interval LOG_INTERVAL]
+                           [--log_level LOG_LEVEL]
+                           [--profile_filename PROFILE_FILENAME]
+                           [--profile_when PROFILE_WHEN]
+                           [--profile_interval PROFILE_INTERVAL]
+                           [--profile_level PROFILE_LEVEL]
+                           [--redis_host REDIS_HOST] [--redis_port REDIS_PORT]
+                           [--redis_db REDIS_DB]
+                           SOURCE_DIRECTORY TARGET_COLLECTION
 
 positional arguments:
-  ROOT                  root directory
-  TARGET                target collection
+  SOURCE_DIRECTORY      Source directory or S3 folder to scan.
+  TARGET_COLLECTION     Target iRODS collection for data objects (created if
+                        non-existent).
 
 optional arguments:
   -h, --help            show this help message and exit
   -i INTERVAL, --interval INTERVAL
-                        restart interval (in seconds)
-  --file_queue FILE QUEUE
-                        file queue
-  --path_queue PATH QUEUE
-                        path queue
-  --restart_queue RESTART QUEUE
-                        restart queue
-  --event_handler EVENT HANDLER
-                        event handler
-  --job_name JOB NAME   job name
-  --append_json APPEND JSON
-                        append json
-  --ignore_cache        ignore cache
-  --initial_ingest      initial ingest
-  --synchronous         synchronous
-  --progress            progress
-  --profile             profile
-  --list_dir            list dir
-  --scan_dir_list       scan dir list
+                        Restart interval (in seconds). If absent, will only
+                        sync once. (default: None)
+  --file_queue FILE_QUEUE
+                        Name for the file queue. (default: file)
+  --path_queue PATH_QUEUE
+                        Name for the path queue. (default: path)
+  --restart_queue RESTART_QUEUE
+                        Name for the restart queue. (default: restart)
+  --event_handler EVENT_HANDLER
+                        Path to event handler file (default: None)
+  --job_name JOB_NAME   Reference name for ingest job (default:
+                        284fad64-bb44-11e8-acde-d89d67f48aea)
+  --append_json APPEND_JSON
+                        Append json output (default: None)
+  --ignore_cache        Ignore last sync time in cache - like starting a new
+                        sync (default: False)
+  --initial_ingest      Use this flag on initial ingest to avoid check for
+                        data object paths already in iRODS. (default: False)
+  --synchronous         Block until sync job is completed. (default: False)
+  --progress            Show progress bar and task counts (must have
+                        --synchronous flag). (default: False)
+  --profile             Generate JSON file of system activity profile during
+                        ingest. (default: False)
+  --files_per_task FILES_PER_TASK
+                        Number of paths to process in a given task on the
+                        queue. (default: 50)
+  --s3_endpoint_domain S3_ENDPOINT_DOMAIN
+                        S3 endpoint domain (default: s3.amazonaws.com)
+  --s3_region_name S3_REGION_NAME
+                        S3 region name (default: us-east-1)
+  --s3_keypair S3_KEYPAIR
+                        Path to S3 keypair file (default: None)
+  --s3_proxy_url S3_PROXY_URL
+                        URL to proxy for S3 access (default: None)
   --exclude_file_type EXCLUDE_FILE_TYPE
                         types of files to exclude: regular, directory,
-                        character, block, socket, pipe, link
+                        character, block, socket, pipe, link (default: none)
   --exclude_file_name EXCLUDE_FILE_NAME [EXCLUDE_FILE_NAME ...]
                         a list of space-separated python regular expressions
                         defining the file names to exclude such as
-                        "(\S+)exclude" "(\S+)\.hidden"
+                        "(\S+)exclude" "(\S+)\.hidden" (default: none)
   --exclude_directory_name EXCLUDE_DIRECTORY_NAME [EXCLUDE_DIRECTORY_NAME ...]
                         a list of space-separated python regular expressions
                         defining the directory names to exclude such as
-                        "(\S+)exclude" "(\S+)\.hidden"
-  --irods_idle_disconnect_seconds DISCONNECT IN SECONDS
-                        irods disconnect time in seconds
-  --redis_host REDIS HOST
-                        redis host
-  --redis_port REDIS PORT
-                        redis port
-  --redis_db REDIS DB   redis db
-  --log_filename LOG FILE
-                        log filename
-  --log_when LOG WHEN   log when
-  --log_interval LOG INTERVAL
-                        log interval
-  --log_level LOG LEVEL
-                        log level
-  --profile_filename PROFILE FILE
-                        profile filename
-  --profile_when PROFILE WHEN
-                        profile when
-  --profile_interval PROFILE INTERVAL
-                        profile interval
-  --profile_level PROFILE LEVEL
-                        profile level
+                        "(\S+)exclude" "(\S+)\.hidden" (default: none)
+  --irods_idle_disconnect_seconds IRODS_IDLE_DISCONNECT_SECONDS
+                        irods disconnect time in seconds (default: None)
+  --log_filename LOG_FILENAME
+                        Specify name of log file. (default: None)
+  --log_when LOG_WHEN   Specify the type of log_interval (see
+                        TimedRotatingFileHandler). (default: None)
+  --log_interval LOG_INTERVAL
+                        Specify the interval with which to rollover the ingest
+                        log file. (default: None)
+  --log_level LOG_LEVEL
+                        Specify minimum level of message to log (DEBUG, INFO,
+                        WARNING, ERROR). (default: None)
+  --profile_filename PROFILE_FILENAME
+                        Specify name of profile filename. (default: None)
+  --profile_when PROFILE_WHEN
+                        Specify the type of profile_interval (see
+                        TimedRotatingFileHandler). (default: None)
+  --profile_interval PROFILE_INTERVAL
+                        Specify the interval with which to rollover the ingest
+                        profile log file. (default: None)
+  --profile_level PROFILE_LEVEL
+                        Specify minimum level of message to log for profiling
+                        (DEBUG, INFO, WARNING, ERROR). (default: None)
+  --redis_host REDIS_HOST
+                        Domain or IP address of Redis host. (default:
+                        localhost)
+  --redis_port REDIS_PORT
+                        Port number for Redis. (default: 6379)
+  --redis_db REDIS_DB   Redis DB number to use for ingest. (default: 0)
 ```
-
-If `-i` is not present, then only sync once.
-
-The `--append_json` is stored in `job.meta["append_json"]`.
-
-The `--ignore_cache` ignores cached last sync time.
-
-The `--synchronous` will block until job is done.
-
-The `--progress` will show progress bar when `--synchronous` is enabled.
-
-The `--list_dir` will use cause the tasks to `listdir` instead of `scandir`.
-
-The `--log_filename` specify profile file name.
-
-The `--log_level` specify the profile level, currently should specify `INFO`
-
-The `--profile` will use enable profiling.
-
-The `--profile_filename` specify profile file name.
-
-The `--profile_level` specify the profile level, currently should specify `INFO`
-
-The `--redis_host`, `--redis_port`, and `--redis_db` specify information about your Redis server (default values used if unspecified).
-
 
 #### List jobs
 ```
