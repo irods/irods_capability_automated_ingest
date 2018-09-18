@@ -54,7 +54,7 @@ def handle_start(args):
     data["target"] = args.target
     data["root"] = args.root
     data["interval"] = args.interval
-    data["job_name"] = args.job_name
+    data["job_name"] = args.job_name if args.job_name else str(uuid1())
     data["append_json"] = args.append_json
     data["ignore_cache"] = args.ignore_cache
     data["initial_ingest"] = args.initial_ingest
@@ -91,8 +91,6 @@ def handle_list(args):
 
 
 def main():
-    uuid = str(uuid1())
-
     parser = argparse.ArgumentParser(description='continuous synchronization utility')
     subparsers = parser.add_subparsers(help="subcommand help")
 
@@ -104,7 +102,7 @@ def main():
     parser_start.add_argument('--path_queue', action="store", type=str, default="path", help='Name for the path queue.')
     parser_start.add_argument('--restart_queue', action="store", type=str, default="restart", help='Name for the restart queue.')
     parser_start.add_argument('--event_handler', action="store", type=str, default=None, help='Path to event handler file')
-    parser_start.add_argument('--job_name', action="store", type=str, default=uuid, help='Reference name for ingest job')
+    parser_start.add_argument('--job_name', action="store", type=str, default=None, help='Reference name for ingest job (defaults to generated uuid)')
     parser_start.add_argument('--append_json', action="store", type=json.loads, default=None, help='Append json output')
     parser_start.add_argument("--ignore_cache", action="store_true", default=False, help='Ignore last sync time in cache - like starting a new sync')
     parser_start.add_argument("--initial_ingest", action="store_true", default=False, help='Use this flag on initial ingest to avoid check for data object paths already in iRODS.')
@@ -119,7 +117,7 @@ def main():
     parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none', help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
     parser_start.add_argument('--exclude_file_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the file names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
     parser_start.add_argument('--exclude_directory_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the directory names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
-    parser_start.add_argument('--irods_idle_disconnect_seconds', action="store", type=int, default=None, help='irods disconnect time in seconds')
+    parser_start.add_argument('--irods_idle_disconnect_seconds', action="store", type=int, default=60, help='irods disconnect time in seconds')
     add_arguments(parser_start)
 
     parser_start.set_defaults(func=handle_start)

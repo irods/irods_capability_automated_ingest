@@ -12,7 +12,63 @@ The example diagrams below show a filesystem scanner and a landing zone.
 
 ## Usage options
 
-### available `--event_handler` methods
+### Redis options
+| option | effect | default |
+| ----   |  ----- |  ----- |
+| redis_host | Domain or IP address of Redis host | localhost |
+| redis_port | Port number for Redis | 6379 |
+| redis_db | Redis DB number to use for ingest | 0 |
+
+### S3 options
+To scan S3 bucket, minimally requires `--s3_keypair` and source path of the form `/bucket_name/path/to/root/folder`.
+| option | effect | default |
+| ----   |  ----- |  ----- |
+| s3_keypair | path to S3 keypair file | None |
+| s3_endpoint_domain | S3 endpoint domain | s3.amazonaws.com |
+| s3_region_name | S3 region name | us-east-1 |
+| s3_proxy_url | URL to proxy for S3 access | None |
+
+### Logging/Profiling options
+| option | effect | default |
+| ----   |  ----- |  ----- |
+| log_filename | Path to output file for logs | None |
+| log_level | Minimum level of message to log | None |
+| log_interval | Time interval with which to rollover ingest log file | None |
+| log_when | Type/units of log_interval (see TimedRotatingFileHandler) | None |
+
+`--profile` allows you to use vis to visualize a profile of Celery workers over time of ingest job.
+| option | effect | default |
+| ----   |  ----- |  ----- |
+| profile_filename | Specify name of profile filename (JSON output) | None |
+| profile_level | Minimum level of message to log for profiling | None |
+| profile_interval | Time interval with which to rollover ingest profile file | None |
+| profile_when | Type/units of profile_interval (see TimedRotatingFileHandler) | None |
+
+### Ingest start options
+These options are used at the "start" of an ingest job.
+| option | effect | default |
+| ----   |  ----- |  ----- |
+| job_name | Reference name for ingest job | a generated uuid |
+| interval | Restart interval (in seconds). If absent, will only sync once. | None |
+| file_queue | Name for the file queue. | file |
+| path_queue | Name for the path queue. | path |
+| restart_queue | Name for the restart queue. | restart |
+| event_handler | Path to event handler file | None (see "event_handler methods" below) |
+| synchronous | Block until sync job is completed | False |
+| progress | Show progress bar and task counts (must have --synchronous flag) | False |
+| ignore_cache | Ignore last sync time in cache - like starting a new sync | False |
+
+### Optimization options
+| option | effect | default |
+| ----   |  ----- |  ----- |
+| exclude_file_type | types of files to exclude: regular, directory, character, block, socket, pipe, link | None |
+| exclude_file_name | a list of space-separated python regular expressions defining the file names to exclude such as "(\S+)exclude" "(\S+)\.hidden" | None |
+| exclude_directory_name | a list of space-separated python regular expressions defining the directory names to exclude such as "(\S+)exclude" "(\S+)\.hidden" | None |
+| files_per_task | Number of paths to process in a given task on the queue | 50 |
+| initial_ingest | Use this flag on initial ingest to avoid check for data object paths already in iRODS | False |
+| irods_idle_disconnect_seconds | Seconds to hold open iRODS connection while idle | 60 |
+
+## available `--event_handler` methods
 
 | method |  effect  | default |
 | ----   |   ----- |  ----- |
@@ -28,9 +84,9 @@ The example diagrams below show a filesystem scanner and a landing zone.
 | target_path | set mount path on the irods server which can be different from client mount path | client mount path |
 | to_resource | defines  target resource request of operation |  as provided by client environment |
 | operation | defines the mode of operation |  `Operation.REGISTER_SYNC` |
-| max_retries | defines max retries | 0
-| timeout | defines timeout | 3600
-| delay | | 
+| max_retries | defines max number of retries on failure | 0 |
+| timeout | defines seconds until job times out | 3600 |
+| delay | defines seconds between retries | 0 |
 
 Event handlers can use `logger` to write logs. See `structlog` for available logging methods and signatures.
 
@@ -111,6 +167,7 @@ Start celery worker(s):
 ```
 celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart,path,file -c <num workers> 
 ```
+**Note:** Make sure queue names match those of the ingest job (default queue names shown here).
 
 #### Run tests
 **Note:** The test suite requires Python version >=3.5.
@@ -122,119 +179,6 @@ python -m irods_capability_automated_ingest.test.test_irods_sync
 #### Start sync job
 ```
 python -m irods_capability_automated_ingest.irods_sync start <source dir> <destination collection>
-```
-
-Usage:
-```
-usage: irods_sync.py start [-h] [-i INTERVAL] [--file_queue FILE_QUEUE]
-                           [--path_queue PATH_QUEUE]
-                           [--restart_queue RESTART_QUEUE]
-                           [--event_handler EVENT_HANDLER]
-                           [--job_name JOB_NAME] [--append_json APPEND_JSON]
-                           [--ignore_cache] [--initial_ingest] [--synchronous]
-                           [--progress] [--profile]
-                           [--files_per_task FILES_PER_TASK]
-                           [--s3_endpoint_domain S3_ENDPOINT_DOMAIN]
-                           [--s3_region_name S3_REGION_NAME]
-                           [--s3_keypair S3_KEYPAIR]
-                           [--s3_proxy_url S3_PROXY_URL]
-                           [--exclude_file_type EXCLUDE_FILE_TYPE]
-                           [--exclude_file_name EXCLUDE_FILE_NAME [EXCLUDE_FILE_NAME ...]]
-                           [--exclude_directory_name EXCLUDE_DIRECTORY_NAME [EXCLUDE_DIRECTORY_NAME ...]]
-                           [--irods_idle_disconnect_seconds IRODS_IDLE_DISCONNECT_SECONDS]
-                           [--log_filename LOG_FILENAME] [--log_when LOG_WHEN]
-                           [--log_interval LOG_INTERVAL]
-                           [--log_level LOG_LEVEL]
-                           [--profile_filename PROFILE_FILENAME]
-                           [--profile_when PROFILE_WHEN]
-                           [--profile_interval PROFILE_INTERVAL]
-                           [--profile_level PROFILE_LEVEL]
-                           [--redis_host REDIS_HOST] [--redis_port REDIS_PORT]
-                           [--redis_db REDIS_DB]
-                           SOURCE_DIRECTORY TARGET_COLLECTION
-
-positional arguments:
-  SOURCE_DIRECTORY      Source directory or S3 folder to scan.
-  TARGET_COLLECTION     Target iRODS collection for data objects (created if
-                        non-existent).
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i INTERVAL, --interval INTERVAL
-                        Restart interval (in seconds). If absent, will only
-                        sync once. (default: None)
-  --file_queue FILE_QUEUE
-                        Name for the file queue. (default: file)
-  --path_queue PATH_QUEUE
-                        Name for the path queue. (default: path)
-  --restart_queue RESTART_QUEUE
-                        Name for the restart queue. (default: restart)
-  --event_handler EVENT_HANDLER
-                        Path to event handler file (default: None)
-  --job_name JOB_NAME   Reference name for ingest job (default:
-                        284fad64-bb44-11e8-acde-d89d67f48aea)
-  --append_json APPEND_JSON
-                        Append json output (default: None)
-  --ignore_cache        Ignore last sync time in cache - like starting a new
-                        sync (default: False)
-  --initial_ingest      Use this flag on initial ingest to avoid check for
-                        data object paths already in iRODS. (default: False)
-  --synchronous         Block until sync job is completed. (default: False)
-  --progress            Show progress bar and task counts (must have
-                        --synchronous flag). (default: False)
-  --profile             Generate JSON file of system activity profile during
-                        ingest. (default: False)
-  --files_per_task FILES_PER_TASK
-                        Number of paths to process in a given task on the
-                        queue. (default: 50)
-  --s3_endpoint_domain S3_ENDPOINT_DOMAIN
-                        S3 endpoint domain (default: s3.amazonaws.com)
-  --s3_region_name S3_REGION_NAME
-                        S3 region name (default: us-east-1)
-  --s3_keypair S3_KEYPAIR
-                        Path to S3 keypair file (default: None)
-  --s3_proxy_url S3_PROXY_URL
-                        URL to proxy for S3 access (default: None)
-  --exclude_file_type EXCLUDE_FILE_TYPE
-                        types of files to exclude: regular, directory,
-                        character, block, socket, pipe, link (default: none)
-  --exclude_file_name EXCLUDE_FILE_NAME [EXCLUDE_FILE_NAME ...]
-                        a list of space-separated python regular expressions
-                        defining the file names to exclude such as
-                        "(\S+)exclude" "(\S+)\.hidden" (default: none)
-  --exclude_directory_name EXCLUDE_DIRECTORY_NAME [EXCLUDE_DIRECTORY_NAME ...]
-                        a list of space-separated python regular expressions
-                        defining the directory names to exclude such as
-                        "(\S+)exclude" "(\S+)\.hidden" (default: none)
-  --irods_idle_disconnect_seconds IRODS_IDLE_DISCONNECT_SECONDS
-                        irods disconnect time in seconds (default: None)
-  --log_filename LOG_FILENAME
-                        Specify name of log file. (default: None)
-  --log_when LOG_WHEN   Specify the type of log_interval (see
-                        TimedRotatingFileHandler). (default: None)
-  --log_interval LOG_INTERVAL
-                        Specify the interval with which to rollover the ingest
-                        log file. (default: None)
-  --log_level LOG_LEVEL
-                        Specify minimum level of message to log (DEBUG, INFO,
-                        WARNING, ERROR). (default: None)
-  --profile_filename PROFILE_FILENAME
-                        Specify name of profile filename. (default: None)
-  --profile_when PROFILE_WHEN
-                        Specify the type of profile_interval (see
-                        TimedRotatingFileHandler). (default: None)
-  --profile_interval PROFILE_INTERVAL
-                        Specify the interval with which to rollover the ingest
-                        profile log file. (default: None)
-  --profile_level PROFILE_LEVEL
-                        Specify minimum level of message to log for profiling
-                        (DEBUG, INFO, WARNING, ERROR). (default: None)
-  --redis_host REDIS_HOST
-                        Domain or IP address of Redis host. (default:
-                        localhost)
-  --redis_port REDIS_PORT
-                        Port number for Redis. (default: 6379)
-  --redis_db REDIS_DB   Redis DB number to use for ingest. (default: 0)
 ```
 
 #### List jobs

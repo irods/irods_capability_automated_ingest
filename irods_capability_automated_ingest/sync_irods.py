@@ -302,9 +302,7 @@ def irods_session(hdlr_mod, meta, logger, **options):
         timer = irods_session_timer_map[key]
         timer.cancel()
         irods_session_timer_map.pop(key, None)
-    idle_sec = 60
-    if None != meta['idle_disconnect_seconds']:
-        idle_sec = meta['idle_disconnect_seconds']
+    idle_sec = meta['idle_disconnect_seconds']
     logger.info("iRODS Idle Time set to: "+str(idle_sec))
 
     timer = disconnect_timer(logger, idle_sec, irods_session_map)
