@@ -368,16 +368,14 @@ def sync_data_from_file(meta, logger, content, **options):
 
         if not exists:
             meta2 = meta.copy()
-            if not meta2.get('is_empty_dir'):
-                meta2["target"] = dirname(target)
+            meta2["target"] = dirname(target)
             if 'b64_path_str' not in meta2:
                 meta2["path"] = dirname(path)
             create_dirs(hdlr_mod, logger, session, meta2, **options)
-            if not meta2.get('is_empty_dir'):
-                if put:
-                    call(hdlr_mod, "on_data_obj_create", upload_file, logger, hdlr_mod, logger, session, meta, **options)
-                else:
-                    call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, meta, **options)
+            if put:
+                call(hdlr_mod, "on_data_obj_create", upload_file, logger, hdlr_mod, logger, session, meta, **options)
+            else:
+                call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, meta, **options)
         elif createRepl:
             options["regRepl"] = ""
 
@@ -396,3 +394,32 @@ def sync_data_from_file(meta, logger, content, **options):
 def sync_metadata_from_file(meta, logger, **options):
     sync_data_from_file(meta, logger, False, **options)
 
+def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
+    pass
+
+def sync_data_from_dir(meta, logger, content, **options):
+    target = meta["target"]
+    path = meta["path"]
+    hdlr_mod = get_hdlr_mod(meta)
+    session = irods_session(hdlr_mod, meta, logger, **options)
+    exists = session.collections.exists(target)
+
+    if hasattr(hdlr_mod, "operation"):
+        op = hdlr_mod.operation(session, meta, **options)
+    else:
+        op = Operation.REGISTER_SYNC
+
+    if op == Operation.NO_OP:
+        if not exists:
+            call(hdlr_mod, "on_coll_create", no_op, logger, hdlr_mod, logger, session, meta, **options)
+        else:
+            call(hdlr_mod, "on_coll_modify", no_op, logger, hdlr_mod, logger, session, meta, **options)
+    else:
+        if not exists:
+            create_dirs(hdlr_mod, logger, session, meta, **options)
+        else:
+            call(hdlr_mod, "on_coll_modify", sync_dir_meta, logger, hdlr_mod, logger, session, meta, **options)
+    start_timer()
+
+def sync_metadata_from_dir(meta, logger, **options):
+    sync_data_from_dir(meta, logger, False, **options)
