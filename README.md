@@ -21,6 +21,7 @@ The example diagrams below show a filesystem scanner and a landing zone.
 
 ### S3 options
 To scan S3 bucket, minimally requires `--s3_keypair` and source path of the form `/bucket_name/path/to/root/folder`.
+
 | option | effect | default |
 | ----   |  ----- |  ----- |
 | s3_keypair | path to S3 keypair file | None |
@@ -37,6 +38,7 @@ To scan S3 bucket, minimally requires `--s3_keypair` and source path of the form
 | log_when | Type/units of log_interval (see TimedRotatingFileHandler) | None |
 
 `--profile` allows you to use vis to visualize a profile of Celery workers over time of ingest job.
+
 | option | effect | default |
 | ----   |  ----- |  ----- |
 | profile_filename | Specify name of profile filename (JSON output) | None |
@@ -46,6 +48,7 @@ To scan S3 bucket, minimally requires `--s3_keypair` and source path of the form
 
 ### Ingest start options
 These options are used at the "start" of an ingest job.
+
 | option | effect | default |
 | ----   |  ----- |  ----- |
 | job_name | Reference name for ingest job | a generated uuid |
