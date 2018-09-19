@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v0.3.0] - 2018-09-19
+
+This release adds support for scanning S3 in addition to
+locally mounted filesystems.  To improve performance, a
+default Celery worker will now work on 50 files, rather than 1.
+
+- [#49] Add support for scanning S3
+- [#51] Fix policy points for syncing directories
+- [#52] Remove list_dir option
+
 ## [v0.2.2] - 2018-09-10
 
 - [#50] fixed invocation used for collection events
@@ -28,7 +38,8 @@
 - Includes logging
 - Nascent support for Docker, Kubernetes, and Helm
 
-[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.0...HEAD
+[v0.3.0]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.2...v0.3.0
 [v0.2.2]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.1...v0.2.2
 [v0.2.1]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.0...v0.2.1
 [v0.2.0]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.1.0...v0.2.0
