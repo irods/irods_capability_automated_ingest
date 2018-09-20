@@ -255,10 +255,10 @@ def sync_path(self, meta):
         logger.info("walk dir", path=path)
         meta = meta.copy()
         meta["task"] = "sync_dir"
-        async(r, logger, sync_dir, meta, file_q_name)
         chunk = {}
 
         if s3_keypair:
+            # TODO: #64 - Need to somehow trigger sync_dir for folders without stat'ing for PEPs
             # instantiate s3 client
             proxy_url = meta.get('s3_proxy_url')
             if proxy_url is None:
@@ -292,9 +292,11 @@ def sync_path(self, meta):
             else:
                 prefix = path_list[1]
             meta['root'] = bucket_name
+            meta['s3_prefix'] = prefix
             itr = client.list_objects_v2(bucket_name, prefix=prefix, recursive=True)
 
         else:
+            async(r, logger, sync_dir, meta, file_q_name)
             itr = scandir(path)
 
         if meta["profile"]:
@@ -311,6 +313,8 @@ def sync_path(self, meta):
         for obj in itr:
             obj_stats = {}
             if s3_keypair:
+                if obj.object_name.endswith('/'):
+                    continue
                 full_path = obj.object_name
                 obj_stats['is_link'] = False
                 obj_stats['is_socket'] = False
@@ -451,8 +455,12 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
                     target2 = target
             else:
                 if meta.get('s3_keypair') is not None:
-                    # S3 path should be represented as /bucket/objectname
-                    target2 = join(target, path)
+                    # Strip prefix from S3 path
+                    prefix = meta['s3_prefix']
+                    reg_path = path.lstrip(prefix).strip('/')
+                    # Construct S3 "logical path"
+                    target2 = join(target, reg_path)
+                    # Construct S3 "physical path" as: /bucket/objectname
                     meta2['path'] = '/' + join(root, path)
                 else:
                     target2 = join(target, relpath(path, start=root))
