@@ -333,7 +333,7 @@ def sync_path(self, meta):
                     logger.error('physical path is not readable [{0}]'.format(full_path))
                     continue
 
-                if obj.is_dir() and not obj.is_file():
+                if obj.is_dir() and not obj.is_symlink() and not obj.is_file():
                     sync_dir_meta = meta.copy()
                     sync_dir_meta['path'] = full_path
                     sync_dir_meta['mtime'] = obj.stat(follow_symlinks=False).st_mtime
