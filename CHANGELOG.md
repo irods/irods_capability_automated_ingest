@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v0.3.2] - 2018-09-25
+
+- [#69] Don't follow symlinks to dirs
+
 ## [v0.3.1] - 2018-09-20
 
 - [#49] Fix S3 syncing dir and registering folder
@@ -42,7 +46,8 @@ default Celery worker will now work on 50 files, rather than 1.
 - Includes logging
 - Nascent support for Docker, Kubernetes, and Helm
 
-[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.2...HEAD
+[v0.3.2]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.2...v0.3.0
 [v0.2.2]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.1...v0.2.2
