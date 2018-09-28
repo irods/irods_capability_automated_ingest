@@ -230,7 +230,6 @@ def exclude_file_type(ex_list, dir_regex, file_regex, full_path, logger, mode=No
 
 @app.task(bind=True, base=IrodsTask)
 def sync_path(self, meta):
-
     task = meta["task"]
     path = meta["path"]
     path_q_name = meta["path_queue"]
@@ -296,7 +295,7 @@ def sync_path(self, meta):
             itr = client.list_objects_v2(bucket_name, prefix=prefix, recursive=True)
 
         else:
-            async(r, logger, sync_dir, meta, file_q_name)
+            sync_dir(meta)
             itr = scandir(path)
 
         if meta["profile"]:
@@ -369,10 +368,6 @@ def sync_path(self, meta):
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
 
 @app.task(bind=True, base=IrodsTask)
-def sync_dir(self, meta):
-    sync_entry(self, meta, "dir", sync_irods.sync_data_from_dir, sync_irods.sync_metadata_from_dir)
-
-@app.task(bind=True, base=IrodsTask)
 def sync_files(self, _meta):
     chunk = _meta["chunk"]
     meta = _meta.copy()
@@ -385,9 +380,23 @@ def sync_files(self, _meta):
         meta["ctime"] = obj_stats.get('ctime')
         meta["size"] = obj_stats.get('size')
         meta['task'] = 'sync_file'
-        sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
+        sync_entry_with_retry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
 
-def sync_entry(self, meta, cls, datafunc, metafunc):
+def sync_dir(meta):
+    sync_entry(meta, "dir", sync_irods.sync_data_from_dir, sync_irods.sync_metadata_from_dir)
+
+def sync_entry_with_retry(self, meta, cls, datafunc, metafunc):
+    config = meta["config"]
+    logging_config = config["log"]
+    logger = sync_logging.get_sync_logger(logging_config)
+    max_retries = get_max_retries(logger, meta)
+    try:
+        sync_entry(meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
+    except Exception as err:
+        retry_countdown = get_delay(logger, meta, self.request.retries + 1)
+        raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
+
+def sync_entry(meta, cls, datafunc, metafunc):
     hdlr = meta["event_handler"]
     task = meta["task"]
     path = meta["path"]
@@ -398,12 +407,8 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
     ignore_cache = meta["ignore_cache"]
     logger = sync_logging.get_sync_logger(logging_config)
 
-    max_retries = get_max_retries(logger, meta)
-
-    lock = None
     logger.info("synchronizing " + cls + ". path = " + path)
 
-    r = get_redis(config)
     try:
         # Attempt to encode full physical path on local filesystem
         # Special handling required for non-encodable strings which raise UnicodeEncodeError
@@ -426,9 +431,9 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
         meta['unicode_error_filename'] = unicode_error_filename
 
         sync_key = file_unique_id + ":" + target
-    try:
-        lock = redis_lock.Lock(r, "sync_" + cls + ":"+sync_key)
-        lock.acquire()
+
+    r = get_redis(config)
+    with redis_lock.Lock(r, "sync_" + cls + ":"+sync_key):
         t = datetime.now().timestamp()
         if not ignore_cache:
             sync_time = get_with_key(r, sync_time_key, sync_key, float)
@@ -472,12 +477,6 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
                 metafunc(meta2, logger)
                 logger.info("succeeded_metadata_only", task=task, path=path)
             set_with_key(r, sync_time_key, sync_key, str(t))
-    except Exception as err:
-        retry_countdown = get_delay(logger, meta, self.request.retries + 1)
-        raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
-    finally:
-        if lock is not None:
-            lock.release()
 
 
 @app.task(base=RestartTask)
