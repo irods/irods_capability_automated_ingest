@@ -8,6 +8,7 @@ import redis_lock
 import json
 import irods.keywords as kw
 import base64, random
+import ssl
 import threading
 
 def child_of(session, child_resc_name, resc_name):
@@ -280,6 +281,8 @@ def irods_session(hdlr_mod, meta, logger, **options):
 
     key = json.dumps(kwargs) # todo add timestamp of env file to key
 
+    if 'irods_ssl_ca_certificate_file' in json.load(open(env_file)):
+        kwargs['ssl_context'] = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=None, capath=None, cadata=None)
 
     if not key in irods_session_map:
         # TODO: #42 - pull out 10 into configuration
