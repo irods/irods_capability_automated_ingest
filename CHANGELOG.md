@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v0.3.3] - 2018-10-27
+
+- [#75] Honor SSL parameters in irods_environment.json
+
 ## [v0.3.2] - 2018-09-25
 
 - [#69] Don't follow symlinks to dirs
@@ -46,7 +50,8 @@ default Celery worker will now work on 50 files, rather than 1.
 - Includes logging
 - Nascent support for Docker, Kubernetes, and Helm
 
-[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.3...HEAD
+[v0.3.3]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.2...v0.3.3
 [v0.3.2]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.2.2...v0.3.0
