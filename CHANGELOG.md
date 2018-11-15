@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v0.3.4] - 2018-11-15
+
+- [#76] Pin redis version to 2.10.6
+
 ## [v0.3.3] - 2018-10-27
 
 - [#75] Honor SSL parameters in irods_environment.json
@@ -50,7 +54,8 @@ default Celery worker will now work on 50 files, rather than 1.
 - Includes logging
 - Nascent support for Docker, Kubernetes, and Helm
 
-[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.4...HEAD
+[v0.3.4]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.3...v0.3.4
 [v0.3.3]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.2...v0.3.3
 [v0.3.2]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.0...v0.3.1
