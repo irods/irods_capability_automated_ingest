@@ -36,7 +36,7 @@ setup(
         'flask-restful',
         'python-irodsclient>=0.8.0',
         'python-redis-lock>=3.2.0',
-        'redis>=2.10.6',
+        'redis==2.10.6',
         'celery[redis]',
         'scandir',
         'structlog>=18.1.0',
