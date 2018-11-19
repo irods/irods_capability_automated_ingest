@@ -3,6 +3,7 @@ import os
 import os.path
 import stat
 import glob
+import base64
 from unittest import TestCase
 from redis import StrictRedis
 from subprocess import Popen
@@ -12,7 +13,7 @@ from shutil import rmtree
 from os.path import join, realpath, getmtime, getsize, dirname, basename, relpath, isfile
 from irods.session import iRODSSession
 from irods.models import Collection, DataObject
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, mkdtemp
 from datetime import datetime
 from ..sync_utils import size, get_with_key, app, failures_key, retries_key
 from ..sync_task import done
@@ -32,6 +33,9 @@ A_COLL = "/tempZone/home/rods/" + A_REMOTE
 NFILES = 10
 NWORKERS = 10
 TIMEOUT = 60
+
+DEFAULT_RESC = "demoResc"
+DEFAULT_RESC_VAULT_PATH = "/var/lib/irods/Vault"
 
 REGISTER_RESC = "regiResc"
 REGISTER_RESC_PATH = "/var/lib/irods/Vault2"
@@ -174,7 +178,7 @@ def read_file(path):
         return f.read()
 
 
-def read_data_object(session, path, resc_name = "demoResc"):
+def read_data_object(session, path, resc_name = DEFAULT_RESC):
     with NamedTemporaryFile() as tf:
         session.data_objects.get(path, file=tf.name, forceFlag="", rescName = resc_name)
         return read_file(tf.name)
@@ -261,12 +265,12 @@ class Test_irods_sync(TestCase):
         proc.wait()
         self.do_register2()
 
-    def do_register(self, eh, resc_name = ["demoResc"]):
+    def do_register(self, eh, resc_name = [DEFAULT_RESC]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         self.do_register2(resc_names=resc_name)
 
-    def do_register2(self, resc_names=["demoResc"]):
+    def do_register2(self, resc_names=[DEFAULT_RESC]):
         workers = start_workers(1)
         wait_for(workers)
 
@@ -295,7 +299,7 @@ class Test_irods_sync(TestCase):
                 self.assertEqual(s1, s2)
                 self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
-    def do_register_dir_par(self, eh, resc_names=["demoResc"]):
+    def do_register_dir_par(self, eh, resc_names=[DEFAULT_RESC]):
         create_files2(10, NFILES)
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
@@ -324,7 +328,7 @@ class Test_irods_sync(TestCase):
                     self.assertEqual(s1, s2)
                     self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
-    def do_register_par(self, eh, resc_names=["demoResc"]):
+    def do_register_par(self, eh, resc_names=[DEFAULT_RESC]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         workers = start_workers(NWORKERS)
@@ -332,7 +336,7 @@ class Test_irods_sync(TestCase):
 
         self.do_assert_register(resc_names)
 
-    def do_retry(self, eh, resc_name = ["demoResc"]):
+    def do_retry(self, eh, resc_name = [DEFAULT_RESC]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         workers = start_workers(1)
@@ -343,7 +347,7 @@ class Test_irods_sync(TestCase):
         self.do_assert_failed_queue("no failures", count=None)
         self.do_assert_retry_queue()
 
-    def do_no_retry(self, eh, resc_name = ["demoResc"]):
+    def do_no_retry(self, eh, resc_name = [DEFAULT_RESC]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         workers = start_workers(1)
@@ -351,7 +355,7 @@ class Test_irods_sync(TestCase):
 
         self.do_assert_failed_queue("no failures")
 
-    def do_put(self, eh, resc_names = ["demoResc"], resc_roots = ["/var/lib/irods/Vault"]):
+    def do_put(self, eh, resc_names = [DEFAULT_RESC], resc_roots = [DEFAULT_RESC_VAULT_PATH]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
 
@@ -360,7 +364,7 @@ class Test_irods_sync(TestCase):
 
         self.do_assert_put(resc_names, resc_roots)
 
-    def do_put_par(self, eh, resc_names=["demoResc"], resc_roots=["/var/lib/irods/Vault"]):
+    def do_put_par(self, eh, resc_names=[DEFAULT_RESC], resc_roots=[DEFAULT_RESC_VAULT_PATH]):
         proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", A, A_COLL, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
 
@@ -397,7 +401,7 @@ class Test_irods_sync(TestCase):
         workers = start_workers(1)
         wait_for(workers)
 
-    def do_register_as_replica(self, eh, resc_names = ["demoResc"]):
+    def do_register_as_replica(self, eh, resc_names = [DEFAULT_RESC]):
         self.do_register_as_replica_no_assertions(eh)
         with iRODSSession(irods_env_file=env_file) as session:
             self.assertTrue(session.collections.exists(A_COLL))
@@ -422,7 +426,7 @@ class Test_irods_sync(TestCase):
                 # self.assertEqual(obj.replicas[0].status, "0")
                 # self.assertEqual(obj.replicas[1].status, "1")
 
-    def do_update(self, eh, resc_name = ["demoResc"]):
+    def do_update(self, eh, resc_name = [DEFAULT_RESC]):
         recreate_files(NFILES)
         self.do_register(eh, resc_name = resc_name)
         with iRODSSession(irods_env_file=env_file) as session:
@@ -436,7 +440,7 @@ class Test_irods_sync(TestCase):
                 self.assertEqual(s1, s2)
                 self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
-    def do_update_metadata(self, eh, resc_name = ["demoResc"]):
+    def do_update_metadata(self, eh, resc_name = [DEFAULT_RESC]):
         ctime_files(NFILES)
         self.do_register(eh, resc_name = resc_name)
         with iRODSSession(irods_env_file=env_file) as session:
@@ -880,6 +884,110 @@ class Test_irods_sync(TestCase):
     def test_post_job(self):
         self.do_post_job("irods_capability_automated_ingest.examples.post_job")
 
+class Test_irods_sync_UnicodeEncodeError(TestCase):
+    def setUp(self):
+        clear_redis()
+        with iRODSSession(irods_env_file=env_file) as session:
+            create_resources(session, HIERARCHY1)
+
+        # Create a file in a known location with an out-of-range Unicode character in the name
+        bad_filename = 'test_register_with_unicode_encode_error_path_' + chr(65535)
+        self.source_dir_path = mkdtemp()
+        self.dest_coll_path = join('/tempZone/home/rods', os.path.basename(self.source_dir_path))
+        self.bad_filepath = join(self.source_dir_path, bad_filename).encode('utf8')
+        with open(self.bad_filepath, 'a'):
+            os.utime(self.bad_filepath, None)
+
+        utf8_escaped_abspath = self.bad_filepath.decode('utf8').encode('utf8', 'surrogateescape')
+        self.b64_path_str = base64.b64encode(utf8_escaped_abspath)
+        self.unicode_error_filename = 'irods_UnicodeEncodeError_' + str(self.b64_path_str.decode('utf8'))
+        self.expected_logical_path = join(self.dest_coll_path, self.unicode_error_filename)
+
+    def tearDown(self):
+        clear_redis()
+        delete_collection_if_exists(self.dest_coll_path)
+        rmtree(self.source_dir_path, ignore_errors=True)
+        with iRODSSession(irods_env_file=env_file) as session:
+            delete_resources(session, HIERARCHY1)
+
+    # Helper member functions
+    def assert_logical_path(self, session):
+        self.assertTrue(session.collections.exists(self.dest_coll_path))
+        self.assertTrue(session.data_objects.exists(self.expected_logical_path))
+
+    def assert_physical_path_and_resource(self, session, expected_physical_path, expected_resource=DEFAULT_RESC):
+        obj = session.data_objects.get(self.expected_logical_path)
+        self.assertEqual(obj.replicas[0].path, expected_physical_path)
+        self.assertEqual(obj.replicas[0].resource_name, expected_resource)
+
+    def assert_data_object_contents(self, session):
+        original_file_contents = read_file(self.bad_filepath)
+        replica_file_contents = read_data_object(session, self.expected_logical_path)
+        self.assertEqual(original_file_contents, replica_file_contents)
+
+    def assert_metadata_annotation(self, session):
+        obj = session.data_objects.get(self.expected_logical_path)
+        metadata_value = obj.metadata.get_one('irods::automated_ingest::UnicodeEncodeError')
+        self.assertEqual(str(metadata_value.value), str(self.b64_path_str.decode('utf8')))
+
+    def assert_data_object_size(self, session):
+        s1 = getsize(self.bad_filepath)
+        s2 = size(session, self.expected_logical_path)
+        self.assertEqual(s1, s2)
+
+    def assert_data_object_mtime(self, session):
+        mtime1 = int(getmtime(self.bad_filepath))
+        mtime2 = modify_time(session, self.expected_logical_path)
+        self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
+
+    def do_assert_failed_queue(self, error_message=None, count=NFILES):
+        r = StrictRedis()
+        self.assertEqual(get_with_key(r, failures_key, "test_irods_sync", int), count)
+
+    def do_assert_retry_queue(self, error_message=None, count=NFILES):
+        r = StrictRedis()
+        self.assertEqual(get_with_key(r, retries_key, "test_irods_sync", int), count)
+
+    def run_scan_with_event_handler(self, event_handler):
+        proc = Popen(["python", "-m", IRODS_SYNC_PY, "start", self.source_dir_path, self.dest_coll_path, "--event_handler", event_handler, "--job_name", "test_irods_sync", "--log_level", "INFO", '--files_per_task', '1'])
+        proc.wait()
+        workers = start_workers(1)
+        wait_for(workers)
+
+    # Tests
+    def test_register(self):
+        expected_physical_path = join(self.source_dir_path, self.unicode_error_filename)
+
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.register")
+
+        with iRODSSession(irods_env_file=env_file) as session:
+            self.assert_logical_path(session)
+            self.assert_physical_path_and_resource(session, expected_physical_path)
+            self.assert_metadata_annotation(session)
+            self.assert_data_object_size(session)
+            self.assert_data_object_mtime(session)
+ 
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
+
+    def test_put(self):
+        expected_physical_path = join(DEFAULT_RESC_VAULT_PATH, 'home', 'rods', os.path.basename(self.source_dir_path), self.unicode_error_filename)
+
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.put")
+
+        with iRODSSession(irods_env_file=env_file) as session:
+            self.assert_logical_path(session)
+            self.assert_physical_path_and_resource(session, expected_physical_path)
+            self.assert_data_object_contents(session)
+            self.assert_metadata_annotation(session)
+            self.assert_data_object_size(session)
+
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
+
+    # TODO: #63 - Add register_as_replica_sync test
+    # TODO: #63 - Add put_sync test
+    # TODO: #63 - Add put_append test
 
 if __name__ == '__main__':
         unittest.main()
