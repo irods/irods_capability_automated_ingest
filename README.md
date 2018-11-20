@@ -132,7 +132,12 @@ sudo service redis-server start
 sudo systemctl start redis
 ```
 
-**Note:** If running on different computers, make sure Redis server accepts connections by editing the `bind` line in /etc/redis/redis.conf or /etc/redis.conf.
+The [Redis documentation](https://redis.io/topics/admin) also recommends an additional step:
+> Make sure to set the Linux kernel overcommit memory setting to 1. Add vm.overcommit_memory = 1 to /etc/sysctl.conf and then reboot or run the command sysctl vm.overcommit_memory=1 for this to take effect immediately.
+
+This allows the Linux kernel to overcommit virtual memory even if this exceeds the physical memory on the host machine. See [kernel.org documentation](https://www.kernel.org/doc/Documentation/vm/overcommit-accounting) for more information.
+
+**Note:** If running in a distributed environment, make sure Redis server accepts connections by editing the `bind` line in /etc/redis/redis.conf or /etc/redis.conf.
 
 #### Setting up virtual environment
 You may need to upgrade pip:
