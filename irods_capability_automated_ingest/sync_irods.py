@@ -72,6 +72,21 @@ def get_resource_name(hdlr_mod, session, meta, **options):
         return None
 
 
+def annotate_metadata_for_special_data_objs(meta, session, source_physical_fullpath, dest_dataobj_logical_fullpath):
+    b64_path_str = meta.get('b64_path_str')
+    if b64_path_str is not None:
+        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
+        obj.metadata.add("irods::automated_ingest::UnicodeEncodeError", b64_path_str, 'python3.base64.b64encode(full_path_of_source_file)')
+
+    if meta['is_socket']:
+        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
+        obj.metadata.add('socket_target', 'socket', 'automated_ingest')
+    elif meta['is_link']:
+        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
+        link_target = os.path.join(os.path.dirname(source_physical_fullpath), os.readlink(source_physical_fullpath))
+        obj.metadata.add('link_target', link_target, 'automated_ingest')
+
+
 def register_file(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
@@ -100,29 +115,27 @@ def register_file(hdlr_mod, logger, session, meta, **options):
 
     logger.info("succeeded", task="irods_register_file", path = source_physical_fullpath)
 
-    if b64_path_str is not None:
-        obj = session.data_objects.get(meta['target'])
-        obj.metadata.add("irods::automated_ingest::UnicodeEncodeError", meta['b64_path_str'], 'python3.base64.b64encode(full_path_of_source_file)')
-
-    if meta['is_socket']:
-        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
-        obj.metadata.add('socket_target', 'socket', 'automated_ingest')
-    elif meta['is_link']:
-        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
-        link_target = os.path.join(os.path.dirname(source_physical_fullpath), os.readlink(source_physical_fullpath))
-        obj.metadata.add('link_target', link_target, 'automated_ingest')
+    annotate_metadata_for_special_data_objs(meta, session, source_physical_fullpath, dest_dataobj_logical_fullpath)
 
 def upload_file(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
+    b64_path_str = meta.get('b64_path_str')
+
     resc_name = get_resource_name(hdlr_mod, session, meta, **options)
 
     if resc_name is not None:
         options["destRescName"] = resc_name
 
+    if b64_path_str is not None:
+        source_physical_fullpath = base64.b64decode(b64_path_str)
+
     logger.info("uploading object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
     session.data_objects.put(source_physical_fullpath, dest_dataobj_logical_fullpath, **options)
+
     logger.info("succeeded", task="irods_upload_file", path = source_physical_fullpath)
+
+    annotate_metadata_for_special_data_objs(meta, session, source_physical_fullpath, dest_dataobj_logical_fullpath)
 
 
 def no_op(hdlr_mod, logger, session, meta, **options):
@@ -130,24 +143,28 @@ def no_op(hdlr_mod, logger, session, meta, **options):
 
 
 def sync_file(hdlr_mod, logger, session, meta, **options):
-    target = meta["target"]
-    path = meta["path"]
-    logger.info("syncing object " + target + ", options = " + str(options))
+    dest_dataobj_logical_fullpath = meta["target"]
+    source_physical_fullpath = meta["path"]
+    b64_path_str = meta.get('b64_path_str')
 
     resc_name = get_resource_name(hdlr_mod, session, meta, **options)
 
     if resc_name is not None:
         options["destRescName"] = resc_name
 
+    if b64_path_str is not None:
+        source_physical_fullpath = base64.b64decode(b64_path_str)
+
+    logger.info("syncing object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
     op = hdlr_mod.operation(session, meta, **options)
 
     if op == Operation.PUT_APPEND:
         BUFFER_SIZE = 1024
-        logger.info("appending object " + target + ", options = " + str(options))
-        tsize = size(session, target)
-        tfd = session.data_objects.open(target, "a", **options)
+        logger.info("appending object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
+        tsize = size(session, dest_dataobj_logical_fullpath)
+        tfd = session.data_objects.open(dest_dataobj_logical_fullpath, "a", **options)
         tfd.seek(tsize)
-        with open(path, "rb") as sfd:
+        with open(source_physical_fullpath, "rb") as sfd:
             sfd.seek(tsize)
             while True:
                 buf = sfd.read(BUFFER_SIZE)
@@ -155,12 +172,12 @@ def sync_file(hdlr_mod, logger, session, meta, **options):
                     break
                 tfd.write(buf)
         tfd.close()
-        logger.info("succeeded", task="irods_append_file", path=path)
+        logger.info("succeeded", task="irods_append_file", path=source_physical_fullpath)
 
     else:
-        logger.info("uploading object " + target + ", options = " + str(options))
-        session.data_objects.put(path, target, **options)
-        logger.info("succeeded", task="irods_update_file", path = path)
+        logger.info("uploading object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
+        session.data_objects.put(source_physical_fullpath, dest_dataobj_logical_fullpath, **options)
+        logger.info("succeeded", task="irods_update_file", path = source_physical_fullpath)
 
 
 def update_metadata(hdlr_mod, logger, session, meta, **options):
@@ -365,7 +382,6 @@ def sync_data_from_file(meta, logger, content, **options):
                 createRepl = True
 
         put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
-        sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]
 
         if not exists:
             meta2 = meta.copy()
@@ -383,6 +399,7 @@ def sync_data_from_file(meta, logger, content, **options):
             call(hdlr_mod, "on_data_obj_create", register_file, logger, hdlr_mod, logger, session, meta, **options)
         elif content:
             if put:
+                sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]
                 if sync:
                     call(hdlr_mod, "on_data_obj_modify", sync_file, logger, hdlr_mod, logger, session, meta, **options)
             else:

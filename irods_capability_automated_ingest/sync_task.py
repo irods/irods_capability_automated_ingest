@@ -387,8 +387,16 @@ def sync_files(self, _meta):
         meta['task'] = 'sync_file'
         sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
 
+def is_unicode_encode_error_path(path):
+    # Attempt to encode full physical path on local filesystem
+    # Special handling required for non-encodable strings which raise UnicodeEncodeError
+    try:
+        _ = path.encode('utf8')
+    except UnicodeEncodeError:
+        return True
+    return False
+
 def sync_entry(self, meta, cls, datafunc, metafunc):
-    hdlr = meta["event_handler"]
     task = meta["task"]
     path = meta["path"]
     root = meta["root"]
@@ -403,33 +411,29 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
     lock = None
     logger.info("synchronizing " + cls + ". path = " + path)
 
-    r = get_redis(config)
-    try:
-        # Attempt to encode full physical path on local filesystem
-        # Special handling required for non-encodable strings which raise UnicodeEncodeError
-        utf8_encode_test = path.encode('utf8')
-        sync_key = path + ":" + target
-    except UnicodeEncodeError:
+    if is_unicode_encode_error_path(path):
         abspath = os.path.abspath(path)
-        hostname = socket.getfqdn()
         path = os.path.dirname(abspath)
-        utf8_abspath = abspath.encode('utf8', 'surrogateescape')
-        b64_path_str = base64.b64encode(utf8_abspath)
+        utf8_escaped_abspath = abspath.encode('utf8', 'surrogateescape')
+        b64_path_str = base64.b64encode(utf8_escaped_abspath)
 
-        file_unique_id = str(utf8_abspath)
-        unicode_error_filename = 'irods_UnicodeEncodeError_' + str(base64.b64encode(file_unique_id.encode('utf8')).decode('utf8'))
+        unicode_error_filename = 'irods_UnicodeEncodeError_' + str(b64_path_str.decode('utf8'))
 
-        logger.warning('sync_entry raised UnicodeEncodeError while syncing path:' + str(utf8_abspath))
+        logger.warning('sync_entry raised UnicodeEncodeError while syncing path:' + str(utf8_escaped_abspath))
 
         meta['path'] = path
         meta['b64_path_str'] = b64_path_str
         meta['unicode_error_filename'] = unicode_error_filename
 
-        sync_key = file_unique_id + ":" + target
+        sync_key = str(b64_path_str.decode('utf8')) + ":" + target
+    else:
+        sync_key = path + ":" + target
+
     try:
+        r = get_redis(config)
         lock = redis_lock.Lock(r, "sync_" + cls + ":"+sync_key)
         lock.acquire()
-        t = datetime.now().timestamp()
+
         if not ignore_cache:
             sync_time = get_with_key(r, sync_time_key, sync_key, float)
         else:
@@ -446,6 +450,7 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
         if sync_time is not None and mtime < sync_time and ctime < sync_time:
             logger.info("succeeded_" + cls + "_has_not_changed", task=task, path=path)
         else:
+            t = datetime.now().timestamp()
             logger.info("synchronizing " + cls, path=path, t0=sync_time, t=t, ctime=ctime)
             meta2 = meta.copy()
             if path == root:
