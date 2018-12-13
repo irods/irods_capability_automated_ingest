@@ -252,6 +252,8 @@ class Test_irods_sync(TestCase):
         with iRODSSession(irods_env_file=env_file) as session:
             create_resources(session, HIERARCHY1)
 
+        self.logfile = NamedTemporaryFile()
+
     def tearDown(self):
         delete_files()
         clear_redis()
@@ -553,7 +555,6 @@ class Test_irods_sync(TestCase):
             self.assertTrue(expected_err_msg in str(e.stderr))
             return
         self.fail('target collection should fail to ingest')
-
 
     # no event handler
 
@@ -914,6 +915,84 @@ class Test_irods_sync(TestCase):
 
     def test_post_job(self):
         self.do_post_job("irods_capability_automated_ingest.examples.post_job")
+
+    # pep callbacks
+    def run_sync_job_with_pep_callbacks(self, source_dir=A, destination_coll=A_COLL):
+        eh = 'irods_capability_automated_ingest.examples.register_with_peps'
+        proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", source_dir, destination_coll, "--event_handler", eh, "--job_name", "test_irods_sync", "--log_level", "INFO", '--log_filename', self.logfile.name, '--files_per_task', '1'])
+        proc.wait()
+
+    def assert_pep_messages_in_log(self, log_contents, messages):
+        # Ensure that the list of pep messages appears in the log
+        for msg in messages:
+            count = log_contents.count(msg)
+            self.assertEqual(1, count, msg='found {0} occurrences of message:[{1}]'.format(count, msg))
+
+    def test_create_peps(self):
+        self.run_sync_job_with_pep_callbacks()
+        self.do_register2(DEFAULT_RESC)
+
+        with open(self.logfile.name, 'r') as f:
+            log_contents = f.read()
+
+        files = [os.path.join(A_COLL, str(x)) for x in range(NFILES)]
+        pep_messages = [['pre_data_obj_create:[' + filepath + ']' for filepath in files],
+                        ['post_data_obj_create:[' + filepath + ']' for filepath in files],
+                        ['pre_coll_create:[' + A_COLL + ']'],
+                        ['post_coll_create:[' + A_COLL + ']']]
+        for messages in pep_messages:
+            self.assert_pep_messages_in_log(log_contents, messages)
+
+    def test_modify_peps(self):
+        # register directory A
+        self.run_sync_job_with_pep_callbacks()
+        self.do_register2(DEFAULT_RESC)
+
+        # recreate files and register sync to trigger modify behavior
+        rmtree(A)
+        create_files(NFILES)
+        self.run_sync_job_with_pep_callbacks()
+        self.do_register2(DEFAULT_RESC)
+
+        # Read in log and verify that PEPs fired
+        with open(self.logfile.name, 'r') as f:
+            log_contents = f.read()
+        files = [os.path.join(A_COLL, str(x)) for x in range(NFILES)]
+        pep_messages = [['pre_data_obj_modify:[' + filepath + ']' for filepath in files],
+                        ['post_data_obj_modify:[' + filepath + ']' for filepath in files],
+                        ['pre_coll_modify:[' + A_COLL + ']'],
+                        ['post_coll_modify:[' + A_COLL + ']']]
+        for messages in pep_messages:
+            self.assert_pep_messages_in_log(log_contents, messages)
+
+    def test_empty_coll_create_peps(self):
+        empty_dir_tree = mkdtemp()
+        subdir_names = ['a', 'b', 'c']
+        for subdir in subdir_names:
+            os.mkdir(os.path.join(empty_dir_tree, subdir))
+
+        try:
+            self.run_sync_job_with_pep_callbacks(empty_dir_tree)
+            workers = start_workers(1)
+            wait_for(workers)
+            # Assert that the collections were created
+            with iRODSSession(irods_env_file=env_file) as session:
+                self.assertTrue(session.collections.exists(A_COLL))
+                for subdir in subdir_names:
+                    self.assertTrue(session.collections.exists(os.path.join(A_COLL, subdir)))
+
+            with open(self.logfile.name, 'r') as f:
+                log_contents = f.read()
+
+            collections = [os.path.join(A_COLL, subdir) for subdir in subdir_names]
+            pep_messages = [['pre_coll_create:[' + collection + ']' for collection in collections],
+                            ['post_coll_create:[' + collection + ']' for collection in collections]]
+
+            for messages in pep_messages:
+                self.assert_pep_messages_in_log(log_contents, messages)
+
+        finally:
+            rmtree(empty_dir_tree, ignore_errors=True)
 
 class Test_irods_sync_UnicodeEncodeError(TestCase):
     def setUp(self):
