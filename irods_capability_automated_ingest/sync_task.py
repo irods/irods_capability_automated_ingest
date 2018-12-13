@@ -559,6 +559,8 @@ def start_synchronization(data):
     data_copy["root"] = root_abs
     data_copy["path"] = root_abs
 
+    sync_irods.validate_target_collection(data_copy, logger)
+
     def store_event_handler(data):
         event_handler = data.get("event_handler")
         event_handler_data = data.get("event_handler_data")
