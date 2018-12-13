@@ -11,6 +11,24 @@ import base64, random
 import ssl
 import threading
 
+def validate_target_collection(meta, logger):
+    # root cannot be the target collection
+    destination_collection_logical_path = meta["target"]
+    if destination_collection_logical_path == "/":
+        raise Exception("Root may only contain collections which represent zones")
+
+    # root collection must exist
+    hdlr_mod = get_hdlr_mod(meta)
+    session = irods_session(hdlr_mod, meta, logger)
+    if not session.collections.exists('/'):
+        raise Exception("Root collection does not exist")
+
+    # zone names reside in root in an iRODS logical path and should already exist
+    zone_name = destination_collection_logical_path.strip('/').split('/')[0]
+    logger.info('checking existence of collection for zone:[' + zone_name + ']')
+    if not session.collections.exists('/' + zone_name):
+        raise Exception("Invalid zone name in destination collection path")
+
 def child_of(session, child_resc_name, resc_name):
     if child_resc_name == resc_name:
         return True
@@ -39,8 +57,6 @@ def create_dirs(hdlr_mod, logger, session, meta, **options):
         if not session.collections.exists(target):
             with redis_lock.Lock(r, "create_dirs:" + path):
                 if not session.collections.exists(target):
-                    if target == "/":
-                        raise Exception("create_dirs: Cannot create root")
                     meta2 = meta.copy()
                     meta2["target"] = dirname(target)
                     meta2["path"] = dirname(path)

@@ -110,6 +110,8 @@ Event handlers can use `logger` to write logs. See `structlog` for available log
 
 ### Basic: manual redis, Celery, pip
 
+Running the sync job and Celery workers requires a valid iRODS environment file for an authenticated iRODS user on each node.
+
 #### Starting Redis Server
 Install redis-server:
 ```
