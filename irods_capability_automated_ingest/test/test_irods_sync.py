@@ -1005,8 +1005,7 @@ class Test_irods_sync_UnicodeEncodeError(TestCase):
         self.source_dir_path = mkdtemp()
         self.dest_coll_path = join('/tempZone/home/rods', os.path.basename(self.source_dir_path))
         self.bad_filepath = join(self.source_dir_path, bad_filename).encode('utf8')
-        with open(self.bad_filepath, 'a'):
-            os.utime(self.bad_filepath, None)
+        self.create_bad_file()
 
         utf8_escaped_abspath = self.bad_filepath.decode('utf8').encode('utf8', 'surrogateescape')
         self.b64_path_str = base64.b64encode(utf8_escaped_abspath)
@@ -1058,6 +1057,12 @@ class Test_irods_sync_UnicodeEncodeError(TestCase):
         r = StrictRedis()
         self.assertEqual(get_with_key(r, retries_key, "test_irods_sync", int), count)
 
+    def create_bad_file(self):
+        if os.path.exists(self.bad_filepath):
+            os.unlink(self.bad_filepath)
+        with open(self.bad_filepath, 'a') as f:
+            f.write('Test_irods_sync_UnicodeEncodeError')
+
     def run_scan_with_event_handler(self, event_handler):
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", self.source_dir_path, self.dest_coll_path, "--event_handler", event_handler, "--job_name", "test_irods_sync", "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
@@ -1069,6 +1074,9 @@ class Test_irods_sync_UnicodeEncodeError(TestCase):
         expected_physical_path = join(self.source_dir_path, self.unicode_error_filename)
 
         self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.register")
+ 
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
         with iRODSSession(irods_env_file=env_file) as session:
             self.assert_logical_path(session)
@@ -1076,14 +1084,46 @@ class Test_irods_sync_UnicodeEncodeError(TestCase):
             self.assert_metadata_annotation(session)
             self.assert_data_object_size(session)
             self.assert_data_object_mtime(session)
- 
+
+    @unittest.skipIf(IRODS_MAJOR < 4 or (IRODS_MAJOR == 4 and IRODS_MINOR < 3), "skip")
+    def test_register_as_replica(self):
+        expected_physical_path = join(self.source_dir_path, self.unicode_error_filename)
+
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.put")
+
+        clear_redis()
+
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.replica_with_resc_name")
+
         self.do_assert_failed_queue(count=None)
         self.do_assert_retry_queue(count=None)
+
+        with iRODSSession(irods_env_file=env_file) as session:
+            #import irods.keywords as kw
+            #obj = session.data_objects.get(self.expected_logical_path)
+            #options = {kw.REPL_NUM_KW: str(0), kw.COPIES_KW: str(1)}
+            #obj.unlink(**options)
+
+            obj = session.data_objects.get(self.expected_logical_path)
+            self.assert_logical_path(session)
+            #self.assert_physical_path_and_resource(session, expected_physical_path)
+            self.assertEqual(obj.replicas[1].path, expected_physical_path)
+            self.assertEqual(obj.replicas[1].resource_name, REGISTER_RESC2A)
+            #self.assert_metadata_annotation(session)
+            metadata_value = obj.metadata.get_one('irods::automated_ingest::UnicodeEncodeError')
+            self.assertEqual(str(metadata_value.value), str(self.b64_path_str.decode('utf8')))
+            #self.assert_data_object_size(session)
+            s1 = size(session, self.expected_logical_path, replica_num=0)
+            s2 = size(session, self.expected_logical_path, replica_num=1)
+            self.assertEqual(s1, s2)
 
     def test_put(self):
         expected_physical_path = join(DEFAULT_RESC_VAULT_PATH, 'home', 'rods', os.path.basename(self.source_dir_path), self.unicode_error_filename)
 
         self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.put")
+
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
 
         with iRODSSession(irods_env_file=env_file) as session:
             self.assert_logical_path(session)
@@ -1092,12 +1132,43 @@ class Test_irods_sync_UnicodeEncodeError(TestCase):
             self.assert_metadata_annotation(session)
             self.assert_data_object_size(session)
 
+    def test_put_sync(self):
+        expected_physical_path = join(DEFAULT_RESC_VAULT_PATH, 'home', 'rods', os.path.basename(self.source_dir_path), self.unicode_error_filename)
+
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.sync")
+
+        self.create_bad_file()
+
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.sync")
         self.do_assert_failed_queue(count=None)
         self.do_assert_retry_queue(count=None)
 
-    # TODO: #63 - Add register_as_replica_sync test
-    # TODO: #63 - Add put_sync test
-    # TODO: #63 - Add put_append test
+        with iRODSSession(irods_env_file=env_file) as session:
+            self.assert_logical_path(session)
+            self.assert_physical_path_and_resource(session, expected_physical_path)
+            self.assert_data_object_contents(session)
+            self.assert_metadata_annotation(session)
+            self.assert_data_object_size(session)
+
+    def test_put_append(self):
+        expected_physical_path = join(DEFAULT_RESC_VAULT_PATH, 'home', 'rods', os.path.basename(self.source_dir_path), self.unicode_error_filename)
+
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.append")
+
+        with open(self.bad_filepath, 'a') as f:
+            f.write('test_put_append')
+
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.append")
+        self.do_assert_failed_queue(count=None)
+        self.do_assert_retry_queue(count=None)
+
+        with iRODSSession(irods_env_file=env_file) as session:
+            self.assert_logical_path(session)
+            self.assert_physical_path_and_resource(session, expected_physical_path)
+            self.assert_data_object_contents(session)
+            self.assert_metadata_annotation(session)
+            self.assert_data_object_size(session)
+
 
 if __name__ == '__main__':
         unittest.main()
