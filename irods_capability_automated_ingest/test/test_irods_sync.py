@@ -24,11 +24,14 @@ LOG_FILE = "/tmp/a"
 IRODS_MAJOR = 4
 IRODS_MINOR = 2
 
+ZONENAME = "tempZone"
+RODSADMIN = "rods"
+
 IRODS_SYNC_PY = "irods_capability_automated_ingest.irods_sync"
 
 A = "a"
 A_REMOTE = "a_remote"
-A_COLL = "/tempZone/home/rods/" + A_REMOTE
+A_COLL = "/" + ZONENAME + "/home/" + RODSADMIN + "/" + A_REMOTE
 
 NFILES = 10
 NWORKERS = 10
@@ -382,7 +385,7 @@ class Test_irods_sync(TestCase):
             for i in listdir(A):
                 path = join(A, i)
                 rpath = A_COLL + "/" + i
-                vaultpaths = map(lambda resc_root : resc_root + "/home/rods/" + A_REMOTE + "/" + i, resc_roots)
+                vaultpaths = map(lambda resc_root : resc_root + "/home/" + RODSADMIN + "/" + A_REMOTE + "/" + i, resc_roots)
                 self.assertTrue(session.data_objects.exists(rpath))
                 a1 = read_file(path)
 
