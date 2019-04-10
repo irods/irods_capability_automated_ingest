@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [v0.3.5] - 2019-04-10
+
+This release adds support for non utf-8 filenames
+and tests for code coverage.
+
+- [#88] Limit Celery version
+- [#63] make easier to test against a non-default zone
+- [#63] Add more UnicodeEncodeError tests
+- [#51] Add tests for event handler PEPs
+- [#31] Handle invalid zone name in target coll
+- [#31] Add test for invalid zone name
+- [#76] Add max redis version and requirements.txt
+- [#40] Handle UnicodeEncodeError filenames for PUT
+- [#40] Add tests for non-encodeable filename
+- [#78] Add documentation around VM overcommitting
+
 ## [v0.3.4] - 2018-11-15
 
 - [#76] Pin redis version to 2.10.6
@@ -54,7 +70,8 @@ default Celery worker will now work on 50 files, rather than 1.
 - Includes logging
 - Nascent support for Docker, Kubernetes, and Helm
 
-[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.5...HEAD
+[v0.3.5]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.4...v0.3.5
 [v0.3.4]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.3...v0.3.4
 [v0.3.3]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.2...v0.3.3
 [v0.3.2]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.1...v0.3.2
