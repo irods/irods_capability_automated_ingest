@@ -462,7 +462,7 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
                 if meta.get('s3_keypair') is not None:
                     # Strip prefix from S3 path
                     prefix = meta['s3_prefix']
-                    reg_path = path.lstrip(prefix).strip('/')
+                    reg_path = path[path.index(prefix) + len(prefix):].strip('/')
                     # Construct S3 "logical path"
                     target2 = join(target, reg_path)
                     # Construct S3 "physical path" as: /bucket/objectname
