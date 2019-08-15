@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [v0.3.6] - 2019-08-14
+
+This release fixes a path registration bug when scanning
+S3 and updates a dependency.
+
+- Bump urllib3 from 1.24.1 to 1.24.2 
+- [#95] Replaced lstrip with index and offset
+
 ## [v0.3.5] - 2019-04-10
 
 This release adds support for non utf-8 filenames
@@ -70,7 +78,8 @@ default Celery worker will now work on 50 files, rather than 1.
 - Includes logging
 - Nascent support for Docker, Kubernetes, and Helm
 
-[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.6...HEAD
+[v0.3.6]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.5...v0.3.6
 [v0.3.5]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.4...v0.3.5
 [v0.3.4]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.3...v0.3.4
 [v0.3.3]: https://github.com/irods/irods_capability_automated_ingest/compare/v0.3.2...v0.3.3
