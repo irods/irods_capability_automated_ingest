@@ -285,7 +285,7 @@ def sync_path(self, meta):
                          http_client=httpClient)
 
             # Split provided path into bucket and source folder "prefix"
-            path_list = path.strip('/').split('/', 1)
+            path_list = path.lstrip('/').split('/', 1)
             bucket_name = path_list[0]
             if len(path_list) == 1:
                 prefix = ''
