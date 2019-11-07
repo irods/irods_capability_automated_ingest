@@ -154,10 +154,12 @@ def interrupt(r, job_name, cli=True, terminate=True):
     if cli:
         tasks = progressbar.progressbar(tasks, max_value=len(tasks))
 
+    # stop active tasks for this job
     for task in tasks:
         app.control.revoke(task, terminate=terminate)
 
-    # TODO stop restart job
+    # stop restart job
+    app.control.revoke(job_name)
 
     reset_with_key(r, stop_key, job_name)
 
