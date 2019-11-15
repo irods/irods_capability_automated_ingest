@@ -207,45 +207,8 @@ python -m irods_capability_automated_ingest.irods_sync watch <job name>
 ```
 
 ### Intermediate: dockerize, manually config (needs to be updated for Celery)
+See [docker/README.md](docker/README.md)
 
-`/tmp/event_handler.py`
-
-```
-from irods_capability_automated_ingest.core import Core
-from irods_capability_automated_ingest.utils import Operation
-
-class event_handler(Core):
-
-    @staticmethod
-    def target_path(session, meta, **options):
-        return "/tmp/host" + path
-
-```
-
-`icommands.env`
-```
-IRODS_PORT=1247
-IRODS_HOST=172.17.0.1
-IRODS_USER_NAME=rods
-IRODS_ZONE_NAME=tempZone
-IRODS_PASSWORD=rods
-```
-
-```
-docker run --rm --name some-redis -d redis:4.0.8
-```
-
-```
-docker run --rm --link some-redis:redis irods_rq-scheduler:0.1.0 worker -u redis://redis:6379/0 restart path file
-```
-
-```
-docker run --rm --link some-redis:redis -v /tmp/host/event_handler.py:/event_handler.py irods_capability_automated_ingest:0.1.0 start /data /tempZone/home/rods/data --redis_host=redis --event_handler=event_handler
-```
-
-```
-docker run --rm --link some-redis:redis --env-file icommands.env -v /tmp/host/data:/data -v /tmp/host/event_handler.py:/event_handler.py irods_rq:0.1.0 worker -u redis://redis:6379/0 restart path file
-```
 ### Advanced: kubernetes (needs to be updated for Celery)
 
 This does not assume that your iRODS installation is in kubernetes.
