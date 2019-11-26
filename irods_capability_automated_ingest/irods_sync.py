@@ -4,7 +4,6 @@ from uuid import uuid1
 import json
 import sys
 
-
 def get_config(args):
     return {
         "log": {
@@ -26,8 +25,24 @@ def get_config(args):
         }
     }
 
+def get_celery_broker_info():
+    from os import environ
+    env_url = environ['CELERY_BROKER_URL']
+    if env_url is None:
+        host = "localhost"
+        port = 6379
+        db = 0
+    else:
+        url = env_url.split('://')[1].split(':')
+        host = url[0]
+        port = url[1].split('/')[0]
+        db = url[1].split('/')[1]
+
+    return host, port, db
 
 def add_arguments(parser):
+    host, port, db = get_celery_broker_info()
+
     parser.add_argument('--log_filename', action="store", type=str, default=None, help="Specify name of log file.")
     parser.add_argument('--log_when', action="store", type=str, default=None, help="Specify the type of log_interval (see TimedRotatingFileHandler).")
     parser.add_argument('--log_interval', action="store", type=int, default=None, help="Specify the interval with which to rollover the ingest log file.")
@@ -36,9 +51,9 @@ def add_arguments(parser):
     parser.add_argument('--profile_when', action="store", type=str, default=None, help="Specify the type of profile_interval (see TimedRotatingFileHandler).")
     parser.add_argument('--profile_interval', action="store", type=int, default=None, help="Specify the interval with which to rollover the ingest profile log file.")
     parser.add_argument('--profile_level', action="store", type=str, default=None, help="Specify minimum level of message to log for profiling (DEBUG, INFO, WARNING, ERROR).")
-    parser.add_argument('--redis_host', action="store", type=str, default="localhost", help="Domain or IP address of Redis host.")
-    parser.add_argument('--redis_port', action="store", type=int, default=6379, help="Port number for Redis.")
-    parser.add_argument('--redis_db', action="store", type=int, default=0, help="Redis DB number to use for ingest.")
+    parser.add_argument('--redis_host', action="store", type=str, default=host, help="Domain or IP address of Redis host.")
+    parser.add_argument('--redis_port', action="store", type=int, default=port, help="Port number for Redis.")
+    parser.add_argument('--redis_db', action="store", type=int, default=db, help="Redis DB number to use for ingest.")
 
 
 def handle_start(args):
