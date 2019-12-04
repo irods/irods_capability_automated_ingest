@@ -2,6 +2,7 @@ import os
 from os.path import dirname, basename
 from irods.session import iRODSSession
 from irods.models import Resource, DataObject, Collection
+from irods.exception import NetworkException
 from .sync_utils import size, get_redis, call, get_hdlr_mod
 from .utils import Operation
 import redis_lock
@@ -16,18 +17,6 @@ def validate_target_collection(meta, logger):
     destination_collection_logical_path = meta["target"]
     if destination_collection_logical_path == "/":
         raise Exception("Root may only contain collections which represent zones")
-
-    # root collection must exist
-    hdlr_mod = get_hdlr_mod(meta)
-    session = irods_session(hdlr_mod, meta, logger)
-    if not session.collections.exists('/'):
-        raise Exception("Root collection does not exist")
-
-    # zone names reside in root in an iRODS logical path and should already exist
-    zone_name = destination_collection_logical_path.strip('/').split('/')[0]
-    logger.info('checking existence of collection for zone:[' + zone_name + ']')
-    if not session.collections.exists('/' + zone_name):
-        raise Exception("Invalid zone name in destination collection path")
 
 def child_of(session, child_resc_name, resc_name):
     if child_resc_name == resc_name:
