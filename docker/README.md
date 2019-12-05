@@ -10,7 +10,7 @@ $ docker build -t ingest .
 
 Build the Celery worker image (uses ingest image as a base so as to be identical):
 ```
-$ docker build -t ingest-workers -f Dockerfile.ingest_worker .
+$ docker build -t ingest-worker -f Dockerfile.ingest_worker .
 ```
 
 ## Step 2: Start redis server
