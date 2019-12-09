@@ -1,6 +1,6 @@
 from irods_capability_automated_ingest.core import Core
 from irods_capability_automated_ingest.utils import Operation
-from redis import StrictRedis
+from irods_capability_automated_ingest.sync_utils import get_redis
 
 class event_handler(Core):
 
@@ -21,7 +21,7 @@ class event_handler(Core):
         path = meta["path"]
         target = meta["target"]
 
-        r = StrictRedis()
+        r = get_redis(meta['config'])
         failures = r.get("failures:"+path)
         if failures is None:
             failures = 0

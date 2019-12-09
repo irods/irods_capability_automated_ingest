@@ -180,11 +180,7 @@ celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart
 **Note:** Make sure queue names match those of the ingest job (default queue names shown here).
 
 #### Run tests
-**Note:** The test suite requires Python version >=3.5.
-**Note:** The tests should be run without running Celery workers.
-```
-python -m irods_capability_automated_ingest.test.test_irods_sync
-```
+See [docker/ingest-test/README.md](docker/ingest-test/README.md) for how to run the test suite.
 
 #### Start sync job
 ```
