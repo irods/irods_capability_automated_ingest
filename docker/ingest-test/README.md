@@ -1,3 +1,30 @@
+# How to run the test suite using docker-compose
+
+## Step 1: Build the images
+
+Run the following to build the required images:
+```
+docker-compose build
+```
+
+## Step 2: Run the project
+
+Bring up the docker-compose project and the test suite will run on its own:
+```
+docker-compose --env-file icommands.env up
+```
+The test suite is one of the services of the docker-compose project, so it will run on its own. The container is tied to the tests running, so it will exit once completed.
+The `--env-file` option is required in order to correctly configure the environment for the tests.
+
+## Step 3: Bring down the project
+
+The project is not made to come down by itself (yet), so it has to be brought down after each run:
+```
+docker-compose down
+```
+
+A script is forthcoming which should make this a little easier to run in the future.
+
 # How to run the test suite using docker
 
 This process is very similar to that of running an ingest job in docker. It is recommended to see [docker/README.md](docker/README.md).

@@ -5,6 +5,7 @@ import os.path
 import stat
 import subprocess
 import time
+import traceback
 import unittest
 from signal import SIGINT
 from os import makedirs, listdir, remove
@@ -14,9 +15,9 @@ from irods.session import iRODSSession
 from irods.models import Collection, DataObject
 from tempfile import NamedTemporaryFile, mkdtemp
 from datetime import datetime
-from irods_capability_automated_ingest.sync_utils import size, get_with_key, app, failures_key, retries_key
+from irods_capability_automated_ingest.sync_utils import size, app
 from irods_capability_automated_ingest.sync_utils import get_redis as sync_utils_get_redis
-from irods_capability_automated_ingest.sync_task import done
+from irods_capability_automated_ingest.sync_job import sync_job
 
 LOG_FILE = "/tmp/a"
 
@@ -151,7 +152,7 @@ def wait_for(workers, job_name = DEFAULT_JOB_NAME):
             active = 0
         else:
             active = sum(map(len, act.values()))
-        d = done(r, job_name)
+        d = sync_job(job_name, r).done()
         if restart != 0 or active != 0 or not d:
             time.sleep(1)
         else:
@@ -342,12 +343,10 @@ class automated_ingest_test_context(object):
                 self.assertIn(obj.replicas[0].resource_name, resc_names)
 
     def do_assert_failed_queue(self, error_message=None, count=NFILES, job_name = DEFAULT_JOB_NAME):
-        r = get_redis()
-        self.assertEqual(get_with_key(r, failures_key, job_name, int), count)
+        self.assertEqual(sync_job(job_name, get_redis()).failures_handle().get_value(), count)
 
     def do_assert_retry_queue(self, error_message=None, count=NFILES, job_name = DEFAULT_JOB_NAME):
-        r = get_redis()
-        self.assertEqual(get_with_key(r, retries_key, job_name, int), count)
+        self.assertEqual(sync_job(job_name, get_redis()).retries_handle().get_value(), count)
 
 
 class Test_event_handlers(automated_ingest_test_context, unittest.TestCase):
@@ -1358,13 +1357,16 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
         else:
             self.fail('target collection should fail to ingest')
 
-@unittest.skip('Running tests as Docker application does not trip UnicodeEncodeError')
+@unittest.skip('Test does not seem to raise UnicodeEncodeError')
 class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
     def setUp(self):
-        os.environ["CELERY_BROKER_URL"] = "redis://redis:6379/0"
+        super(Test_register_as_replica, self).setUp()
 
+    def tearDown(self):
+        super(Test_register_as_replica, self).tearDown()
+
+    def do_register_as_replica_no_assertions(self, eh, job_name = DEFAULT_JOB_NAME):
         clear_redis()
-        irmtrash()
 
         # Create a file in a known location with an out-of-range Unicode character in the name
         bad_filename = 'test_register_with_unicode_encode_error_path_' + chr(65535)
@@ -1388,7 +1390,6 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
         clear_redis()
         delete_collection_if_exists(self.dest_coll_path)
         rmtree(self.source_dir_path, ignore_errors=True)
-        irmtrash()
         with iRODSSession(**get_kwargs()) as session:
             delete_resources(session, HIERARCHY1)
 
@@ -1424,13 +1425,11 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
         mtime2 = modify_time(session, self.expected_logical_path)
         self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
-    def do_assert_failed_queue(self, error_message=None, job_name=DEFAULT_JOB_NAME, count=NFILES):
-        r = get_redis()
-        self.assertEqual(get_with_key(r, failures_key, job_name, int), count)
+    def do_assert_failed_queue(self, error_message=None, count=NFILES, job_name = DEFAULT_JOB_NAME):
+        self.assertEqual(sync_job(job_name, get_redis()).failures_handle().get_value(), count)
 
-    def do_assert_retry_queue(self, error_message=None, job_name=DEFAULT_JOB_NAME, count=NFILES):
-        r = get_redis()
-        self.assertEqual(get_with_key(r, retries_key, job_name, int), count)
+    def do_assert_retry_queue(self, error_message=None, count=NFILES, job_name = DEFAULT_JOB_NAME):
+        self.assertEqual(sync_job(job_name, get_redis()).retries_handle().get_value(), count)
 
     def create_bad_file(self):
         if os.path.exists(self.bad_filepath):
@@ -1475,10 +1474,8 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
 
         clear_redis()
 
-        job_name = 'test_register_as_replica.register_as_replica'
-        self.run_scan_with_event_handler(
-            "irods_capability_automated_ingest.examples.replica_with_resc_name",
-            job_name = job_name)
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.replica_with_resc_name")
+
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
@@ -1504,10 +1501,8 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
     def test_put(self):
         expected_physical_path = join(DEFAULT_RESC_VAULT_PATH, 'home', 'rods', os.path.basename(self.source_dir_path), self.unicode_error_filename)
 
-        job_name = 'test_put.run_scan_with_event_handler'
-        self.run_scan_with_event_handler(
-            "irods_capability_automated_ingest.examples.put",
-            job_name = job_name)
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.put")
+
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
@@ -1530,10 +1525,7 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
 
         self.create_bad_file()
 
-        job_name = 'test_put_sync.recreate'
-        self.run_scan_with_event_handler(
-            "irods_capability_automated_ingest.examples.sync",
-            job_name = job_name)
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.sync")
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
@@ -1557,10 +1549,7 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
         with open(self.bad_filepath, 'a') as f:
             f.write('test_put_append')
 
-        job_name = 'test_put_append.append'
-        self.run_scan_with_event_handler(
-            "irods_capability_automated_ingest.examples.append",
-            job_name = job_name)
+        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.append")
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
