@@ -1,151 +1,3 @@
-from . import sync_logging, sync_irods
-from .custom_event_handler import custom_event_handler
-from .sync_job import sync_job
-from .sync_utils import app
-from .utils import enqueue_task
-from .task_queue import task_queue
-#from .scanner import scanner_factory
-import traceback
-from celery.signals import task_prerun, task_postrun
-from billiard import current_process
-
-@task_prerun.connect()
-def task_prerun(task_id=None, task=None, args=None, kwargs=None, **kw):
-    meta = args[0]
-    if meta["profile"]:
-        config = meta["config"]
-        profile_log = config.get("profile")
-        logger = sync_logging.get_sync_logger(profile_log)
-        logger.info("task_prerun", event_id=task_id, event_name=task.name, path=meta.get("path"), target=meta.get("target"), hostname=task.request.hostname, index=current_process().index)
-
-
-@task_postrun.connect()
-def task_postrun(task_id=None, task=None, args=None, kwargs=None, retval=None, state=None, **kw):
-    meta = args[0]
-    if meta["profile"]:
-        config = meta["config"]
-        profile_log = config.get("profile")
-        logger = sync_logging.get_sync_logger(profile_log)
-        logger.info("task_postrun", event_id=task_id, event_name=task.name, path=meta.get("path"), target=meta.get("target"), hostname=task.request.hostname, index=current_process().index,state=state)
-
-class IrodsTask(app.Task):
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
-        meta = args[0]
-        config = meta["config"]
-        job = sync_job.from_meta(meta)
-        logger = sync_logging.get_sync_logger(config["log"])
-        logger.error('failed_task', task=meta["task"], path=meta["path"], job_name=job.name(), task_id=task_id, exc=exc, einfo=einfo, traceback=traceback.extract_tb(exc.__traceback__))
-        job.failures_handle().incr()
-
-    def on_retry(self, exc, task_id, args, kwargs, einfo):
-        meta = args[0]
-        config = meta["config"]
-        job = sync_job.from_meta(meta)
-        logger = sync_logging.get_sync_logger(config["log"])
-        logger.warning('retry_task', task=meta["task"], path=meta["path"], job_name=job.name(), task_id=task_id, exc=exc, einfo=einfo, traceback=traceback.extract_tb(exc.__traceback__))
-        job.retries_handle().incr()
-
-    def on_success(self, retval, task_id, args, kwargs):
-        meta = args[0]
-        config = meta["config"]
-        logger = sync_logging.get_sync_logger(config["log"])
-        job_name = meta["job_name"]
-        logger.info('succeeded_task', task=meta["task"], path=meta["path"], job_name=job_name, task_id=task_id, retval=retval)
-
-    def after_return(self, status, retval, task_id, args, kwargs, einfo):
-        meta = args[0]
-        config = meta["config"]
-        job = sync_job.from_meta(meta)
-        logger = sync_logging.get_sync_logger(config["log"])
-        logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job.name(), task_id=task_id, retval=retval)
-
-        done = job.tasks_handle().decr() and not job.periodic()
-        if done:
-            job.cleanup()
-
-        job.dequeue_handle().rpush(task_id)
-
-        if done:
-            event_handler = custom_event_handler(meta)
-            if event_handler.hasattr('post_job'):
-                module = event_handler.get_module()
-                module.post_job(module, logger, meta)
-
-
-class RestartTask(app.Task):
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
-        meta = args[0]
-        config = meta["config"]
-        job_name = meta["job_name"]
-        logger = sync_logging.get_sync_logger(config["log"])
-        logger.error('failed_restart', path=meta["path"], job_name=job_name, task_id=task_id, exc=exc, einfo=einfo, traceback=traceback.extract_tb(exc.__traceback__))
-
-@app.task(base=RestartTask)
-def restart(meta):
-    # Start periodic job on restart_queue
-    job_name = meta["job_name"]
-    restart_queue = meta["restart_queue"]
-    interval = meta["interval"]
-    if interval is not None:
-        restart.s(meta).apply_async(task_id=job_name, queue=restart_queue, countdown=interval)
-
-    # Continue with singlepass job
-    config = meta["config"]
-    logging_config = config["log"]
-    logger = sync_logging.get_sync_logger(logging_config)
-    try:
-        event_handler = custom_event_handler(meta)
-        if event_handler.hasattr('pre_job'):
-            module = event_handler.get_module()
-            module.pre_job(module, logger, meta)
-
-        logger.info("***************** restart *****************")
-        job = sync_job.from_meta(meta)
-        if not job.periodic() or job.done():
-            logger.info("no tasks for this job and worker handling this task is not busy")
-
-            job.reset()
-            meta = meta.copy()
-            meta["task"] = "sync_path"
-            #task_queue(meta["path_queue"]).add(sync_path, meta)
-            meta['queue_name'] = meta["path_queue"]
-            enqueue_task(sync_path, meta)
-        else:
-            logger.info("tasks exist for this job or worker handling this task is busy")
-
-    except OSError as err:
-        logger.warning("Warning: " + str(err), traceback=traceback.extract_tb(err.__traceback__))
-
-    except Exception as err:
-        logger.error("Unexpected error: " + str(err), traceback=traceback.extract_tb(err.__traceback__))
-        raise
-
-@app.task(bind=True, base=IrodsTask)
-def sync_path(self, meta):
-    syncer = scanner_factory(meta)
-    syncer.sync_path(self, meta)
-
-@app.task(bind=True, base=IrodsTask)
-def sync_dir(self, meta):
-    syncer = scanner_factory(meta)
-    syncer.sync_entry(self, meta, "dir", sync_irods.sync_data_from_dir, sync_irods.sync_metadata_from_dir)
-
-@app.task(bind=True, base=IrodsTask)
-def sync_files(self, _meta):
-    chunk = _meta["chunk"]
-    meta = _meta.copy()
-    for path, obj_stats in chunk.items():
-        meta['path'] = path
-        meta["is_empty_dir"] = obj_stats.get('is_empty_dir')
-        meta["is_link"] = obj_stats.get('is_link')
-        meta["is_socket"] = obj_stats.get('is_socket')
-        meta["mtime"] = obj_stats.get('mtime')
-        meta["ctime"] = obj_stats.get('ctime')
-        meta["size"] = obj_stats.get('size')
-        meta['task'] = 'sync_file'
-        syncer = scanner_factory(meta)
-        syncer.sync_entry(self, meta, "file", sync_irods.sync_data_from_file, sync_irods.sync_metadata_from_file)
-
 # Use the built-in version of scandir/walk if possible, otherwise
 # use the scandir module version
 try:
@@ -158,14 +10,14 @@ import os
 from os.path import join, getmtime, relpath, getctime
 from datetime import datetime
 import redis_lock
-#from . import sync_logging
-#from .custom_event_handler import custom_event_handler
+from . import sync_logging
+from .custom_event_handler import custom_event_handler
 from .redis_key import sync_time_key_handle
 from .sync_utils import get_redis
-#from .utils import enqueue_task
+from .utils import enqueue_task
 #from .task_queue import task_queue
 from minio import Minio
-#from billiard import current_process
+from billiard import current_process
 import base64
 import re
 
@@ -175,7 +27,7 @@ class scanner(object):
         self.meta = meta.copy()
 
     def exclude_file_type(self, dir_regex, file_regex, full_path, logger, mode=None):
-        ex_list = self.meta['exclude_file_type']
+        exclude_type_list = self.meta['exclude_file_type']
         if len(ex_list) <= 0 and None == dir_regex and None == file_regex:
             return False
 
@@ -272,7 +124,7 @@ class filesystem_scanner(scanner):
                 full_path = os.path.abspath(obj.path)
                 mode = obj.stat(follow_symlinks=False).st_mode
 
-                if self.exclude_file_type(dir_regex, file_regex, full_path, logger, mode):
+                if exclude_file_type(exclude_type_list, dir_regex, file_regex, full_path, logger, mode):
                     continue
 
                 if not obj.is_symlink() and not bool(mode & stat.S_IRGRP):
@@ -305,7 +157,7 @@ class filesystem_scanner(scanner):
                     sync_files_meta = meta.copy()
                     sync_files_meta['chunk'] = chunk
                     #task_queue(file_q_name).add(sync_files, sync_files_meta)
-                    sync_files_meta['queue_name'] = file_q_name
+                    sync_dir_meta['queue_name'] = file_q_name
                     enqueue_task(sync_files, sync_files_meta)
                     chunk.clear()
 
@@ -465,18 +317,12 @@ class s3_scanner(scanner):
                                         )
                              )
             endpoint_domain = meta.get('s3_endpoint_domain')
-            s3_region_name = meta.get('s3_region_name')
             s3_access_key = meta.get('s3_access_key')
             s3_secret_key = meta.get('s3_secret_key')
-            s3_secure_connection = meta.get('s3_secure_connection')
-            if s3_secure_connection is None:
-                s3_secure_connection = True
             client = Minio(
                          endpoint_domain,
-                         region=s3_region_name,
                          access_key=s3_access_key,
                          secret_key=s3_secret_key,
-                         secure=s3_secure_connection,
                          http_client=httpClient)
 
             # Split provided path into bucket and source folder "prefix"
@@ -642,6 +488,9 @@ class s3_scanner(scanner):
                 lock.release()
 
 def scanner_factory(meta):
+    # TODO: Look into passing a string as a type... modularize scanners and import as needed
+    # TODO: Talk to Dan about eval()
     if meta.get('s3_keypair'):
         return s3_scanner(meta)
     return filesystem_scanner(meta)
+

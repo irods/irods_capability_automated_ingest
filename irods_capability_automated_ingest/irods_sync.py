@@ -1,6 +1,6 @@
-from .sync_task import start_synchronization, stop_synchronization, list_synchronization, monitor_synchronization
-import argparse
 from uuid import uuid1
+from . import sync_actions
+import argparse
 import json
 import sys
 
@@ -89,19 +89,19 @@ def handle_start(args):
     data['exclude_directory_name'] = [ ''.join(r) for r in args.exclude_directory_name ]
     data['idle_disconnect_seconds'] = args.irods_idle_disconnect_seconds
 
-    return start_synchronization(data)
+    return sync_actions.start_job(data)
 
 def handle_stop(args):
-    stop_synchronization(args.job_name, get_config(args))
+    sync_actions.stop_job(args.job_name, get_config(args))
     return 0
 
 
 def handle_watch(args):
-    return monitor_synchronization(args.job_name, True, get_config(args))
+    return sync_actions.monitor_job(args.job_name, True, get_config(args))
 
 
 def handle_list(args):
-    jobs = list_synchronization(get_config(args))
+    jobs = sync_actions.list_jobs(get_config(args))
     print(json.dumps(jobs))
     return 0
 

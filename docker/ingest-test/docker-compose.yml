@@ -1,0 +1,52 @@
+version: '3'
+
+services:
+  some-redis:
+    image: redis
+    hostname: redis
+    networks:
+      default:
+        aliases:
+          - redis
+
+  icat:
+    build:
+      context: icat
+      args:
+        postgres_password: testpassword
+    hostname: catalog.example.org
+    networks:
+      default:
+        aliases:
+          - catalog.example.org
+
+  irods-catalog-provider:
+    build:
+      context: provider
+    hostname: icat.example.org
+    networks:
+      default:
+        aliases:
+          - icat.example.org
+    volumes:
+      - "/tmp/mountdir:/tmp/testdir:ro"
+    depends_on:
+      - icat
+
+  ingest-test:
+    build:
+      context: test
+    environment:
+      - "PIP_PACKAGE"
+      - "TEST_CASE"
+      - "IRODS_PORT"
+      - "IRODS_HOST"
+      - "IRODS_USER_NAME"
+      - "IRODS_ZONE_NAME"
+      - "IRODS_ENVIRONMENT_FILE"
+      - "IRODS_PASSWORD"
+    volumes:
+      - "/tmp/mountdir:/tmp/testdir"
+    depends_on:
+      - some-redis
+      - irods-catalog-provider
