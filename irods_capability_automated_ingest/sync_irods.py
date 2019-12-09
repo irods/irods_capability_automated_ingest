@@ -76,21 +76,32 @@ def get_resource_name(hdlr_mod, session, meta, **options):
     else:
         return None
 
-
 def annotate_metadata_for_special_data_objs(meta, session, source_physical_fullpath, dest_dataobj_logical_fullpath):
+    def add_metadata_if_not_present(obj, key, val, unit=None):
+        # TODO: If updating/syncing link items, we might want to update the readlink result...
+        if key not in obj.metadata.keys():
+            obj.metadata.add(key, val, unit)
+
     b64_path_str = meta.get('b64_path_str')
     if b64_path_str is not None:
-        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
-        obj.metadata.add("irods::automated_ingest::UnicodeEncodeError", b64_path_str, 'python3.base64.b64encode(full_path_of_source_file)')
+        add_metadata_if_not_present(
+            session.data_objects.get(dest_dataobj_logical_fullpath),
+            'irods::automated_ingest::UnicodeEncodeError',
+            b64_path_str,
+            'python3.base64.b64encode(full_path_of_source_file)')
 
     if meta['is_socket']:
-        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
-        obj.metadata.add('socket_target', 'socket', 'automated_ingest')
+        add_metadata_if_not_present(
+            session.data_objects.get(dest_dataobj_logical_fullpath),
+            'socket_target',
+            'socket',
+            'automated_ingest')
     elif meta['is_link']:
-        obj = session.data_objects.get(dest_dataobj_logical_fullpath)
-        link_target = os.path.join(os.path.dirname(source_physical_fullpath), os.readlink(source_physical_fullpath))
-        obj.metadata.add('link_target', link_target, 'automated_ingest')
-
+        add_metadata_if_not_present(
+            session.data_objects.get(dest_dataobj_logical_fullpath),
+            'link_target',
+            os.path.join(os.path.dirname(source_physical_fullpath), os.readlink(source_physical_fullpath)),
+            'automated_ingest')
 
 def register_file(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]

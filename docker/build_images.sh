@@ -7,5 +7,5 @@ fi
 
 BUILD_ARG="PIP_PACKAGE=${PIP_INSTALL}"
 
-docker build --no-cache --build-arg ${BUILD_ARG} -t ingest .
-docker build --no-cache -t ingest-worker -f Dockerfile.ingest_worker .
+docker build --build-arg ${BUILD_ARG} -t ingest .
+docker build -t ingest-worker -f Dockerfile.ingest_worker .

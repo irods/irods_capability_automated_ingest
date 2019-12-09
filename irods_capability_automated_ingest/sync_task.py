@@ -419,7 +419,7 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
         utf8_escaped_abspath = abspath.encode('utf8', 'surrogateescape')
         b64_path_str = base64.b64encode(utf8_escaped_abspath)
 
-        unicode_error_filename = 'irods_UnicodeEncodeError_' + str(b64_path_str.decode('utf8'))
+        unicode_error_filename = 'irods_UnicodeEncodeError_' + str(b64_path_str.decode('utf8')).rstrip('/')
 
         logger.warning('sync_entry raised UnicodeEncodeError while syncing path:' + str(utf8_escaped_abspath))
 
