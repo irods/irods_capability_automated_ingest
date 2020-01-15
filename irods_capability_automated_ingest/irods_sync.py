@@ -83,6 +83,7 @@ def handle_start(args):
     data["s3_region_name"] = args.s3_region_name
     data["s3_keypair"] = args.s3_keypair
     data["s3_proxy_url"] = args.s3_proxy_url
+    data["s3_secure_connection"] = not args.s3_insecure_connection
     data["exclude_file_type"] = ex_arg_list
     data['exclude_file_name'] = [ ''.join(r) for r in args.exclude_file_name ]
     data['exclude_directory_name'] = [ ''.join(r) for r in args.exclude_directory_name ]
@@ -126,6 +127,7 @@ def main():
     parser_start.add_argument('--s3_region_name', action="store", type=str, default='us-east-1', help='S3 region name')
     parser_start.add_argument('--s3_keypair', action="store", type=str, default=None, help='Path to S3 keypair file')
     parser_start.add_argument('--s3_proxy_url', action="store", type=str, default=None, help='URL to proxy for S3 access')
+    parser_start.add_argument('--s3_insecure_connection', action="store_true", default=False, help='Do not use SSL when connecting to S3 endpoint')
     parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none', help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
     parser_start.add_argument('--exclude_file_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the file names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')
     parser_start.add_argument('--exclude_directory_name', type=list, nargs='+', action="store", default='none', help='a list of space-separated python regular expressions defining the directory names to exclude such as "(\S+)exclude" "(\S+)\.hidden"')

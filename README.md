@@ -28,6 +28,7 @@ To scan S3 bucket, minimally requires `--s3_keypair` and source path of the form
 | s3_endpoint_domain | S3 endpoint domain | s3.amazonaws.com |
 | s3_region_name | S3 region name | us-east-1 |
 | s3_proxy_url | URL to proxy for S3 access | None |
+| s3_insecure_connection | Do not use SSL when connecting to S3 endpoint | False |
 
 ### Logging/Profiling options
 | option | effect | default |
