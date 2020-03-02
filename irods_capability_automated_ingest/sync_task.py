@@ -278,6 +278,7 @@ def sync_path(self, meta):
                                         )
                              )
             endpoint_domain = meta.get('s3_endpoint_domain')
+            s3_region_name = meta.get('s3_region_name')
             s3_access_key = meta.get('s3_access_key')
             s3_secret_key = meta.get('s3_secret_key')
             s3_secure_connection = meta.get('s3_secure_connection')
@@ -285,6 +286,7 @@ def sync_path(self, meta):
                 s3_secure_connection = True
             client = Minio(
                          endpoint_domain,
+                         region=s3_region_name,
                          access_key=s3_access_key,
                          secret_key=s3_secret_key,
                          secure=s3_secure_connection,
