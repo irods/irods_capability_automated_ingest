@@ -7,6 +7,7 @@ from .sync_utils import size, get_redis
 from .utils import Operation
 from .custom_event_handler import custom_event_handler
 import redis_lock
+from minio import Minio
 import json
 import irods.keywords as kw
 import base64
@@ -127,6 +128,79 @@ def register_file(hdlr_mod, logger, session, meta, **options):
 
     annotate_metadata_for_special_data_objs(meta, session, source_physical_fullpath, dest_dataobj_logical_fullpath)
 
+def get_s3_client(meta):
+
+    proxy_url = meta.get('s3_proxy_url')
+    if proxy_url is None:
+        httpClient = None
+    else:
+        import urllib3
+        httpClient = urllib3.ProxyManager(
+                                proxy_url,
+                                timeout=urllib3.Timeout.DEFAULT_TIMEOUT,
+                                cert_reqs='CERT_REQUIRED',
+                                retries=urllib3.Retry(
+                                    total=5,
+                                    backoff_factor=0.2,
+                                    status_forcelist=[500, 502, 503, 504]
+                                )
+                     )
+    endpoint_domain = meta.get('s3_endpoint_domain')
+    s3_region_name = meta.get('s3_region_name')
+    s3_access_key = meta.get('s3_access_key')
+    s3_secret_key = meta.get('s3_secret_key')
+    s3_secure_connection = meta.get('s3_secure_connection')
+    if s3_secure_connection is None:
+        s3_secure_connection = True
+    client = Minio(
+                 endpoint_domain,
+                 region=s3_region_name,
+                 access_key=s3_access_key,
+                 secret_key=s3_secret_key,
+                 secure=s3_secure_connection,
+                 http_client=httpClient)
+    return client
+
+
+def upload_file_from_S3(logger, session, meta, src, dest, offset=0, **options):
+
+    BUFFER_SIZE = 1024
+    client = get_s3_client(meta)
+    path_list = src.lstrip('/').split('/', 1)
+    if len(path_list) == 1:
+        logger.error("failed", task="irods_upload_S3file", path=src)
+    else:
+        bucket_name = path_list[0]
+        object_name = path_list[1]
+
+    #Set operation type to trigger acPostProcForPut
+    if kw.OPR_TYPE_KW not in options:
+        options[kw.OPR_TYPE_KW] = 1 #PUT_OPR
+
+    #Add checksum calculation for opening file
+    if kw.REG_CHKSUM_KW not in options:
+        options[kw.REG_CHKSUM_KW] = ''
+
+    if offset!=0:
+        tfd = session.data_objects.open(dest, "a", **options)
+        tfd.seek(offset)
+    else:
+        tfd = session.data_objects.open(dest, "w", **options)
+    response = client.get_partial_object(bucket_name, object_name, offset)
+    etag = response.getheader('Etag').replace('"','')
+    hash_md5 = hashlib.md5()
+    for data in response.stream(amt=BUFFER_SIZE):
+        #TODO CALCULATE MD5SUM on the fly for the data chunks.
+        hash_md5.update(data)
+        tfd.write(data)
+    response.release_conn()
+    tfd.close()
+
+    etagrods = hash_md5.hexdigest()
+    if etag!=etagrods:
+        logger.info("checksums do not match! etag {} etagrods {}".format(etag,etagrods), task="irods_S3upload_file", path=src)
+
+
 def upload_file(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
@@ -140,10 +214,15 @@ def upload_file(hdlr_mod, logger, session, meta, **options):
     if b64_path_str is not None:
         source_physical_fullpath = base64.b64decode(b64_path_str)
 
-    logger.info("uploading object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
-    session.data_objects.put(source_physical_fullpath, dest_dataobj_logical_fullpath, **options)
-
-    logger.info("succeeded", task="irods_upload_file", path = source_physical_fullpath)
+    s3_keypair = meta.get("s3_keypair")
+    if s3_keypair:
+        logger.info("uploading object " + source_physical_fullpath + "from S3, options = " + str(options))
+        upload_file_from_S3(logger, session, meta, source_physical_fullpath, dest_dataobj_logical_fullpath, offset=0, **options)
+        logger.info("succeeded", task="irods_S3upload_file", path=source_physical_fullpath)
+    else:
+        logger.info("uploading object " + dest_dataobj_logical_fullpath + "from local FS, options = " + str(options))
+        session.data_objects.put(source_physical_fullpath, dest_dataobj_logical_fullpath, **options)
+        logger.info("succeeded", task="irods_FSupload_file", path=source_physical_fullpath)
 
     annotate_metadata_for_special_data_objs(meta, session, source_physical_fullpath, dest_dataobj_logical_fullpath)
 
@@ -168,28 +247,42 @@ def sync_file(hdlr_mod, logger, session, meta, **options):
     logger.info("syncing object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
     op = event_handler.operation(session, **options)
 
-    if op == Operation.PUT_APPEND:
-        BUFFER_SIZE = 1024
-        logger.info("appending object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
-        tsize = size(session, dest_dataobj_logical_fullpath)
-        tfd = session.data_objects.open(dest_dataobj_logical_fullpath, "a", **options)
-        tfd.seek(tsize)
-        with open(source_physical_fullpath, "rb") as sfd:
-            sfd.seek(tsize)
-            while True:
-                buf = sfd.read(BUFFER_SIZE)
-                if buf == b"":
-                    break
-                tfd.write(buf)
-        tfd.close()
-        logger.info("succeeded", task="irods_append_file", path=source_physical_fullpath)
+    s3_keypair = meta.get("s3_keypair")
+    logger.info("checking if data object from S3 " + str(s3_keypair))
+    if op is None:
+        op = Operation.REGISTER_SYNC
 
+    if s3_keypair:
+        if op == Operation.PUT_APPEND:
+            logger.info("appending object " + source_physical_fullpath + "from S3, options = " + str(options))
+            tsize = size(session, dest_dataobj_logical_fullpath)
+            upload_file_from_S3(logger, session, meta, source_physical_fullpath, dest_dataobj_logical_fullpath, offset=tsize, **options)
+            logger.info("succeeded", task="irods_append_S3file", path=source_physical_fullpath)
+        else:
+            logger.info("uploading object " + source_physical_fullpath + " from S3, options = " + str(options))
+            upload_file_from_S3(logger, session, meta, source_physical_fullpath, dest_dataobj_logical_fullpath, offset=0, **options)
+            logger.info("succeeded", task="irods_upload_S3file", path=source_physical_fullpath)
     else:
-        if op is None:
-            op = Operation.REGISTER_SYNC
-        logger.info("uploading object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
-        session.data_objects.put(source_physical_fullpath, dest_dataobj_logical_fullpath, **options)
-        logger.info("succeeded", task="irods_update_file", path = source_physical_fullpath)
+        if op == Operation.PUT_APPEND:
+            BUFFER_SIZE = 1024
+            logger.info("appending object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
+            tsize = size(session, dest_dataobj_logical_fullpath)
+            tfd = session.data_objects.open(dest_dataobj_logical_fullpath, "a", **options)
+            tfd.seek(tsize)
+            with open(source_physical_fullpath, "rb") as sfd:
+                sfd.seek(tsize)
+                while True:
+                    buf = sfd.read(BUFFER_SIZE)
+                    if buf == b"":
+                        break
+                    tfd.write(buf)
+            tfd.close()
+            logger.info("succeeded", task="irods_append_file", path=source_physical_fullpath)
+
+        else:
+            logger.info("uploading object " + dest_dataobj_logical_fullpath + "from FS, options = " + str(options))
+            session.data_objects.put(source_physical_fullpath, dest_dataobj_logical_fullpath, **options)
+            logger.info("succeeded", task="irods_update_file", path=source_physical_fullpath)
 
 
 def update_metadata(hdlr_mod, logger, session, meta, **options):
