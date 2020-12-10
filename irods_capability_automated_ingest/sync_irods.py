@@ -314,8 +314,12 @@ def irods_session(hdlr_mod, meta, logger, **options):
 
     key = json.dumps(kwargs) # todo add timestamp of env file to key
 
-    if 'irods_ssl_ca_certificate_file' in json.load(open(env_file)):
-        kwargs['ssl_context'] = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=None, capath=None, cadata=None)
+    with open(env_file) as irods_env:
+        irods_env_as_json =  json.load(irods_env)
+        if 'irods_ssl_ca_certificate_file' in irods_env_as_json:
+            kwargs['ssl_context'] = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH,
+                                                               cafile=irods_env_as_json['irods_ssl_ca_certificate_file'],
+                                                               capath=None, cadata=None)
 
     if not key in irods_session_map:
         # TODO: #42 - pull out 10 into configuration
