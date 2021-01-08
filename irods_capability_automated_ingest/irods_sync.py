@@ -63,9 +63,9 @@ def handle_start(args):
         ex_arg_list = [x.strip() for x in ex_file_arg[0].split(',')]
 
     data = {}
-    data["restart_queue"] = 'restart'
-    data["path_queue"] = 'path'
-    data["file_queue"] = 'file'
+    data["restart_queue"] = args.restart_queue
+    data["path_queue"] = args.path_queue
+    data["file_queue"] = args.file_queue
     data["target"] = args.target
     data["root"] = args.root
     data["interval"] = args.interval
@@ -114,6 +114,9 @@ def main():
     parser_start.add_argument('root', metavar='SOURCE_DIRECTORY', type=str, help='Source directory or S3 folder to scan.')
     parser_start.add_argument('target', metavar='TARGET_COLLECTION', type=str, help='Target iRODS collection for data objects (created if non-existent).')
     parser_start.add_argument('-i', '--interval', action="store", type=int, default=None, help='Restart interval (in seconds). If absent, will only sync once.')
+    parser_start.add_argument('--file_queue', action="store", type=str, default="file", help='Name for the file queue.')
+    parser_start.add_argument('--path_queue', action="store", type=str, default="path", help='Name for the path queue.')
+    parser_start.add_argument('--restart_queue', action="store", type=str, default="restart", help='Name for the restart queue.')
     parser_start.add_argument('--event_handler', action="store", type=str, default=None, help='Path to event handler file')
     parser_start.add_argument('--job_name', action="store", type=str, default=None, help='Reference name for ingest job (defaults to generated uuid)')
     parser_start.add_argument('--append_json', action="store", type=json.loads, default=None, help='Append json output')
