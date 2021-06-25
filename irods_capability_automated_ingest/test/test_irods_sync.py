@@ -200,7 +200,7 @@ def read_file(path):
 
 def read_data_object(session, path, resc_name = DEFAULT_RESC):
     with NamedTemporaryFile() as tf:
-        session.data_objects.get(path, file=tf.name, forceFlag="", rescName = resc_name)
+        session.data_objects.get(path, tf.name, forceFlag="", rescName = resc_name)
         return read_file(tf.name)
 
 

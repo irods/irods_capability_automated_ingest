@@ -93,7 +93,7 @@ def monitor_job(job_name, progress, config):
 def start_job(data):
     config = data["config"]
     logging_config = config["log"]
-    root = data["root"]
+    src_path = data["src_path"]
     job_name = data["job_name"]
     interval = data["interval"]
     restart_queue = data["restart_queue"]
@@ -115,13 +115,13 @@ def start_job(data):
             with open(s3_keypair) as f:
                 data_copy['s3_access_key'] = f.readline().rstrip()
                 data_copy['s3_secret_key'] = f.readline().rstrip()
-        # set root
-        root_abs = root
+        # set source
+        src_abs = src_path
     else:
-        root_abs = realpath(root)
+        src_abs = realpath(src_path)
 
-    data_copy["root"] = root_abs
-    data_copy["path"] = root_abs
+    data_copy["root"] = src_abs
+    data_copy["path"] = src_abs
 
     sync_irods.validate_target_collection(data_copy, logger)
 
