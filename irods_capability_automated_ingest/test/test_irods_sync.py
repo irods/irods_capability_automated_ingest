@@ -1,6 +1,7 @@
 import base64
 import glob
 import os
+import re
 import os.path
 import stat
 import subprocess
@@ -18,6 +19,8 @@ from datetime import datetime
 from irods_capability_automated_ingest.sync_utils import size, app
 from irods_capability_automated_ingest.sync_utils import get_redis as sync_utils_get_redis
 from irods_capability_automated_ingest.sync_job import sync_job
+from irods.data_object import irods_dirname, irods_basename
+import irods.keywords as kw
 
 LOG_FILE = "/tmp/a"
 
@@ -198,9 +201,21 @@ def read_file(path):
         return f.read()
 
 
+def hierarchy_string_for_leaf (session, logical_path, leafName):
+    ptn = re.compile(";" + leafName + "$")
+    equals_or_is_leaf_of = lambda leaf,hierstr : leaf == hierstr or ptn.search(hierstr)
+    q = session.query(DataObject).filter(DataObject.name == irods_basename(logical_path),
+                                         Collection.name == irods_dirname(logical_path))
+    hierstr = [ r[DataObject.resc_hier] for r in q if equals_or_is_leaf_of(leafName,r[DataObject.resc_hier]) ]
+    return hierstr[0] if hierstr else ''
+
+
 def read_data_object(session, path, resc_name = DEFAULT_RESC):
     with NamedTemporaryFile() as tf:
-        session.data_objects.get(path, tf.name, forceFlag="", rescName = resc_name)
+        resc_hier = hierarchy_string_for_leaf(session, path, resc_name)
+        options = {kw.RESC_HIER_STR_KW:resc_hier} if resc_hier \
+             else {kw.RESC_NAME_KW:resc_name}
+        session.data_objects.get(path, tf.name, forceFlag="", **options)
         return read_file(tf.name)
 
 
