@@ -58,7 +58,7 @@ def create_dirs(logger, session, meta, **options):
         raise Exception("create_dirs: relative path; target:[" + target + ']; path:[' + path + ']')
 
 
-def create_dir(logger, session, meta, **options):
+def create_dir(hdlr_mod, logger, session, meta, **options):
     target = meta["target"]
     path = meta["path"]
     logger.info("creating collection " + target)
@@ -92,7 +92,7 @@ def annotate_metadata_for_special_data_objs(meta, session, source_physical_fullp
             os.path.join(os.path.dirname(source_physical_fullpath), os.readlink(source_physical_fullpath)),
             'automated_ingest')
 
-def register_file(logger, session, meta, **options):
+def register_file(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
     b64_path_str = meta.get('b64_path_str')
@@ -125,7 +125,7 @@ def register_file(logger, session, meta, **options):
 
     annotate_metadata_for_special_data_objs(meta, session, source_physical_fullpath, dest_dataobj_logical_fullpath)
 
-def upload_file(logger, session, meta, **options):
+def upload_file(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
     b64_path_str = meta.get('b64_path_str')
@@ -146,11 +146,11 @@ def upload_file(logger, session, meta, **options):
     annotate_metadata_for_special_data_objs(meta, session, source_physical_fullpath, dest_dataobj_logical_fullpath)
 
 
-def no_op(logger, session, meta, **options):
+def no_op(hdlr_mod, logger, session, meta, **options):
     pass
 
 
-def sync_file(logger, session, meta, **options):
+def sync_file(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
     b64_path_str = meta.get('b64_path_str')
@@ -164,7 +164,7 @@ def sync_file(logger, session, meta, **options):
         source_physical_fullpath = base64.b64decode(b64_path_str)
 
     logger.info("syncing object " + dest_dataobj_logical_fullpath + ", options = " + str(options))
-    op = event_handler.operation(session, meta, **options)
+    op = event_handler.operation(session, **options)
 
     if op == Operation.PUT_APPEND:
         BUFFER_SIZE = 1024
@@ -190,7 +190,7 @@ def sync_file(logger, session, meta, **options):
         logger.info("succeeded", task="irods_update_file", path = source_physical_fullpath)
 
 
-def update_metadata(logger, session, meta, **options):
+def update_metadata(hdlr_mod, logger, session, meta, **options):
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
     event_handler = custom_event_handler(meta)
@@ -242,7 +242,7 @@ def update_metadata(logger, session, meta, **options):
         logger.info("succeeded", task="irods_update_metadata", path = source_physical_fullpath)
 
 
-def sync_file_meta(logger, session, meta, **options):
+def sync_file_meta(hdlr_mod, logger, session, meta, **options):
     pass
 
 irods_session_map = {}
@@ -348,7 +348,7 @@ def irods_session(handler_module, meta, logger, **options):
     return sess
 
 
-def sync_data_from_file(meta, logger, content, **options):
+def sync_data_from_file(hdlr_mod, meta, logger, content, **options):
     target = meta["target"]
     path = meta["path"]
     init = meta["initial_ingest"]
@@ -424,13 +424,13 @@ def sync_data_from_file(meta, logger, content, **options):
 
     start_timer()
 
-def sync_metadata_from_file(meta, logger, **options):
-    sync_data_from_file(meta, logger, False, **options)
+def sync_metadata_from_file(hdlr_mod, meta, logger, **options):
+    sync_data_from_file(hdlr_mod, meta, logger, False, **options)
 
-def sync_dir_meta(logger, session, meta, **options):
+def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
     pass
 
-def sync_data_from_dir(meta, logger, content, **options):
+def sync_data_from_dir(hdlr_mod, meta, logger, content, **options):
     target = meta["target"]
     path = meta["path"]
 
@@ -454,5 +454,5 @@ def sync_data_from_dir(meta, logger, content, **options):
             event_handler.call("on_coll_modify", logger, sync_dir_meta, logger, session, meta, **options)
     start_timer()
 
-def sync_metadata_from_dir(meta, logger, **options):
-    sync_data_from_dir(meta, logger, False, **options)
+def sync_metadata_from_dir(hdlr_mod, meta, logger, **options):
+    sync_data_from_dir(hdlr_mod, meta, logger, False, **options)
