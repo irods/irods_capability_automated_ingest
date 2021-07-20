@@ -247,10 +247,10 @@ class filesystem_scanner(scanner):
 # ----------------------
                 meta2["target"] = target2
                 if sync_time is None or mtime >= sync_time:
-                    datafunc(meta2, logger, True)
+                    datafunc(event_handler.get_module(), meta2, logger, True)
                     logger.info("succeeded", task=meta["task"], path=path)
                 else:
-                    metafunc(meta2, logger)
+                    metafunc(event_handler.get_module(), meta2, logger)
                     logger.info("succeeded_metadata_only",
                                 task=meta["task"], path=path)
                 sync_time_handle.set_value(str(t))
@@ -466,10 +466,10 @@ class s3_scanner(scanner):
 # ----------------------
                 meta2["target"] = target2
                 if sync_time is None or mtime >= sync_time:
-                    datafunc(meta2, logger, True)
+                    datafunc(event_handler.get_module(), meta2, logger, True)
                     logger.info("succeeded", task=meta["task"], path=path)
                 else:
-                    metafunc(meta2, logger)
+                    metafunc(event_handler.get_module(), meta2, logger)
                     logger.info("succeeded_metadata_only",
                                 task=meta["task"], path=path)
                 sync_time_handle.set_value(str(t))
