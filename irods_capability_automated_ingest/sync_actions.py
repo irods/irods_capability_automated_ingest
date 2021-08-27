@@ -2,6 +2,7 @@ from . import sync_logging, sync_irods
 from .sync_job import sync_job
 from .sync_utils import get_redis
 from .sync_task import restart
+from .redis_key import redis_key_handle
 from os.path import realpath
 from uuid import uuid1
 import json
@@ -130,6 +131,7 @@ def start_job(data):
         event_handler_data = data.get("event_handler_data")
         event_handler_path = data.get("event_handler_path")
 
+        #investigate 
         if event_handler is None and event_handler_path is not None and event_handler_data is not None:
             event_handler = "event_handler" + uuid1().hex
             hdlr2 = event_handler_path + "/" + event_handler + ".py"
@@ -138,6 +140,12 @@ def start_job(data):
             cleanup_list = [hdlr2.encode("utf-8")]
             data["event_handler"] = event_handler
         else:
+            #print("EHP" + str(event_handler_path))
+            with open(event_handler, "r") as f:
+                content_string = f.read()
+            event_handler_key = redis_key_handle(r, "custom_event_handler", job.name())
+            event_handler_key.set_value(content_string)
+
             cleanup_list = []
         job.cleanup_handle().set_value(json.dumps(cleanup_list))
 
