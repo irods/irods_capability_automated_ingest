@@ -1,4 +1,7 @@
 import importlib
+import sys
+from .redis_key import redis_key_handle
+from .sync_utils import get_redis
 
 class custom_event_handler(object):
     def __init__(self, meta):
@@ -6,12 +9,21 @@ class custom_event_handler(object):
         self.logger = self.meta['config']['log']
 
     def get_module(self, rtn_mod_and_class = False):   # get_ev_handler_class or something
+        r = get_redis(self.meta['config'])
         key = 'event_handler'
-        h = self.meta.get(key)
-        if h is None:
-            return (None, None) if rtn_mod_and_class else None
+        #h = self.meta.get(key)
+        #if h is None:
+        #    return (None, None) if rtn_mod_and_class else None
 
-        mod = importlib.import_module(h)
+        event_handler_key = redis_key_handle(r, "custom_event_handler", self.meta['job_name'])
+        content_string = event_handler_key.get_value()
+        with open("/tmp/event_handler.py", "w") as eh:
+            eh.write(content_string.decode("utf-8"))
+
+        sys.path.insert(0, "/tmp/")
+        #import event_handler
+
+        mod = importlib.import_module("event_handler")
         if mod is None:
             return (None, None) if rtn_mod_and_class else None
 
