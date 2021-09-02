@@ -2,6 +2,8 @@ import importlib
 import sys
 from .redis_key import redis_key_handle
 from .sync_utils import get_redis
+import os.path
+import sys
 
 class custom_event_handler(object):
     def __init__(self, meta):
@@ -11,19 +13,32 @@ class custom_event_handler(object):
     def get_module(self, rtn_mod_and_class = False):   # get_ev_handler_class or something
         r = get_redis(self.meta['config'])
         key = 'event_handler'
-        #h = self.meta.get(key)
-        #if h is None:
-        #    return (None, None) if rtn_mod_and_class else None
 
-        event_handler_key = redis_key_handle(r, "custom_event_handler", self.meta['job_name'])
+        job_name = self.meta['job_name']
+
+        #reconstructing redis key from meta
+        event_handler_key_str = self.meta['event_handler_key']
+        event_handler_split = event_handler_key_str.split(':/')
+        event_handler_key = redis_key_handle(r, event_handler_split[0], event_handler_split[1])
+
         content_string = event_handler_key.get_value()
-        with open("/tmp/event_handler.py", "w") as eh:
-            eh.write(content_string.decode("utf-8"))
 
-        sys.path.insert(0, "/tmp/")
-        #import event_handler
+        #getting uuid for file construction
+        event_handler_str = event_handler_key.get_key().split('::')
+        uuid_ = event_handler_str[1]
 
-        mod = importlib.import_module("event_handler")
+        eh_file_name = "event_handler" + job_name + uuid_
+        eh_path = "/tmp/" + eh_file_name + ".py"
+
+        #if the file does not already exist, create new file
+        if not (os.path.isfile(eh_path)):
+            with open(eh_path, "w") as eh:
+                eh.write(content_string.decode("utf-8"))
+
+        #import event_handler module
+        if '/tmp' not in sys.path:
+            sys.path.insert(0, '/tmp')
+        mod = importlib.import_module(eh_file_name)
         if mod is None:
             return (None, None) if rtn_mod_and_class else None
 
