@@ -310,12 +310,15 @@ def irods_session(handler_module, meta, logger, **options):
 
     key = json.dumps(kwargs) # todo add timestamp of env file to key
 
-    with open(env_file) as irods_env:
-        irods_env_as_json =  json.load(irods_env)
-        if 'irods_ssl_ca_certificate_file' in irods_env_as_json:
-            kwargs['ssl_context'] = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH,
-                                                               cafile=irods_env_as_json['irods_ssl_ca_certificate_file'],
-                                                               capath=None, cadata=None)
+    if env_file:
+        with open(env_file) as irods_env:
+            irods_env_as_json =  json.load(irods_env)
+            verify_server = irods_env_as_json.get('irods_ssl_verify_server')
+            ca_file = irods_env_as_json.get('irods_ssl_ca_certificate_file')
+            if verify_server and verify_server != 'none' and ca_file:
+                kwargs['ssl_context'] = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH,
+                                                                   cafile=ca_file,
+                                                                   capath=None, cadata=None)
 
     if not key in irods_session_map:
         # TODO: #42 - pull out 10 into configuration
