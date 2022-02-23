@@ -34,7 +34,7 @@ setup(
         'minio',
         'flask',
         'flask-restful',
-        'python-irodsclient==0.8.0',
+        'python-irodsclient==1.1.1',
         'python-redis-lock>=3.2.0',
         'redis>=2.10.6, <3.0.0',
         'celery[redis]>=4.2.1, <4.3.0',
