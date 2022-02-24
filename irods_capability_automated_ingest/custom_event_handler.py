@@ -27,7 +27,7 @@ class custom_event_handler(object):
         event_handler_str = event_handler_key.get_key().split('::')
         uuid_ = event_handler_str[1]
 
-        eh_file_name = "event_handler" + job_name + uuid_
+        eh_file_name = "event_handler" + job_name.replace('.', '__') + uuid_
         eh_path = "/tmp/" + eh_file_name + ".py"
 
         #if the file does not already exist, create new file

@@ -5,6 +5,7 @@ import re
 import os.path
 import stat
 import subprocess
+import sys
 import time
 import traceback
 import unittest
@@ -20,6 +21,7 @@ from irods_capability_automated_ingest.sync_utils import size, app
 from irods_capability_automated_ingest.sync_utils import get_redis as sync_utils_get_redis
 from irods_capability_automated_ingest.sync_job import sync_job
 from irods.data_object import irods_dirname, irods_basename
+import irods_capability_automated_ingest.examples
 import irods.keywords as kw
 
 LOG_FILE = "/tmp/a"
@@ -277,6 +279,9 @@ def modify_time(session, path):
         return row[DataObject.modify_time]
 
 
+def event_handler_path(eh_name):
+    return os.path.join(sys.modules["irods_capability_automated_ingest.examples"].__path__[0], eh_name + '.py')
+
 class automated_ingest_test_context(object):
     def setUp(self):
         os.environ["CELERY_BROKER_URL"] = "redis://redis:6379/0"
@@ -299,7 +304,9 @@ class automated_ingest_test_context(object):
             delete_resources(session, HIERARCHY1)
 
     # utilities
-    def do_register(self, eh, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
+    def do_register(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
+        eh = event_handler_path(eh_name)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         self.do_register2(job_name, resc_names=resc_name)
@@ -331,7 +338,9 @@ class automated_ingest_test_context(object):
                 self.assertEqual(s1, s2)
                 self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
 
-    def do_put(self, eh, job_name = DEFAULT_JOB_NAME, resc_names = [DEFAULT_RESC], resc_roots = [DEFAULT_RESC_VAULT_PATH]):
+    def do_put(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_names = [DEFAULT_RESC], resc_roots = [DEFAULT_RESC_VAULT_PATH]):
+        eh = event_handler_path(eh_name)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
 
@@ -384,7 +393,9 @@ class Test_event_handlers(automated_ingest_test_context, unittest.TestCase):
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
     # no op
-    def do_no_op(self, eh, job_name = DEFAULT_JOB_NAME):
+    def do_no_op(self, eh_name, job_name = DEFAULT_JOB_NAME):
+        eh = event_handler_path(eh_name)
+
         recreate_files(NFILES)
 
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
@@ -395,15 +406,15 @@ class Test_event_handlers(automated_ingest_test_context, unittest.TestCase):
 
     def test_no_op(self):
         job_name = 'test_no_op.do_no_op'
-        self.do_no_op(
-            "irods_capability_automated_ingest.examples.no_op",
-            job_name = job_name)
+        self.do_no_op("no_op", job_name = job_name)
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
 
     # append_json
-    def do_append_json(self, eh, job_name = DEFAULT_JOB_NAME):
+    def do_append_json(self, eh_name, job_name = DEFAULT_JOB_NAME):
+        eh = event_handler_path(eh_name)
+
         recreate_files(NFILES)
 
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--append_json", "\"append_json\"", "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
@@ -417,13 +428,16 @@ class Test_event_handlers(automated_ingest_test_context, unittest.TestCase):
     def test_append_json(self):
         job_name = 'test_append_json'
         self.do_append_json(
-            "irods_capability_automated_ingest.examples.append_json",
+            "append_json",
             job_name = job_name)
 
 
     # create dir
-    def do_register_dir_par(self, eh, job_name = DEFAULT_JOB_NAME, resc_names=[DEFAULT_RESC]):
+    def do_register_dir_par(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_names=[DEFAULT_RESC]):
+        eh = event_handler_path(eh_name)
+
         create_files2(10, NFILES)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         workers = start_workers(NWORKERS)
@@ -454,13 +468,15 @@ class Test_event_handlers(automated_ingest_test_context, unittest.TestCase):
     def test_create_dir(self):
         job_name = 'test_create_dir'
         self.do_register_dir_par(
-            "irods_capability_automated_ingest.examples.register",
+            "register",
             job_name = job_name)
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
     # timeout
-    def do_timeout(self, eh, job_name = DEFAULT_JOB_NAME):
+    def do_timeout(self, eh_name, job_name = DEFAULT_JOB_NAME):
+        eh = event_handler_path(eh_name)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
 
@@ -472,7 +488,7 @@ class Test_event_handlers(automated_ingest_test_context, unittest.TestCase):
     def test_timeout(self):
         job_name = 'test_timeout.do_timeout'
         self.do_timeout(
-            "irods_capability_automated_ingest.examples.timeout",
+            "timeout",
             job_name = job_name)
 
 class Test_retry(automated_ingest_test_context, unittest.TestCase):
@@ -482,7 +498,9 @@ class Test_retry(automated_ingest_test_context, unittest.TestCase):
     def tearDown(self):
         super(Test_retry, self).tearDown()
 
-    def do_no_retry(self, eh, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
+    def do_no_retry(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
+        eh = event_handler_path(eh_name)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         workers = start_workers(1)
@@ -491,7 +509,9 @@ class Test_retry(automated_ingest_test_context, unittest.TestCase):
         self.do_assert_failed_queue("no failures", job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
-    def do_retry(self, eh, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
+    def do_retry(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
+        eh = event_handler_path(eh_name)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         workers = start_workers(1)
@@ -501,15 +521,15 @@ class Test_retry(automated_ingest_test_context, unittest.TestCase):
         self.do_assert_retry_queue(job_name=job_name)
 
     def test_no_retry(self):
-        job_name = 'test_no_op.do_no_retry'
+        job_name = 'test_retry.do_no_retry'
         self.do_no_retry(
-            "irods_capability_automated_ingest.examples.no_retry",
+            "no_retry",
             job_name = job_name)
 
     def test_retry(self):
         job_name = 'test_retry.do_retry'
         self.do_retry(
-            "irods_capability_automated_ingest.examples.retry",
+            "retry",
             job_name = job_name)
 
 
@@ -520,7 +540,9 @@ class Test_pre_and_post_job(automated_ingest_test_context, unittest.TestCase):
     def tearDown(self):
         super(Test_pre_and_post_job, self).tearDown()
 
-    def do_pre_job(self, eh, job_name = DEFAULT_JOB_NAME):
+    def do_pre_job(self, eh_name, job_name = DEFAULT_JOB_NAME):
+        eh = event_handler_path(eh_name)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
 
@@ -530,7 +552,9 @@ class Test_pre_and_post_job(automated_ingest_test_context, unittest.TestCase):
             lines = f.readlines()
             self.assertEqual(lines, ["pre_job"])
 
-    def do_post_job(self, eh, job_name = DEFAULT_JOB_NAME):
+    def do_post_job(self, eh_name, job_name = DEFAULT_JOB_NAME):
+        eh = event_handler_path(eh_name)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
 
@@ -543,13 +567,13 @@ class Test_pre_and_post_job(automated_ingest_test_context, unittest.TestCase):
     def test_pre_job(self):
         job_name = 'test_pre_job.do_pre_job'
         self.do_pre_job(
-            "irods_capability_automated_ingest.examples.pre_job",
+            "pre_job",
             job_name = job_name)
 
     def test_post_job(self):
         job_name = 'test_post_job.do_post_job'
         self.do_post_job(
-            "irods_capability_automated_ingest.examples.post_job",
+            "post_job",
             job_name = job_name)
 
 class Test_no_sync(automated_ingest_test_context, unittest.TestCase):
@@ -559,7 +583,9 @@ class Test_no_sync(automated_ingest_test_context, unittest.TestCase):
     def tearDown(self):
         super(Test_no_sync, self).tearDown()
 
-    def do_no_sync(self, eh, job_name = DEFAULT_JOB_NAME):
+    def do_no_sync(self, eh_name, job_name = DEFAULT_JOB_NAME):
+        eh = event_handler_path(eh_name)
+
         recreate_files(NFILES)
 
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
@@ -580,14 +606,14 @@ class Test_no_sync(automated_ingest_test_context, unittest.TestCase):
     def test_no_sync(self):
         put_job = 'test_no_sync.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = put_job)
         self.do_assert_failed_queue(count=None, job_name=put_job)
         self.do_assert_retry_queue(count=None, job_name=put_job)
 
         no_sync_job = 'test_no_sync.no_sync'
         self.do_no_sync(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = no_sync_job)
         self.do_assert_failed_queue(count=None, job_name=no_sync_job)
         self.do_assert_retry_queue(count=None, job_name=no_sync_job)
@@ -595,7 +621,7 @@ class Test_no_sync(automated_ingest_test_context, unittest.TestCase):
     def test_no_sync_root_with_resc_name(self):
         put_job = 'test_no_sync_root_with_resc_name.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put_root_with_resc_name",
+            "put_root_with_resc_name",
             job_name = put_job,
             resc_names = [REGISTER_RESC2A, REGISTER_RESC2B],
             resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
@@ -604,7 +630,7 @@ class Test_no_sync(automated_ingest_test_context, unittest.TestCase):
 
         no_sync_job = 'test_no_sync_root_with_resc_name.no_sync'
         self.do_no_sync(
-            "irods_capability_automated_ingest.examples.put_root_with_resc_name",
+            "put_root_with_resc_name",
             job_name = no_sync_job)
         self.do_assert_failed_queue(count=None, job_name=no_sync_job)
         self.do_assert_retry_queue(count=None, job_name=no_sync_job)
@@ -628,7 +654,7 @@ class Test_sync(automated_ingest_test_context, unittest.TestCase):
     def test_sync(self):
         put_job = 'test_sync.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.sync",
+            "sync",
             job_name = put_job)
         self.do_assert_failed_queue(count=None, job_name=put_job)
         self.do_assert_retry_queue(count=None, job_name=put_job)
@@ -636,7 +662,7 @@ class Test_sync(automated_ingest_test_context, unittest.TestCase):
         recreate_job = 'test_sync.recreate'
         recreate_files(NFILES)
         self.do_put(
-            "irods_capability_automated_ingest.examples.sync",
+            "sync",
             job_name = recreate_job)
         self.do_assert_failed_queue(count=None, job_name=recreate_job)
         self.do_assert_retry_queue(count=None, job_name=recreate_job)
@@ -644,7 +670,7 @@ class Test_sync(automated_ingest_test_context, unittest.TestCase):
     def test_sync_root_with_resc_name(self):
         put_job = 'test_sync_root_with_resc_name.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.sync_root_with_resc_name",
+            "sync_root_with_resc_name",
             job_name = put_job,
             resc_names = [REGISTER_RESC2A, REGISTER_RESC2B],
             resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
@@ -654,7 +680,7 @@ class Test_sync(automated_ingest_test_context, unittest.TestCase):
         recreate_job = 'test_sync_root_with_resc_name.recreate'
         recreate_files(NFILES)
         self.do_put(
-            "irods_capability_automated_ingest.examples.sync_root_with_resc_name",
+            "sync_root_with_resc_name",
             job_name = recreate_job,
             resc_names = [REGISTER_RESC2A, REGISTER_RESC2B],
             resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
@@ -676,9 +702,9 @@ class Test_update(automated_ingest_test_context, unittest.TestCase):
     def tearDown(self):
         super(Test_update, self).tearDown()
 
-    def do_update(self, eh, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
+    def do_update(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
         recreate_files(NFILES)
-        self.do_register(eh, job_name, resc_name = resc_name)
+        self.do_register(eh_name, job_name, resc_name = resc_name)
         with iRODSSession(**get_kwargs()) as session:
             for i in listdir(PATH_TO_SOURCE_DIR):
                 path = join(PATH_TO_SOURCE_DIR, i)
@@ -693,14 +719,14 @@ class Test_update(automated_ingest_test_context, unittest.TestCase):
     def test_update(self):
         register_job = 'test_update.register'
         self.do_register(
-            "irods_capability_automated_ingest.examples.register",
+            "register",
             job_name = register_job)
         self.do_assert_failed_queue(count=None, job_name=register_job)
         self.do_assert_retry_queue(count=None, job_name=register_job)
 
         update_job = 'test_update.update'
         self.do_update(
-            "irods_capability_automated_ingest.examples.register",
+            "register",
             job_name = update_job)
         self.do_assert_failed_queue(count=None, job_name=update_job)
         self.do_assert_retry_queue(count=None, job_name=update_job)
@@ -708,7 +734,7 @@ class Test_update(automated_ingest_test_context, unittest.TestCase):
     def test_update_with_resc_name(self):
         register_job = 'test_update_with_resc_name.register'
         self.do_register(
-            "irods_capability_automated_ingest.examples.register_with_resc_name",
+            "register_with_resc_name",
             job_name = register_job,
             resc_name = [REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=register_job)
@@ -716,7 +742,7 @@ class Test_update(automated_ingest_test_context, unittest.TestCase):
 
         update_job = 'test_update_with_resc_name.update'
         self.do_update(
-            "irods_capability_automated_ingest.examples.register_with_resc_name",
+            "register_with_resc_name",
             job_name = update_job,
             resc_name = [REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=update_job)
@@ -725,7 +751,7 @@ class Test_update(automated_ingest_test_context, unittest.TestCase):
     def test_update_root_with_resc_name(self):
         register_job = 'test_update_root_with_resc_name.register'
         self.do_register(
-            "irods_capability_automated_ingest.examples.register_root_with_resc_name",
+            "register_root_with_resc_name",
             job_name = register_job,
             resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=register_job)
@@ -733,7 +759,7 @@ class Test_update(automated_ingest_test_context, unittest.TestCase):
 
         update_job = 'test_update_root_with_resc_name.update'
         self.do_update(
-            "irods_capability_automated_ingest.examples.register_root_with_resc_name",
+            "register_root_with_resc_name",
             job_name = update_job,
             resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=update_job)
@@ -750,7 +776,9 @@ class Test_put(automated_ingest_test_context, unittest.TestCase):
     def tearDown(self):
         super(Test_put, self).tearDown()
 
-    def do_put_par(self, eh, job_name = DEFAULT_JOB_NAME, resc_names=[DEFAULT_RESC], resc_roots=[DEFAULT_RESC_VAULT_PATH]):
+    def do_put_par(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_names=[DEFAULT_RESC], resc_roots=[DEFAULT_RESC_VAULT_PATH]):
+        eh = event_handler_path(eh_name)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
 
@@ -762,14 +790,14 @@ class Test_put(automated_ingest_test_context, unittest.TestCase):
     def test_put(self):
         job_name = 'test_put.do_put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = job_name)
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
     def test_put_with_resc_name(self):
         job_name = 'test_put_with_resc_name.put'
-        event_handler = 'irods_capability_automated_ingest.examples.put_with_resc_name'
+        event_handler = event_handler_path('put_with_resc_name')
         proc = subprocess.Popen([
             "python", "-m", IRODS_SYNC_PY, "start",
             PATH_TO_SOURCE_DIR,
@@ -787,7 +815,7 @@ class Test_put(automated_ingest_test_context, unittest.TestCase):
     def test_put_root_with_resc_name(self):
         job_name = 'test_put_root_with_resc_name.do_put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put_root_with_resc_name",
+            "put_root_with_resc_name",
             job_name = job_name,
             resc_names = [REGISTER_RESC2A, REGISTER_RESC2B],
             resc_roots = [REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
@@ -796,7 +824,7 @@ class Test_put(automated_ingest_test_context, unittest.TestCase):
 
     def test_put_non_leaf_non_root_with_resc_name(self):
         job_name = 'test_put_non_leaf_non_root_with_resc_name.put'
-        event_handler = 'irods_capability_automated_ingest.examples.put_non_leaf_non_root_with_resc_name'
+        event_handler = event_handler_path('put_non_leaf_non_root_with_resc_name')
         proc = subprocess.Popen([
             "python", "-m", IRODS_SYNC_PY, "start",
             PATH_TO_SOURCE_DIR,
@@ -814,7 +842,7 @@ class Test_put(automated_ingest_test_context, unittest.TestCase):
     def test_put_with_multiple_workers(self):
         job_name = 'test_put_with_multiple_workers'
         self.do_put_par(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = job_name)
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
@@ -829,7 +857,7 @@ class Test_append(automated_ingest_test_context, unittest.TestCase):
     def test_append(self):
         put_job = 'test_append.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.append",
+            "append",
             job_name = put_job)
         self.do_assert_failed_queue(count=None, job_name=put_job)
         self.do_assert_retry_queue(count=None, job_name=put_job)
@@ -837,7 +865,7 @@ class Test_append(automated_ingest_test_context, unittest.TestCase):
         recreate_job = 'test_append.recreate'
         recreate_files(NFILES)
         self.do_put(
-            "irods_capability_automated_ingest.examples.append",
+            "append",
             job_name = recreate_job)
         self.do_assert_failed_queue(count=None, job_name=recreate_job)
         self.do_assert_retry_queue(count=None, job_name=recreate_job)
@@ -845,7 +873,7 @@ class Test_append(automated_ingest_test_context, unittest.TestCase):
     def test_append_root_with_resc_name(self):
         put_job = 'test_append_root_with_resc_name.put'
         self.do_put(
-            'irods_capability_automated_ingest.examples.append_root_with_resc_name',
+            'append_root_with_resc_name',
             job_name = put_job,
             resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
             resc_roots=[REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
@@ -855,7 +883,7 @@ class Test_append(automated_ingest_test_context, unittest.TestCase):
         recreate_job = 'test_append_root_with_resc_name.recreate'
         recreate_files(NFILES)
         self.do_put(
-            "irods_capability_automated_ingest.examples.append_root_with_resc_name",
+            "append_root_with_resc_name",
             job_name = recreate_job,
             resc_names=[REGISTER_RESC2A, REGISTER_RESC2B],
             resc_roots=[REGISTER_RESC_PATH2A, REGISTER_RESC_PATH2B])
@@ -878,7 +906,7 @@ class Test_pep_callbacks(automated_ingest_test_context, unittest.TestCase):
         super(Test_pep_callbacks, self).tearDown()
 
     def run_sync_job_with_pep_callbacks(self, source_dir=PATH_TO_SOURCE_DIR, destination_coll=PATH_TO_COLLECTION, job_name = DEFAULT_JOB_NAME):
-        eh = 'irods_capability_automated_ingest.examples.register_with_peps'
+        eh = event_handler_path('register_with_peps')
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", source_dir, destination_coll, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--log_filename', self.logfile.name, '--files_per_task', '1'])
         proc.wait()
 
@@ -975,7 +1003,9 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     def tearDown(self):
         super(Test_register_as_replica, self).tearDown()
 
-    def do_register_as_replica_no_assertions(self, eh, job_name = DEFAULT_JOB_NAME):
+    def do_register_as_replica_no_assertions(self, eh_name, job_name = DEFAULT_JOB_NAME):
+        eh = event_handler_path(eh_name)
+
         clear_redis()
         recreate_files(NFILES)
 
@@ -992,8 +1022,8 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
         workers = start_workers(1)
         wait_for(workers, job_name)
 
-    def do_register_as_replica(self, eh, job_name = DEFAULT_JOB_NAME, resc_names = [DEFAULT_RESC]):
-        self.do_register_as_replica_no_assertions(eh)
+    def do_register_as_replica(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_names = [DEFAULT_RESC]):
+        self.do_register_as_replica_no_assertions(eh_name)
         with iRODSSession(**get_kwargs()) as session:
             self.assertTrue(session.collections.exists(PATH_TO_COLLECTION))
             for i in os.listdir(PATH_TO_SOURCE_DIR):
@@ -1020,14 +1050,14 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     def test_register_as_replica_with_resc_name(self):
         put_job = 'test_register_as_replica_with_resc_name.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = put_job)
         self.do_assert_failed_queue(count=None, job_name=put_job)
         self.do_assert_retry_queue(count=None, job_name=put_job)
 
         register_as_replica_job = 'test_register_as_replica_with_resc_name.register_as_replica_job'
         self.do_register_as_replica(
-            "irods_capability_automated_ingest.examples.replica_with_resc_name",
+            "replica_with_resc_name",
             job_name = register_as_replica_job,
             resc_names = [REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=register_as_replica_job)
@@ -1036,14 +1066,14 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     def test_register_as_replica_root_with_resc_name(self):
         put_job = 'test_register_as_replica_root_with_resc_name.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = put_job)
         self.do_assert_failed_queue(count=None, job_name=put_job)
         self.do_assert_retry_queue(count=None, job_name=put_job)
 
         register_as_replica_job = 'test_register_as_replica_root_with_resc_name.register_as_replica_job'
         self.do_register_as_replica(
-            'irods_capability_automated_ingest.examples.replica_root_with_resc_name',
+            'replica_root_with_resc_name',
             job_name = register_as_replica_job,
             resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=register_as_replica_job)
@@ -1052,13 +1082,13 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     def test_register_as_replica_non_leaf_non_root_with_resc_name(self):
         put_job = 'test_register_as_replica_non_leaf_non_root_with_resc_name.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = put_job)
         self.do_assert_failed_queue(count=None, job_name=put_job)
         self.do_assert_retry_queue(count=None, job_name=put_job)
 
         register_as_replica_job = 'test_register_non_leaf_non_root_with_resc_name.register_as_replica'
-        event_handler = 'irods_capability_automated_ingest.examples.replica_with_non_leaf_non_root_resc_name'
+        event_handler = 'replica_with_non_leaf_non_root_resc_name'
         # This should result in a hierarchy error
         self.do_register_as_replica_no_assertions(event_handler, register_as_replica_job)
         self.do_assert_failed_queue(job_name=register_as_replica_job)
@@ -1067,14 +1097,14 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     def test_update_with_resc_name_with_two_replicas(self):
         put_job = 'test_update_with_resc_name_with_two_replicas.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = put_job)
         self.do_assert_failed_queue(count=None, job_name=put_job)
         self.do_assert_retry_queue(count=None, job_name=put_job)
 
         register_as_replica_job = 'test_update_with_resc_name_with_two_replicas.register_as_replica'
         self.do_register_as_replica(
-            "irods_capability_automated_ingest.examples.replica_with_resc_name",
+            "replica_with_resc_name",
             job_name = register_as_replica_job,
             resc_names = [REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=register_as_replica_job)
@@ -1082,7 +1112,7 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
 
         update_replica_job = 'test_update_with_resc_name_with_two_replicas.update_replica'
         self.do_register_as_replica(
-            "irods_capability_automated_ingest.examples.replica_with_resc_name",
+            "replica_with_resc_name",
             job_name = update_replica_job,
             resc_names = [REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=update_replica_job)
@@ -1092,14 +1122,14 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     def test_update_root_with_resc_name_with_two_replicas(self):
         put_job = 'test_update_root_with_resc_name_with_two_replicas.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = put_job)
         self.do_assert_failed_queue(count=None, job_name=put_job)
         self.do_assert_retry_queue(count=None, job_name=put_job)
 
         register_as_replica_job = 'test_update_root_with_resc_name_with_two_replicas.register_as_replica'
         self.do_register_as_replica(
-            "irods_capability_automated_ingest.examples.replica_root_with_resc_name",
+            "replica_root_with_resc_name",
             job_name = register_as_replica_job,
             resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=register_as_replica_job)
@@ -1107,7 +1137,7 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
 
         update_replica_job = 'test_update_root_with_resc_name_with_two_replicas.update_replica'
         self.do_register_as_replica(
-            "irods_capability_automated_ingest.examples.replica_root_with_resc_name",
+            "replica_root_with_resc_name",
             job_name = update_replica_job,
             resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=update_replica_job)
@@ -1117,14 +1147,14 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     def test_update_non_leaf_non_root_with_resc_name_with_two_replicas(self):
         put_job = 'test_update_non_leaf_non_root_with_resc_name_with_two_replicas.put'
         self.do_put(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = put_job)
         self.do_assert_failed_queue(count=None, job_name=put_job)
         self.do_assert_retry_queue(count=None, job_name=put_job)
 
         register_as_replica_job = 'test_update_non_leaf_non_root_with_resc_name_with_two_replicas.register_as_replica'
         self.do_register_as_replica(
-            "irods_capability_automated_ingest.examples.replica_with_non_leaf_non_root_resc_name",
+            "replica_with_non_leaf_non_root_resc_name",
             job_name = register_as_replica_job,
             resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=register_as_replica_job)
@@ -1132,7 +1162,7 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
 
         update_replica_job = 'test_update_non_leaf_non_root_with_resc_name_with_two_replicas.update_replica'
         self.do_register_as_replica(
-            "irods_capability_automated_ingest.examples.replica_with_non_leaf_non_root_resc_name",
+            "replica_with_non_leaf_non_root_resc_name",
             job_name = update_replica_job,
             resc_names = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=update_replica_job)
@@ -1142,7 +1172,7 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
         with iRODSSession(**get_kwargs()) as session:
             session.resources.remove_child(REGISTER_RESC2, REGISTER_RESC2A)
         self.do_put(
-            "irods_capability_automated_ingest.examples.put_with_resc_name",
+            "put_with_resc_name",
             job_name = job_name,
             resc_names = [REGISTER_RESC2A],
             resc_roots = [REGISTER_RESC_PATH2A])
@@ -1158,33 +1188,33 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
 
         register_as_replica_job = 'test_register_as_replica_with_resc_name_with_another_replica_in_hier.register_as_replica_job'
         self.do_register_as_replica_no_assertions(
-            "irods_capability_automated_ingest.examples.replica_with_resc_name",
+            "replica_with_resc_name",
             job_name = register_as_replica_job)
         self.do_assert_failed_queue("wrong paths", job_name=register_as_replica_job)
 
     @unittest.skip('irods/irods#3517 - this is not allowed')
     def test_register_as_replica_root_with_resc_name_with_another_replica_in_hier(self):
         self.do_put_to_child()
-        self.do_register_as_replica_no_assertions("irods_capability_automated_ingest.examples.replica_root_with_resc_name")
+        self.do_register_as_replica_no_assertions("replica_root_with_resc_name")
         self.do_assert_failed_queue("wrong paths", job_name=job_name)
 
     @unittest.skip('this should result in a HIERARCHY_ERROR')
     def test_register_as_replica_non_leaf_non_root_with_resc_name_with_another_replica_in_hier(self):
         self.do_put_to_child()
-        self.do_register_as_replica_no_assertions("irods_capability_automated_ingest.examples.replica_with_non_root_non_leaf_resc_name")
+        self.do_register_as_replica_no_assertions("replica_with_non_root_non_leaf_resc_name")
         self.do_assert_failed_queue("wrong paths", job_name=job_name)
 
 
     # register with as replica event handler
     @unittest.skip('irods/irods#4623')
     def test_register_with_as_replica_event_handler_with_resc_name(self):
-        self.do_register("irods_capability_automated_ingest.examples.replica_with_resc_name", resc_name = [REGISTER_RESC2A])
+        self.do_register("replica_with_resc_name", resc_name = [REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
     @unittest.skip('irods/irods#4623')
     def test_register_with_as_replica_event_handler_root_with_resc_name(self):
-        self.do_register("irods_capability_automated_ingest.examples.replica_root_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
+        self.do_register("replica_root_with_resc_name", resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
@@ -1200,9 +1230,9 @@ class Test_update_metadata(automated_ingest_test_context, unittest.TestCase):
         super(Test_update_metadata, self).tearDown()
 
     # update metadata
-    def do_update_metadata(self, eh, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
+    def do_update_metadata(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_name = [DEFAULT_RESC]):
         ctime_files(NFILES)
-        self.do_register(eh, job_name, resc_name = resc_name)
+        self.do_register(eh_name, job_name, resc_name = resc_name)
         with iRODSSession(**get_kwargs()) as session:
             for i in listdir(PATH_TO_SOURCE_DIR):
                 path = join(PATH_TO_SOURCE_DIR, i)
@@ -1217,14 +1247,14 @@ class Test_update_metadata(automated_ingest_test_context, unittest.TestCase):
     def test_update_metadata(self):
         register_job = 'test_update_metadata.register'
         self.do_register(
-            "irods_capability_automated_ingest.examples.register",
+            "register",
             job_name = 'test_update_metadata.do_register')
         self.do_assert_failed_queue(count=None, job_name=register_job)
         self.do_assert_retry_queue(count=None, job_name=register_job)
 
         update_job = 'test_update_metadata.update'
         self.do_update_metadata(
-            "irods_capability_automated_ingest.examples.register",
+            "register",
             job_name = update_job)
         self.do_assert_failed_queue(count=None, job_name=update_job)
         self.do_assert_retry_queue(count=None, job_name=update_job)
@@ -1232,7 +1262,7 @@ class Test_update_metadata(automated_ingest_test_context, unittest.TestCase):
     def test_update_metadata_with_resc_name(self):
         register_job = 'test_update_metadata_with_resc_name.register'
         self.do_register(
-            "irods_capability_automated_ingest.examples.register_with_resc_name",
+            "register_with_resc_name",
             job_name = register_job,
             resc_name=[REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=register_job)
@@ -1240,7 +1270,7 @@ class Test_update_metadata(automated_ingest_test_context, unittest.TestCase):
 
         update_metadata_job = 'test_update_metadata_with_resc_name.update_metadata'
         self.do_update_metadata(
-            "irods_capability_automated_ingest.examples.register_with_resc_name",
+            "register_with_resc_name",
             job_name = update_metadata_job,
             resc_name=[REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=update_metadata_job)
@@ -1249,7 +1279,7 @@ class Test_update_metadata(automated_ingest_test_context, unittest.TestCase):
     def test_update_metadata_root_with_resc_name(self):
         register_job = 'test_update_metadata_root_with_resc_name.register'
         self.do_register(
-            "irods_capability_automated_ingest.examples.register_root_with_resc_name",
+            "register_root_with_resc_name",
             job_name = register_job,
             resc_name=[REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=register_job)
@@ -1257,7 +1287,7 @@ class Test_update_metadata(automated_ingest_test_context, unittest.TestCase):
 
         update_metadata_job = 'test_update_metadata_root_with_resc_name.update_metadata'
         self.do_update_metadata(
-            "irods_capability_automated_ingest.examples.register_root_with_resc_name",
+            "register_root_with_resc_name",
             job_name = update_metadata_job,
             resc_name=[REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=update_metadata_job)
@@ -1277,7 +1307,7 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
     def test_register(self):
         job_name = 'test_register'
         self.do_register(
-            "irods_capability_automated_ingest.examples.register",
+            "register",
             job_name = job_name)
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
@@ -1285,7 +1315,7 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
     def test_register_with_resc_name(self):
         job_name = 'test_register_with_resc_name'
         self.do_register(
-            "irods_capability_automated_ingest.examples.register_with_resc_name",
+            "register_with_resc_name",
             job_name = job_name,
             resc_name = [REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=job_name)
@@ -1294,19 +1324,19 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
     def test_register_root_with_resc_name(self):
         job_name = 'test_register_root_with_resc_name'
         self.do_register(
-            "irods_capability_automated_ingest.examples.register_root_with_resc_name",
+            "register_root_with_resc_name",
             job_name = job_name, resc_name = [REGISTER_RESC2A, REGISTER_RESC2B])
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
     def test_register_non_leaf_non_root_with_resc_name(self):
         job_name = 'test_register_non_leaf_non_root_with_resc_name'
-        event_handler = 'irods_capability_automated_ingest.examples.register_non_leaf_non_root_with_resc_name'
+        event_handler = 'register_non_leaf_non_root_with_resc_name'
         proc = subprocess.Popen([
             "python", "-m", IRODS_SYNC_PY, "start",
             PATH_TO_SOURCE_DIR,
             PATH_TO_COLLECTION,
-            "--event_handler", event_handler,
+            "--event_handler", event_handler_path(event_handler),
             "--job_name", job_name,
             "--log_level", "INFO",
             '--files_per_task', '1'])
@@ -1317,7 +1347,9 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
         # This should result in a hierarchy error
         self.do_assert_failed_queue(job_name=job_name)
 
-    def do_register_par(self, eh, job_name = DEFAULT_JOB_NAME, resc_names=[DEFAULT_RESC]):
+    def do_register_par(self, eh_name, job_name = DEFAULT_JOB_NAME, resc_names=[DEFAULT_RESC]):
+        eh = event_handler_path(eh_name)
+
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         workers = start_workers(NWORKERS)
@@ -1328,7 +1360,7 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
     def test_register_with_multiple_workers(self):
         job_name = 'test_register_with_multiple_workers'
         self.do_register_par(
-            "irods_capability_automated_ingest.examples.register",
+            "register",
             job_name = job_name)
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
@@ -1380,6 +1412,7 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
     def tearDown(self):
         super(Test_register_as_replica, self).tearDown()
 
+    # TODO: eh?
     def do_register_as_replica_no_assertions(self, eh, job_name = DEFAULT_JOB_NAME):
         clear_redis()
 
@@ -1452,7 +1485,8 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
         with open(self.bad_filepath, 'w') as f:
             f.write('Test_irods_sync_UnicodeEncodeError')
 
-    def run_scan_with_event_handler(self, event_handler, job_name = DEFAULT_JOB_NAME):
+    def run_scan_with_event_handler(self, eh_name, job_name = DEFAULT_JOB_NAME):
+        event_handler = event_handler_path(eh_name)
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", self.source_dir_path, self.dest_coll_path, "--event_handler", event_handler, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
         workers = start_workers(1)
@@ -1464,9 +1498,9 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
 
         job_name = 'test_register.run_scan_with_event_handler'
         self.run_scan_with_event_handler(
-            "irods_capability_automated_ingest.examples.register",
+            "register",
             job_name = job_name)
- 
+
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
@@ -1482,14 +1516,14 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
 
         job_name = 'test_register_as_replica.put'
         self.run_scan_with_event_handler(
-            "irods_capability_automated_ingest.examples.put",
+            "put",
             job_name = job_name)
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
         clear_redis()
 
-        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.replica_with_resc_name")
+        self.run_scan_with_event_handler("replica_with_resc_name")
 
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
@@ -1516,7 +1550,7 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
     def test_put(self):
         expected_physical_path = join(DEFAULT_RESC_VAULT_PATH, 'home', 'rods', os.path.basename(self.source_dir_path), self.unicode_error_filename)
 
-        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.put")
+        self.run_scan_with_event_handler("put")
 
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
@@ -1533,14 +1567,14 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
 
         job_name = 'test_put_sync.sync'
         self.run_scan_with_event_handler(
-            "irods_capability_automated_ingest.examples.sync",
+            "sync",
             job_name = job_name)
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
         self.create_bad_file()
 
-        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.sync")
+        self.run_scan_with_event_handler("sync")
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
@@ -1556,7 +1590,7 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
 
         job_name = 'test_put_append.put'
         self.run_scan_with_event_handler(
-            "irods_capability_automated_ingest.examples.append",
+            "append",
             job_name = job_name)
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
@@ -1564,7 +1598,7 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
         with open(self.bad_filepath, 'a') as f:
             f.write('test_put_append')
 
-        self.run_scan_with_event_handler("irods_capability_automated_ingest.examples.append")
+        self.run_scan_with_event_handler("append")
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 

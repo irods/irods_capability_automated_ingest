@@ -30,7 +30,7 @@ class redis_key_handle(object):
         raise RuntimeError("max retries")
 
     def get_key(self):
-        return str(self.category + ':/' + self.identifier)
+        return str(self.category + self.delimiter + self.identifier)
 
     def get_value(self):
         if self.get_key() is None:
