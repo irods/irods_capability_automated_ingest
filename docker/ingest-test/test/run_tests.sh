@@ -1,6 +1,6 @@
-#! /bin/bash
+#! /bin/bash -ex
 
-pip install --upgrade ${PIP_PACKAGE}
+pip install ${PIP_PACKAGE}
 
 # Wait until the provider is up and accepting connections.
 until nc -z icat.example.org 1247; do
@@ -9,4 +9,4 @@ done
 
 sleep 10
 
-python -m unittest ${TEST_CASE}
+python -m unittest -v ${TEST_CASE}

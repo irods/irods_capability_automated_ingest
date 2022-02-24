@@ -1,10 +1,6 @@
-FROM python:3.5
+FROM python:3.10
 
 RUN apt update && apt install -y netcat
-
-ARG PIP_PACKAGE="irods-capability-automated-ingest"
-
-RUN pip install ${PIP_PACKAGE}
 
 COPY irods_environment.json /
 
