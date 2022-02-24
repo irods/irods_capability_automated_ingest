@@ -10,6 +10,12 @@ The example diagrams below show a filesystem scanner and a landing zone.
 
 ![Automated Ingest: Landing Zone Diagram](capability_automated_ingest_landing_zone.jpg)
 
+## Supported/Tested Python versions
+- 3.7
+- 3.8
+- 3.9
+- 3.10
+
 ## Usage options
 
 ### Redis options
@@ -181,7 +187,7 @@ celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart
 **Note:** Make sure queue names match those of the ingest job (default queue names shown here).
 
 #### Run tests
-**Note:** The test suite requires Python version >=3.5.
+**Note:** The test suite requires Python version >=3.7.
 **Note:** The tests should be run without running Celery workers or with an unused redis database.
 ```
 python -m irods_capability_automated_ingest.test.test_irods_sync
