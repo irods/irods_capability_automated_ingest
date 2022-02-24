@@ -1093,7 +1093,6 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
         self.do_register_as_replica_no_assertions(event_handler, register_as_replica_job)
         self.do_assert_failed_queue(job_name=register_as_replica_job)
 
-    @unittest.skip('irods/irods#4622')
     def test_update_with_resc_name_with_two_replicas(self):
         put_job = 'test_update_with_resc_name_with_two_replicas.put'
         self.do_put(
@@ -1118,7 +1117,6 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
         self.do_assert_failed_queue(count=None, job_name=update_replica_job)
         self.do_assert_retry_queue(count=None, job_name=update_replica_job)
 
-    @unittest.skip('irods/irods#4622')
     def test_update_root_with_resc_name_with_two_replicas(self):
         put_job = 'test_update_root_with_resc_name_with_two_replicas.put'
         self.do_put(
@@ -1180,7 +1178,6 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
             session.resources.add_child(REGISTER_RESC2, REGISTER_RESC2A)
 
     # replica with another replica in hier
-    @unittest.skip('irods/irods#4622')
     def test_register_as_replica_with_resc_name_with_another_replica_in_hier(self):
         put_job = 'test_register_as_replica_with_resc_name_with_another_replica_in_hier.put'
         self.do_put_to_child(job_name = put_job)
@@ -1384,7 +1381,6 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
             '/tempZ/home/rods',
             job_name = 'test_register_to_existing_zone_substring')
 
-    @unittest.skip('irods/irods#4621')
     def test_register_to_existing_zone_superstring(self):
         self.do_register_to_invalid_zone(
             '/tempZoneMore/home/rods',
