@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+## [v0.4.0] - 2022-02-24
+
+This release abstracts the scanners, eases deployment
+by putting the event handler in redis, provides better
+SSL support, and now requires Python 3.7+.
+
+- [#171] Un-skip tests with resolved issues
+- [#167] Bump versions in setup.py and test image
+- [#170] Fix tests to use event_handler files
+- Bump celery from 4.2.1 to 5.2.2
+- Bump urllib3 from 1.24.2 to 1.26.5
+- Bump jinja2 from 2.10 to 2.11.3
+- [#102] event_handler goes into redis
+- [#159] add performance benchmark test harness
+- [#147][#157] Allow running workers with env only
+- [#156] modified test to use resc_hier string
+- [#155] added helper for unicode errors and renamed variables
+- [#110] Add several interfaces for refactor
+- [irods/python-irodsclient#237] load certificate into ssl context
+- fixed the parsing of the S3 region parameter
+- Bump werkzeug from 0.14.1 to 0.15.3
+- [#125] Add non-SSL connection option for S3
+- [#86][#117] Test suite cleanup + docker image
+- Correct README.md for docker instructions
+- [#109] Update docker steps for Celery
+- [#114] Remove zone hint check
+- [#90] Honor CELERY_BROKER_URL when present
+
 ## [v0.3.8] - 2019-11-12
 
 This release fixes handling of stopped periodic jobs
