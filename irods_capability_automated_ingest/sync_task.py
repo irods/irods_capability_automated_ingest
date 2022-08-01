@@ -17,6 +17,7 @@ from .task_queue import task_queue
 import traceback
 from celery.signals import task_prerun, task_postrun
 from billiard import current_process
+from .char_map_util import translate_path
 
 class ContinueException(Exception):
     pass
@@ -214,7 +215,7 @@ def sync_path(self, meta):
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
 
 def sync_entry(self, meta, cls, datafunc, metafunc):
-    
+
     syncer = scanner.scanner_factory(meta)
 
     path=meta["path"]
@@ -230,20 +231,26 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
 
     logger.info("synchronizing " + cls + ". path = " + path)
 
-    if scanner.is_unicode_encode_error_path(path):
-        # encodes to utf8 and logs warning
+    char_map_func = getattr(event_handler.get_module(),'character_map',None)
+    unicode_error = scanner.is_unicode_encode_error_path(path)
+
+
+    if (unicode_error
+            or char_map_func
+            ): # or char_map_func: # compute things we could need for either case
         abspath=os.path.abspath(path)
-        path=os.path.dirname(abspath)
         utf8_escaped_abspath=abspath.encode('utf8', 'surrogateescape')
         b64_path_str=base64.b64encode(utf8_escaped_abspath)
+
+    if unicode_error:
+        path=os.path.dirname(abspath)
         unicode_error_filename='irods_UnicodeEncodeError_' + \
                     str(b64_path_str.decode('utf8'))
-
         logger.warning(
                     'sync_entry raised UnicodeEncodeError while syncing path:' + str(utf8_escaped_abspath))
-
         meta['path'] = path
         meta['b64_path_str'] = b64_path_str
+        meta["b64_reason"] = "UnicodeEncodeError"
         meta['unicode_error_filename'] = unicode_error_filename
         sync_key = str(b64_path_str.decode('utf8')) + ":" + target
     else:
@@ -284,7 +291,23 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
             else:
                 target2 = syncer.construct_path(meta2, path)
 
+            # If the event handler has a character_map function, it should have returned a
+            # structure (either a dict or a list/tuple of key-value tuples) to be used for
+            # instantiating a collections.OrderedDict object. This object will dictate how
+            # the logical path's characters are remapped.  The re-mapping is performed
+            # independently for each path element of the collection hierarchy.
+
+            if 'unicode_error_filename' not in meta:
+                if char_map_func:
+                    translated_path = translate_path(target2,char_map_func())
+                    # arrange for AVU to be attached only when logical name changes
+                    if translated_path != target2:
+                        target2 = translated_path
+                        meta2["b64_reason"] = "character_map"
+                        meta2['b64_path_str_charmap'] = b64_path_str
+
             meta2["target"] = target2
+
             if sync_time is None or mtime >= sync_time:
                 datafunc(event_handler.get_module(), meta2, logger, True)
                 logger.info("succeeded", task=meta["task"], path=path)
