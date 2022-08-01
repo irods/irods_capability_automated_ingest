@@ -71,13 +71,15 @@ def annotate_metadata_for_special_data_objs(meta, session, source_physical_fullp
         if key not in obj.metadata.keys():
             obj.metadata.add(key, val, unit)
 
-    b64_path_str = meta.get('b64_path_str')
+    b64_path_str = meta.get('b64_path_str') or meta.get('b64_path_str_charmap')
     if b64_path_str is not None:
-        add_metadata_if_not_present(
-            session.data_objects.get(dest_dataobj_logical_fullpath),
-            'irods::automated_ingest::UnicodeEncodeError',
-            b64_path_str,
-            'python3.base64.b64encode(full_path_of_source_file)')
+        b64_reason = meta.get('b64_reason')
+        if b64_reason in ('UnicodeEncodeError','character_map'):
+            add_metadata_if_not_present(
+                session.data_objects.get(dest_dataobj_logical_fullpath),
+                'irods::automated_ingest::{}'.format(b64_reason),
+                b64_path_str,
+                'python3.base64.b64encode(full_path_of_source_file)')
 
     if meta['is_socket']:
         add_metadata_if_not_present(
@@ -103,7 +105,7 @@ def register_file(hdlr_mod, logger, session, meta, **options):
     else:
         phypath_to_register_in_catalog = event_handler.target_path(session, **options)
     if phypath_to_register_in_catalog is None:
-        if b64_path_str is not None:
+        if b64_path_str is not None and 'unicode_error_filename' in meta:
             phypath_to_register_in_catalog = os.path.join(source_physical_fullpath, meta['unicode_error_filename'])
         else:
             phypath_to_register_in_catalog = source_physical_fullpath
@@ -197,7 +199,7 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
     phypath_to_register_in_catalog = event_handler.target_path(session, **options)
     b64_path_str = meta.get('b64_path_str')
     if phypath_to_register_in_catalog is None:
-        if b64_path_str is not None:
+        if b64_path_str is not None and 'unicode_error_filename' in meta:
             # Append generated filename to truncated fullpath because it failed to encode
             phypath_to_register_in_catalog = os.path.join(source_physical_fullpath, meta['unicode_error_filename'])
         else:

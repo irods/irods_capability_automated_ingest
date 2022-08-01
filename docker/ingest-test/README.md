@@ -6,6 +6,17 @@ Run the following to build the required images:
 ```
 docker-compose build
 ```
+When testing against an alternative version of iRODS (default is currently 4.3.0), there are three variables in the
+`docker-compose.yml` file which must be changed prior to the build step. For example, if testing against iRODS 4.2.11:
+```
+  irods-catalog-provider:
+    build:
+      args:
+          irods_version: 4.2.11-1~bionic
+          irods_version_major_minor: 4.2
+          py_version: ""
+```
+Note that, depending on whether the iRODS major/minor version is 4.2 or 4.3, the `py_version` takes on the possible values `""` or `"3"`, respectively.
 
 ## Step 2: Run the project
 

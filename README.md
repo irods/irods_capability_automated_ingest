@@ -90,6 +90,7 @@ These options are used at the "start" of an ingest job.
 | post_coll_create    |  user-defined python   |  none |
 | pre_coll_modify    |   user-defined python |  none |
 | post_coll_modify    |  user-defined python   |  none |
+| character_map | user-defined python | none |
 | as_user |   takes action as this iRODS user |  authenticated user |
 | target_path | set mount path on the irods server which can be different from client mount path | client mount path |
 | to_resource | defines  target resource request of operation |  as provided by client environment |
@@ -99,6 +100,70 @@ These options are used at the "start" of an ingest job.
 | delay | defines seconds between retries | 0 |
 
 Event handlers can use `logger` to write logs. See `structlog` for available logging methods and signatures.
+
+### Character Mapping option
+If an application should require that iRODS logical paths produced by the ingest process exclude subsets of the
+range of possible Unicode characters, we can add a character\_map method that returns a dict object. For example:
+
+```
+    class event_handler(Core):
+        @staticmethod
+        def character_map():
+            return {
+                re.compile('[^a-zA-Z0-9]'):'_'
+            }
+        # ...
+```
+The returned dictionary, in this case, indicates that the ingest process should replace all non-alphanumeric (as
+well as non-ASCII) characters with an underscore wherever they may occur in an otherwise normally generated logical path.
+The substition process also applies to the intermediate (ie collection name) elements in a logical path, and a suffix is
+appended to affected path elements to avoid potential collisions with other remapped object names.
+
+Each key of the returned dictionary indicates a character or set of characters needing substitution.
+Possible key types include:
+
+   1. character
+   ```
+       # substitute backslashes with underscores
+       '\\': '_'
+   ```
+   2. tuple of characters
+   ```
+       # any character of the tuple is replaced by a Unicode small script x
+       ('\\','#','-'): '\u2093'
+   ```
+   3. regular expression
+   ```
+       # any character outside of range 0-256 becomes an underscore
+       re.compile('[\u0100-\U0010ffff]'): '_'  
+   ```
+   4. callable accepting a character argument and returning a boolean
+   ```
+       # ASCII codes above 'z' become ':'
+       (lambda c: ord(c) in range(ord('z')+1,128)): ':'
+   ```
+
+In the event that the order-of-substitution is significant, the method may instead return a list of key-value tuples.
+
+### UnicodeEncodeError
+Any file whose path in the filesystem whose ingest results in a UnicodeEncodeError exception being raised (e.g. by the
+inclusion of an unencodable UTF8 sequence) will be automatically renamed using a base-64 sequence to represent the original,
+unmodified vault path.
+
+Additionally, data objects that have had their names remapped, whether pro forma or via a UnicodeEncodeError, will be
+annotated with an AVU of the form
+
+   Attribute:	"irods::automated_ingest::" + ANNOTATION_REASON
+   Value:	A PREFIX plus the base64-converted "bad filepath"
+   Units:	"python3.base64.b64encode(full_path_of_source_file)"
+
+Where :
+   - ANNOTATION_REASON is either or "UnicodeEncodeError" "character\_map" depending on why the remapping occurred.
+   - PREFIX is either "irods_UnicodeEncodeError\_" or blank(""), again depending on the re-mapping cause.
+
+Note that the UnicodeEncodeError type of remapping is unconditional, whereas the character remapping is contingent on
+an event handler's character_map method being defined.  Also, if a UnicodeEncodeError-style ingest is performed on a
+given object, this precludes character mapping being done for the object.
 
 ### operation mode ###
 

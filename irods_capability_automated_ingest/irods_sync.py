@@ -43,6 +43,37 @@ def get_celery_broker_info():
     return host, port, db
 
 
+class character_map_argument_error(Exception): pass
+
+# Make sure, if a character_map method is defined for the given event handler, that it
+# returns a dictionary (or argument for construction of dictionary) appropriate within the
+# conventions laid out in the README.  Also, within reason, check any characters explicitly
+# named for remapping. To satisfy the principle of least surprise, they should at least
+# be restricted to being strings of length one.
+
+def check_event_handler(filename):
+    namespace = {}
+    if filename is not None:
+        exec(open(filename,'r').read(), namespace, namespace)
+        ev_hdlr_class = namespace['event_handler']
+        char_map_method = getattr(ev_hdlr_class, 'character_map', None)
+        error_message = ''
+        if char_map_method:
+          returned = char_map_method()
+          try:
+              char_mapper = dict(returned)
+          except TypeError:
+              error_message = 'character_map() method must return a dict or iterable of key value tuples'
+              raise character_map_argument_error(error_message)
+          for key,value in char_mapper.items():
+              if isinstance(key, str) and len(key) > 1 or \
+                 isinstance(key, tuple) and any(len(s) > 1 for s in key) or \
+                 isinstance(value, str) and len(value) > 1:
+                     error_message = "character_map()'s returned object should denote only single-character substitutions"
+                     raise character_map_argument_error(error_message)
+    exit()
+
+
 def add_arguments(parser):
     host, port, db = get_celery_broker_info()
 
@@ -75,6 +106,8 @@ def handle_start(args):
     ex_file_arg = args.exclude_file_type
     if ex_file_arg != None:
         ex_arg_list = [x.strip() for x in ex_file_arg[0].split(',')]
+
+    check_event_handler(args.event_handler)
 
     data = {}
     data["restart_queue"] = args.restart_queue
