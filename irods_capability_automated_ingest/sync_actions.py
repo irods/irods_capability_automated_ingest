@@ -89,7 +89,7 @@ def monitor_job(job_name, progress, config):
             time.sleep(1)
 
     failures = job.failures_handle().get_value()
-    if failures != 0:
+    if failures is not None and failures != 0:
         return -1
     else:
         return 0
