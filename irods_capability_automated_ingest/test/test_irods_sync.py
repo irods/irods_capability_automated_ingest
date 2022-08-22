@@ -1400,49 +1400,86 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
         else:
             self.fail('target collection should fail to ingest')
 
-@unittest.skip('Test does not seem to raise UnicodeEncodeError')
-class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
+
+# TODO base64 transform should be the same for each of the current types of test
+
+def b64_calculation(this):
+    utf8_escaped_abspath = this.bad_filepath
+    this.b64_path_str = base64.b64encode(utf8_escaped_abspath)
+
+
+class _Test_irods_sync_with_bad_filename:
+
+    # - configurable values
+
+    BAD_FILENAME = None
+    PREFIX = ''
+    EH_SUFFIX = ''
+    B64_CALCULATION = b64_calculation
+    CHARACTER_MAPPING_TRANSFORM = None
+    LOGICAL_PATH_CALCULATION = \
+        lambda this : join(this.dest_coll_path, this.unicode_error_filename)
+    DETAILED_CHECK = True
+    # Flag to indicate whether suffixes will be appended to data names for de-ambiguation
+    ALLOW_LOGICAL_NAME_SUFFIX = False
+
     def setUp(self):
-        super(Test_register_as_replica, self).setUp()
+        if self.BAD_FILENAME is None:
+            self.skipTest('Need BAD_FILENAME, ie test vector, that is not None')
+        basename = str(int(time.time()))
+        self.source_dir_path = join('/', 'tmp', 'testdir', basename)
+        os.makedirs(self.source_dir_path)
+        self.dest_coll_path = join('/tempZone/home/rods', basename)
+        self.bad_filepath = join(self.source_dir_path.encode('utf8'), self.BAD_FILENAME)
+        self.create_bad_file()
+        self.b64_path_str = ''
+
+        if self.CHARACTER_MAPPING_TRANSFORM:
+            self.CHARACTER_MAPPING_TRANSFORM()
+
+        # calculate base64 transformed, original physical path
+        if self.B64_CALCULATION:
+            self.B64_CALCULATION()
+
+        self.unicode_error_filename = self.PREFIX + str(self.b64_path_str.decode('utf8')).rstrip('/')
+
+        if self.LOGICAL_PATH_CALCULATION:
+            self.expected_logical_path = self.LOGICAL_PATH_CALCULATION()
+
+    def noop_test(self):
+        x = 1
+        pass
 
     def tearDown(self):
-        super(Test_register_as_replica, self).tearDown()
+        delete_collection_if_exists(self.dest_coll_path)
+        rmtree(self.source_dir_path, ignore_errors=True)
+        clear_redis()
 
     # TODO: eh?
     def do_register_as_replica_no_assertions(self, eh, job_name = DEFAULT_JOB_NAME):
         clear_redis()
 
-        # Create a file in a known location with an out-of-range Unicode character in the name
-        bad_filename = 'test_register_with_unicode_encode_error_path_' + chr(65535)
-        self.source_dir_path = join(os.path.dirname(PATH_TO_SOURCE_DIR), 'b')
-        os.makedirs(self.source_dir_path)
-
-        self.dest_coll_path = join('/tempZone/home/rods', os.path.basename(self.source_dir_path))
-        self.bad_filepath = join(self.source_dir_path, bad_filename).encode('utf8')
-        self.create_bad_file()
-
-        utf8_escaped_abspath = self.bad_filepath.decode('utf8').encode('utf8', 'surrogateescape')
-        self.b64_path_str = base64.b64encode(utf8_escaped_abspath)
-        self.unicode_error_filename = 'irods_UnicodeEncodeError_' + str(self.b64_path_str.decode('utf8')).rstrip('/')
-        self.expected_logical_path = join(self.dest_coll_path, self.unicode_error_filename)
-
-        with iRODSSession(**get_kwargs()) as session:
-            create_resources(session, HIERARCHY1)
-
-
-    def tearDown(self):
-        clear_redis()
-        delete_collection_if_exists(self.dest_coll_path)
-        rmtree(self.source_dir_path, ignore_errors=True)
-        with iRODSSession(**get_kwargs()) as session:
-            delete_resources(session, HIERARCHY1)
-
     # Helper member functions
-    def assert_logical_path(self, session):
+    def assert_logical_path(self, session, allow_suffix = False):
         self.assertTrue(session.collections.exists(self.dest_coll_path),
             msg='Did not find collection {self.dest_coll_path}'.format(**locals()))
-        self.assertTrue(session.data_objects.exists(self.expected_logical_path),
-            msg='Did not find data object {self.expected_logical_path}'.format(**locals()))
+        coll_name = irods_dirname( self.expected_logical_path )
+        data_name = irods_basename( self.expected_logical_path )
+        self.asserted_logical_path = self.expected_logical_path
+
+        def existence_criterion():
+            if not allow_suffix:
+                return session.data_objects.exists(self.expected_logical_path)
+            query = session.query(DataObject.name).filter(Collection.name == coll_name)
+            for row in query:
+                row_data_name = row[DataObject.name]
+                self.asserted_logical_path = '{coll_name}/{row_data_name}'.format(**locals())
+                if row_data_name[:len(data_name)] == data_name:
+                    return True
+            return False
+
+        self.assertTrue(existence_criterion(),
+            msg='Did not find data object for {self.expected_logical_path}'.format(**locals()))
 
     def assert_physical_path_and_resource(self, session, expected_physical_path, expected_resource=DEFAULT_RESC):
         obj = session.data_objects.get(self.expected_logical_path)
@@ -1455,9 +1492,10 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
         self.assertEqual(original_file_contents, replica_file_contents)
 
     def assert_metadata_annotation(self, session):
-        obj = session.data_objects.get(self.expected_logical_path)
-        metadata_value = obj.metadata.get_one('irods::automated_ingest::UnicodeEncodeError')
-        self.assertEqual(str(metadata_value.value), str(self.b64_path_str.decode('utf8')))
+        if self.b64_path_str:
+            obj = session.data_objects.get(self.asserted_logical_path)
+            metadata_value = obj.metadata.get_one('irods::automated_ingest::{0.ANNOTATION_REASON}'.format(self))
+            self.assertEqual(str(metadata_value.value), str(self.b64_path_str.decode('utf8')))
 
     def assert_data_object_size(self, session):
         s1 = getsize(self.bad_filepath)
@@ -1492,21 +1530,44 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
     def test_register(self):
         expected_physical_path = join(self.source_dir_path, self.unicode_error_filename)
 
-        job_name = 'test_register.run_scan_with_event_handler'
+        job_name = self.__class__.__name__ + '.test_register.run_scan_with_event_handler'
         self.run_scan_with_event_handler(
-            "register",
+            "register{.EH_SUFFIX}".format(self),
             job_name = job_name)
 
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
         with iRODSSession(**get_kwargs()) as session:
-            self.assert_logical_path(session)
-            self.assert_physical_path_and_resource(session, expected_physical_path)
+            self.assert_logical_path(session, allow_suffix = self.ALLOW_LOGICAL_NAME_SUFFIX )
             self.assert_metadata_annotation(session)
-            self.assert_data_object_size(session)
-            self.assert_data_object_mtime(session)
+            if self.DETAILED_CHECK:
+                self.assert_physical_path_and_resource(session, expected_physical_path)
+                self.assert_data_object_size(session)
+                self.assert_data_object_mtime(session)
 
+    def test_put(self):
+        expected_physical_path = join(DEFAULT_RESC_VAULT_PATH, 'home', 'rods', os.path.basename(self.source_dir_path), self.unicode_error_filename)
+
+        job_name = self.__class__.__name__ + '.test_register.run_scan_with_event_handler'
+        self.run_scan_with_event_handler("put{.EH_SUFFIX}".format(self),
+                job_name = job_name)
+
+        self.do_assert_failed_queue(count=None, job_name=job_name)
+        self.do_assert_retry_queue(count=None, job_name=job_name)
+
+        with iRODSSession(**get_kwargs()) as session:
+            self.assert_logical_path(session, allow_suffix = self.ALLOW_LOGICAL_NAME_SUFFIX )
+            self.assert_metadata_annotation(session)
+            if self.DETAILED_CHECK:
+                self.assert_physical_path_and_resource(session, expected_physical_path)
+                self.assert_data_object_contents(session)
+                self.assert_data_object_size(session)
+
+
+class _supplementary_tests_with_bad_filename:
+
+    @unittest.skip("SYS_RESC_DOES_NOT_EXIST - index out of range on replica")
     def test_register_as_replica(self):
         expected_physical_path = join(self.source_dir_path, self.unicode_error_filename)
 
@@ -1542,21 +1603,6 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
             s1 = size(session, self.expected_logical_path, replica_num=0)
             s2 = size(session, self.expected_logical_path, replica_num=1)
             self.assertEqual(s1, s2)
-
-    def test_put(self):
-        expected_physical_path = join(DEFAULT_RESC_VAULT_PATH, 'home', 'rods', os.path.basename(self.source_dir_path), self.unicode_error_filename)
-
-        self.run_scan_with_event_handler("put")
-
-        self.do_assert_failed_queue(count=None, job_name=job_name)
-        self.do_assert_retry_queue(count=None, job_name=job_name)
-
-        with iRODSSession(**get_kwargs()) as session:
-            self.assert_logical_path(session)
-            self.assert_physical_path_and_resource(session, expected_physical_path)
-            self.assert_data_object_contents(session)
-            self.assert_metadata_annotation(session)
-            self.assert_data_object_size(session)
 
     def test_put_sync(self):
         expected_physical_path = join(DEFAULT_RESC_VAULT_PATH, 'home', 'rods', os.path.basename(self.source_dir_path), self.unicode_error_filename)
@@ -1604,6 +1650,40 @@ class Test_irods_sync_UnicodeEncodeError(unittest.TestCase):
             self.assert_data_object_contents(session)
             self.assert_metadata_annotation(session)
             self.assert_data_object_size(session)
+
+
+
+
+# This is the transform built into the example files:
+# (Exclusion of '/' added here to handle path-at-a-time)
+
+regex = re.compile('[^0-9a-zA-Z/]')
+
+def character_mapping_transform(this):
+    this.remapped_bad_filename = regex.sub('_',this.BAD_FILENAME.decode('utf8'))
+    this.dest_coll_path = regex.sub('_',this.dest_coll_path)
+
+
+class Test_irods_sync_character_mapped_path(_Test_irods_sync_with_bad_filename,
+                                            unittest.TestCase):
+    # These tests will operate on a "bad filename" wherein characters are in need of re-mapping
+    BAD_FILENAME = b'test-file~with@5!non.alphas'  # maybe add some unicode
+    EH_SUFFIX = '_using_char_map'
+    CHARACTER_MAPPING_TRANSFORM = character_mapping_transform
+    LOGICAL_PATH_CALCULATION = \
+        lambda this : join(this.dest_coll_path, this.remapped_bad_filename)
+    ALLOW_LOGICAL_NAME_SUFFIX = True
+    DETAILED_CHECK = False
+    ANNOTATION_REASON = 'character_map'
+
+
+class Test_irods_sync_UnicodeEncodeError(_Test_irods_sync_with_bad_filename,
+                                         _supplementary_tests_with_bad_filename,
+                                         unittest.TestCase):
+    # These tests will operate on a "bad filename" with a truncated UTF8 sequence in the name
+    PREFIX = 'irods_UnicodeEncodeError_'
+    BAD_FILENAME = b'test_register_with_unicode_encode_error_path_' + u'\u1000'.encode('utf8')[:-1]
+    ANNOTATION_REASON = 'UnicodeEncodeError'
 
 def main():
     unittest.main()

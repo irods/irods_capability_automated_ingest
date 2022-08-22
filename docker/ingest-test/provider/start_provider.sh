@@ -12,7 +12,7 @@ echo Postgres took approximately $counter seconds to fully start ...
 # Set up iRODS if not already done
 if [ ! -e /var/lib/irods/setup_complete ]
     then
-        python /var/lib/irods/scripts/setup_irods.py < /irods_provider.input
+        python${PY_VERSION} /var/lib/irods/scripts/setup_irods.py < /irods_provider.input
 fi
 
 # run the server

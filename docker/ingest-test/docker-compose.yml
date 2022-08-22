@@ -23,6 +23,10 @@ services:
   irods-catalog-provider:
     build:
       context: provider
+      args:
+        irods_version: 4.3.0-1~bionic
+        irods_version_major_minor: 4.3
+        py_version: 3
     hostname: icat.example.org
     networks:
       default:

@@ -135,7 +135,7 @@ Possible key types include:
    3. regular expression
    ```
        # any character outside of range 0-256 becomes an underscore
-       re.compile('[\u0100-\U0010ffff]'): '_'  
+       re.compile('[\u0100-\U0010ffff]'): '_'
    ```
    4. callable accepting a character argument and returning a boolean
    ```
@@ -158,7 +158,7 @@ annotated with an AVU of the form
    Units:	"python3.base64.b64encode(full_path_of_source_file)"
 
 Where :
-   - ANNOTATION_REASON is either or "UnicodeEncodeError" "character\_map" depending on why the remapping occurred.
+   - ANNOTATION_REASON is either "UnicodeEncodeError" or "character\_map" depending on why the remapping occurred.
    - PREFIX is either "irods_UnicodeEncodeError\_" or blank(""), again depending on the re-mapping cause.
 
 Note that the UnicodeEncodeError type of remapping is unconditional, whereas the character remapping is contingent on
