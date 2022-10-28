@@ -43,7 +43,7 @@ class scanner(object):
         for f in file_regex:
             file_match = None != f.match(full_path)
             if(file_match == True):
-                break
+                return True
 
         try:
             if mode is None:
@@ -101,7 +101,7 @@ class filesystem_scanner(scanner):
 
         try:
             if self.exclude_file_type(dir_regex, file_regex, full_path, logger, mode):
-                return full_path, obj_stats
+                raise ContinueException
 
             if not obj.is_symlink() and not bool(mode & stat.S_IRGRP):
                 logger.error(
