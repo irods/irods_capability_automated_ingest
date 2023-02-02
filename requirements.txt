@@ -25,5 +25,5 @@ six==1.12.0
 structlog==18.2.0
 urllib3==1.26.5
 vine==1.1.4
-Werkzeug==0.15.3
+Werkzeug==0.15.5
 xmlrunner==1.7.7
