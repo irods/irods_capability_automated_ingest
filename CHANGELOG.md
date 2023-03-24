@@ -1,6 +1,15 @@
 # Changelog
 
-## [Unreleased]
+## [v0.4.1] - 2023-03-26
+
+This release fixes an exit code bug and adds a
+character_map event handler method.
+
+- [#188] eliminate exit call in check_event_handler
+- [#40][#166] tests work for unicodeEncodeError and char_map put/register
+- [#166] implement object path character remapping (with AVU hints)
+- [#180] add .gitignore
+- [#177] Fix wrong exit code with --synchronous option
 
 ## [v0.4.0] - 2022-02-24
 
