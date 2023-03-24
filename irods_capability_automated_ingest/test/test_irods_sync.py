@@ -193,7 +193,7 @@ def ctime_files(nfiles=NFILES):
 
 
 def delete_files():
-    rmtree(PATH_TO_SOURCE_DIR)
+    rmtree(PATH_TO_SOURCE_DIR, ignore_errors = True)
     if isfile(LOG_FILE):
         remove(LOG_FILE)
 
@@ -1453,6 +1453,7 @@ class _Test_irods_sync_with_bad_filename:
     def tearDown(self):
         delete_collection_if_exists(self.dest_coll_path)
         rmtree(self.source_dir_path, ignore_errors=True)
+        delete_files()
         clear_redis()
 
     # TODO: eh?

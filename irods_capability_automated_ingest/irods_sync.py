@@ -71,7 +71,6 @@ def check_event_handler(filename):
                  isinstance(value, str) and len(value) > 1:
                      error_message = "character_map()'s returned object should denote only single-character substitutions"
                      raise character_map_argument_error(error_message)
-    exit()
 
 
 def add_arguments(parser):
