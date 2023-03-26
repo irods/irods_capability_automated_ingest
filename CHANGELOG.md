@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.4.2] - 2023-06-26
+
+This release fixes the exclude and post_job behavior
+and updates two dependencies.
+
+- [#200] Add --exclude_file_type test
+- [#201] Amend test for post_job
+- [#195] apply CELERY_BROKER_URL env var globally to tests
+- [#198] update to Python 3.11 in docker test suite
+- [#201] Fix job done condition
+- [#200] Fix exclude_file_name/exclude_file_type
+- [#200] Add test for --exclude_file_name
+- Bump certifi from 2018.11.29 to 2022.12.7
+- Bump werkzeug from 0.15.3 to 2.2.3
+
 ## [v0.4.1] - 2023-03-26
 
 This release fixes an exit code bug and adds a
