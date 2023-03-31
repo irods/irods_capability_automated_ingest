@@ -19,7 +19,7 @@ python-irodsclient==0.8.1
 python-redis-lock==3.2.0
 python-utils==2.3.0
 pytz==2018.7
-redis==2.10.6
+redis==4.4.4
 scandir==1.9.0
 six==1.12.0
 structlog==18.2.0
