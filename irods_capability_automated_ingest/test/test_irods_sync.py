@@ -24,6 +24,8 @@ from irods.data_object import irods_dirname, irods_basename
 import irods_capability_automated_ingest.examples
 import irods.keywords as kw
 
+os.environ["CELERY_BROKER_URL"] = "redis://redis:6379/0"
+
 LOG_FILE = "/tmp/a"
 
 ZONENAME = "tempZone"
@@ -284,8 +286,6 @@ def event_handler_path(eh_name):
 
 class automated_ingest_test_context(object):
     def setUp(self):
-        os.environ["CELERY_BROKER_URL"] = "redis://redis:6379/0"
-
         irmtrash()
         clear_redis()
         delete_collection_if_exists(PATH_TO_COLLECTION)
