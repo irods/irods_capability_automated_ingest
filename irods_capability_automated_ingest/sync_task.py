@@ -78,7 +78,7 @@ class IrodsTask(app.Task):
         logger.info('decr_job_name', task=meta["task"], path=meta["path"], job_name=job.name(
         ), task_id=task_id, retval=retval)
 
-        done = job.tasks_handle().decr() and not job.periodic()
+        done = job.tasks_handle().decr() == 0 and not job.periodic()
         if done:
             job.cleanup()
 
