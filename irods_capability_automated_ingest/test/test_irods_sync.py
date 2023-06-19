@@ -1401,6 +1401,45 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
             self.fail('target collection should fail to ingest')
 
 
+class test_ingest_options(automated_ingest_test_context, unittest.TestCase):
+    def setUp(self):
+        super(test_ingest_options, self).setUp()
+
+    def tearDown(self):
+        super(test_ingest_options, self).tearDown()
+
+    def test_exclude_file_name(self):
+        job_name = 'test_exclude_file_name'
+        exclude_file_name = '5'
+        sync_cmd = [
+            'python', '-m', IRODS_SYNC_PY, 'start',
+            PATH_TO_SOURCE_DIR,
+            PATH_TO_COLLECTION,
+            '--exclude_file_name', os.path.join(PATH_TO_SOURCE_DIR, exclude_file_name),
+            '--job_name', job_name,
+            '--log_level', 'INFO',
+            '--files_per_task', '1']
+
+        proc = subprocess.Popen(sync_cmd)
+        proc.wait()
+        workers = start_workers(1)
+        wait_for(workers, job_name)
+
+        # Make sure no jobs fail
+        self.do_assert_failed_queue(count=None, job_name=job_name)
+
+        resc_names = [DEFAULT_RESC]
+        with iRODSSession(**get_kwargs()) as session:
+            self.assertTrue(session.collections.exists(PATH_TO_COLLECTION))
+            for i in listdir(PATH_TO_SOURCE_DIR):
+                logical_path = PATH_TO_COLLECTION + "/" + i
+                # If this is the exclude_file_name, ensure that it was NOT registered because it should be excluded.
+                if i == exclude_file_name:
+                    self.assertFalse(session.data_objects.exists(logical_path))
+                else:
+                    self.assertTrue(session.data_objects.exists(logical_path))
+
+
 # TODO base64 transform should be the same for each of the current types of test
 
 def b64_calculation(this):
