@@ -9,7 +9,8 @@ class event_handler(Core):
 
     @staticmethod
     def post_job(hdlr_mod, logger, meta):
-        with open("/tmp/a", "w") as f:
+        # Amend here for testing so that we can ensure that post_job executes once per job.
+        with open("/tmp/a", "a") as f:
             f.write("post_job")
 
 

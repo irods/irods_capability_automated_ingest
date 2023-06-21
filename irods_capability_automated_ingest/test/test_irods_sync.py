@@ -558,7 +558,8 @@ class Test_pre_and_post_job(automated_ingest_test_context, unittest.TestCase):
         proc = subprocess.Popen(["python", "-m", IRODS_SYNC_PY, "start", PATH_TO_SOURCE_DIR, PATH_TO_COLLECTION, "--event_handler", eh, "--job_name", job_name, "--log_level", "INFO", '--files_per_task', '1'])
         proc.wait()
 
-        workers = start_workers(1)
+        # Start 4 workers to ensure that the post_job is executed only once per job, not once per worker.
+        workers = start_workers(4)
         wait_for(workers, job_name)
         with open(LOG_FILE,"r") as f:
             lines = f.readlines()
