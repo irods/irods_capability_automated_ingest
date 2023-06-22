@@ -1402,21 +1402,36 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
             self.fail('target collection should fail to ingest')
 
 
-class test_ingest_options(automated_ingest_test_context, unittest.TestCase):
+class test_exclude_options(automated_ingest_test_context, unittest.TestCase):
     def setUp(self):
-        super(test_ingest_options, self).setUp()
+        super(test_exclude_options, self).setUp()
 
     def tearDown(self):
-        super(test_ingest_options, self).tearDown()
+        super(test_exclude_options, self).tearDown()
 
-    def test_exclude_file_name(self):
+    def assert_that_source_files_are_excluded_in_collection(self,
+                                                            source_dir=PATH_TO_SOURCE_DIR,
+                                                            destination_coll=PATH_TO_COLLECTION,
+                                                            excluded_files=[]):
+        with iRODSSession(**get_kwargs()) as session:
+            self.assertTrue(session.collections.exists(destination_coll))
+            for i in listdir(source_dir):
+                logical_path = destination_coll + "/" + i
+                if i in excluded_files:
+                    self.assertFalse(session.data_objects.exists(logical_path))
+                else:
+                    self.assertTrue(session.data_objects.exists(logical_path))
+
+
+    def test_exclude_file_name_single_file(self):
         job_name = 'test_exclude_file_name'
         exclude_file_name = '5'
+        exclude_file_path = os.path.join(PATH_TO_SOURCE_DIR, exclude_file_name)
         sync_cmd = [
             'python', '-m', IRODS_SYNC_PY, 'start',
             PATH_TO_SOURCE_DIR,
             PATH_TO_COLLECTION,
-            '--exclude_file_name', os.path.join(PATH_TO_SOURCE_DIR, exclude_file_name),
+            '--exclude_file_name', exclude_file_path,
             '--job_name', job_name,
             '--log_level', 'INFO',
             '--files_per_task', '1']
@@ -1429,16 +1444,34 @@ class test_ingest_options(automated_ingest_test_context, unittest.TestCase):
         # Make sure no jobs fail
         self.do_assert_failed_queue(count=None, job_name=job_name)
 
-        resc_names = [DEFAULT_RESC]
-        with iRODSSession(**get_kwargs()) as session:
-            self.assertTrue(session.collections.exists(PATH_TO_COLLECTION))
-            for i in listdir(PATH_TO_SOURCE_DIR):
-                logical_path = PATH_TO_COLLECTION + "/" + i
-                # If this is the exclude_file_name, ensure that it was NOT registered because it should be excluded.
-                if i == exclude_file_name:
-                    self.assertFalse(session.data_objects.exists(logical_path))
-                else:
-                    self.assertTrue(session.data_objects.exists(logical_path))
+        self.assert_that_source_files_are_excluded_in_collection(excluded_files=[exclude_file_name])
+
+
+    def test_exclude_file_type_single_file_link(self):
+        job_name = 'test_exclude_file_name'
+        exclude_file_name = 'link_to_5'
+        link_path = os.path.join(PATH_TO_SOURCE_DIR, 'link_to_5')
+        link_target = os.path.join(PATH_TO_SOURCE_DIR, '5')
+        sync_cmd = [
+            'python', '-m', IRODS_SYNC_PY, 'start',
+            PATH_TO_SOURCE_DIR,
+            PATH_TO_COLLECTION,
+            '--exclude_file_type', 'link',
+            '--job_name', job_name,
+            '--log_level', 'INFO',
+            '--files_per_task', '1']
+
+        os.symlink(link_target, link_path)
+
+        proc = subprocess.Popen(sync_cmd)
+        proc.wait()
+        workers = start_workers(1)
+        wait_for(workers, job_name)
+
+        # Make sure no jobs fail
+        self.do_assert_failed_queue(count=None, job_name=job_name)
+
+        self.assert_that_source_files_are_excluded_in_collection(excluded_files=[exclude_file_name])
 
 
 # TODO base64 transform should be the same for each of the current types of test
