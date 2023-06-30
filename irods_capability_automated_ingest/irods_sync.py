@@ -130,6 +130,7 @@ def handle_start(args):
     data["s3_keypair"] = args.s3_keypair
     data["s3_proxy_url"] = args.s3_proxy_url
     data["s3_secure_connection"] = not args.s3_insecure_connection
+    data["s3_multipart_chunksize_in_mib"] = args.s3_multipart_chunksize_in_mib
     data["exclude_file_type"] = ex_arg_list
     data['exclude_file_name'] = [''.join(r) for r in args.exclude_file_name]
     data['exclude_directory_name'] = [
@@ -198,6 +199,9 @@ def main():
                               type=str, default=None, help='URL to proxy for S3 access')
     parser_start.add_argument('--s3_insecure_connection', action="store_true",
                               default=False, help='Do not use SSL when connecting to S3 endpoint')
+    parser_start.add_argument('--s3_multipart_chunksize_in_mib',action="store", type=int,
+                              default=8, choices=range(5, 5001), metavar="[5-5000]",
+                              help='Chunk size in mebibytes for multipart S3 uploads. Minimum part size is 5 MiB and the maximum part size is 5000 MiB.')
     parser_start.add_argument('--exclude_file_type', nargs=1, action="store", default='none',
                               help='types of files to exclude: regular, directory, character, block, socket, pipe, link')
     parser_start.add_argument('--exclude_file_name', type=list, nargs='+', action="store", default='none',
