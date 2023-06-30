@@ -165,9 +165,8 @@ class s3_scanner(scanner):
         endpoint_domain = meta.get('s3_endpoint_domain')
         s3_access_key = meta.get('s3_access_key')
         s3_secret_key = meta.get('s3_secret_key')
-        s3_secure_connection = meta.get('s3_secure_connection')
-        if s3_secure_connection is None:
-            s3_secure_connection = True
+        s3_secure_connection = meta.get('s3_secure_connection', True)
+       
         client = Minio(
             endpoint_domain,
             access_key=s3_access_key,

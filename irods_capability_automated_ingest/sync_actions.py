@@ -106,19 +106,14 @@ def start_job(data):
     s3_region_name = data["s3_region_name"]
     s3_endpoint_domain = data["s3_endpoint_domain"]
     s3_keypair = data["s3_keypair"]
-
+    s3_multipart_chunksize = data["s3_multipart_chunksize_in_mib"]
     logger = sync_logging.get_sync_logger(logging_config)
     data_copy = data.copy()
 
     if s3_keypair is not None:
-        data_copy['s3_region_name'] = s3_region_name
-        data_copy['s3_endpoint_domain'] = s3_endpoint_domain
-        data_copy['s3_keypair'] = s3_keypair
-        # parse s3 keypair
-        if s3_keypair is not None:
-            with open(s3_keypair) as f:
-                data_copy['s3_access_key'] = f.readline().rstrip()
-                data_copy['s3_secret_key'] = f.readline().rstrip()
+        with open(s3_keypair) as f:
+            data_copy['s3_access_key'] = f.readline().rstrip()
+            data_copy['s3_secret_key'] = f.readline().rstrip()
         # set source
         src_abs = src_path
     else:
