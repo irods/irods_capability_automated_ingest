@@ -29,7 +29,7 @@ class event_handler(Core):
 
     @staticmethod
     def operation(session, meta, **options):
-        return Operation.REGISTER
+        return Operation.REGISTER_SYNC
 
 
 
