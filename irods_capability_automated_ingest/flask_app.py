@@ -1,4 +1,8 @@
-from irods_capability_automated_ingest.sync_task import start_synchronization, stop_synchronization, list_synchronization
+from irods_capability_automated_ingest.sync_task import (
+    start_synchronization,
+    stop_synchronization,
+    list_synchronization,
+)
 from uuid import uuid1
 from flask import Flask, request
 import flask
@@ -20,10 +24,10 @@ def put(job_name, data):
     data2 = yaml.load(data.decode("utf-8"))
 
     data2["event_handler_path"] = app.config.get("event_handler_path")
-    data2.setdefault('max_retries', 0)
-    data2.setdefault('file_queue', "file")
-    data2.setdefault('path_queue', "path")
-    data2.setdefault('restart_queue', "restart")
+    data2.setdefault("max_retries", 0)
+    data2.setdefault("file_queue", "file")
+    data2.setdefault("path_queue", "path")
+    data2.setdefault("restart_queue", "restart")
     data2.setdefault("ignore_cache", False)
     data2.setdefault("initial_ingest", False)
     data2.setdefault("synchronous", False)
@@ -74,13 +78,13 @@ def get_config():
             "filename": os.environ.get("log_filename"),
             "when": os.environ.get("log_when"),
             "interval": os.environ.get("log_interval"),
-            "level": os.environ.get("log_level")
+            "level": os.environ.get("log_level"),
         },
         "redis": {
-            "host" : os.environ.get("redis_host", "localhost"),
-            "port" : os.environ.get("redis_port", 6379),
-            "db" : os.environ.get("redis_db", 0)
-        }
+            "host": os.environ.get("redis_host", "localhost"),
+            "port": os.environ.get("redis_port", 6379),
+            "db": os.environ.get("redis_db", 0),
+        },
     }
 
 
@@ -90,7 +94,9 @@ DEFAULT_EVENT_HANDLER_PATH = "/tmp"
 builtin_run_command = flask.cli.run_command
 
 
-@app.cli.command('run_app', help=builtin_run_command.help, short_help=builtin_run_command.short_help)
+@app.cli.command(
+    "run_app", help=builtin_run_command.help, short_help=builtin_run_command.short_help
+)
 @click.option("--event_handler_path", default=DEFAULT_EVENT_HANDLER_PATH)
 @click.pass_context
 def run_app(ctx, event_handler_path, **kwargs):
@@ -98,6 +104,5 @@ def run_app(ctx, event_handler_path, **kwargs):
     ctx.params.pop("event_handler_path", None)
     ctx.forward(builtin_run_command)
 
+
 run_app.params[:0] = builtin_run_command.params
-
-

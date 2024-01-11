@@ -3,10 +3,10 @@ from irods_capability_automated_ingest.utils import Operation
 from irods.meta import iRODSMeta
 import os
 
-filesystem_mode = 'filesystem::mode'
+filesystem_mode = "filesystem::mode"
+
 
 class event_handler(Core):
-
     @staticmethod
     def post_data_obj_create(hdlr_mod, logger, session, meta, **options):
         target = meta["target"]
@@ -15,8 +15,7 @@ class event_handler(Core):
         mode = s.st_mode
 
         obj = session.data_objects.get(target)
-        obj.metadata.add(filesystem_mode, str(mode), '')
-
+        obj.metadata.add(filesystem_mode, str(mode), "")
 
     @staticmethod
     def post_data_obj_modify(hdlr_mod, logger, session, meta, **options):
@@ -30,6 +29,3 @@ class event_handler(Core):
     @staticmethod
     def operation(session, meta, **options):
         return Operation.REGISTER_SYNC
-
-
-

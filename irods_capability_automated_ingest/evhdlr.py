@@ -1,8 +1,8 @@
 from irods_capability_automated_ingest.core import Core
 from irods_capability_automated_ingest.utils import Operation
 
-class event_handler(Core):
 
+class event_handler(Core):
     @staticmethod
     def post_data_obj_create(hdlr_mod, logger, session, meta, **options):
         target = meta["target"]

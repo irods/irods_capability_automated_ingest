@@ -12,7 +12,11 @@ irods_sync_logger = "irods_sync"
 def timestamper(logger, log_method, event_dict):
     utc_offset_sec = time.altzone if time.localtime().tm_isdst else time.timezone
     utc_offset = datetime.timedelta(seconds=-utc_offset_sec)
-    event_dict["@timestamp"] = datetime.datetime.now().replace(tzinfo=datetime.timezone(offset=utc_offset)).isoformat()
+    event_dict["@timestamp"] = (
+        datetime.datetime.now()
+        .replace(tzinfo=datetime.timezone(offset=utc_offset))
+        .isoformat()
+    )
     return event_dict
 
 
@@ -25,7 +29,9 @@ def create_sync_logger(logging_config):
     interval = logging_config["interval"]
     level = logging_config["level"]
 
-    logger = logging.getLogger(irods_sync_logger + "/" + get_sync_logger_key(logging_config))
+    logger = logging.getLogger(
+        irods_sync_logger + "/" + get_sync_logger_key(logging_config)
+    )
     logger.propagate = False
 
     # logger = get_task_logger(irods_sync_logger)
@@ -35,7 +41,9 @@ def create_sync_logger(logging_config):
 
     if log_file is not None:
         if when is not None:
-            handler = logging.handlers.TimedRotatingFileHandler(log_file, when=when, interval=interval)
+            handler = logging.handlers.TimedRotatingFileHandler(
+                log_file, when=when, interval=interval
+            )
         else:
             handler = logging.FileHandler(log_file)
     else:
@@ -49,8 +57,8 @@ def create_sync_logger(logging_config):
             structlog.stdlib.add_logger_name,
             structlog.stdlib.add_log_level,
             timestamper,
-            structlog.processors.JSONRenderer()
-        ]
+            structlog.processors.JSONRenderer(),
+        ],
     )
 
 
