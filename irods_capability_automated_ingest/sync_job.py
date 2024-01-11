@@ -4,6 +4,7 @@ import json
 import os
 import progressbar
 
+
 class sync_job(object):
     def __init__(self, job_name, redis_handle):
         self.job_name = job_name
@@ -46,10 +47,10 @@ class sync_job(object):
         return self.job_name.encode("utf-8") in periodic_list
 
     def cleanup(self):
-        #hdlr = get_with_key(r, cleanup_key, job_name, lambda bs: json.loads(bs.decode("utf-8")))
+        # hdlr = get_with_key(r, cleanup_key, job_name, lambda bs: json.loads(bs.decode("utf-8")))
         cleanup_list = self.cleanup_handle().get_value()
         if cleanup_list is not None:
-            file_list = json.loads(cleanup_list.decode('utf-8'))
+            file_list = json.loads(cleanup_list.decode("utf-8"))
             for f in file_list:
                 os.remove(f)
 
@@ -69,8 +70,12 @@ class sync_job(object):
 
     def interrupt(self, cli=True, terminate=True):
         self.stop_handle().set_value("")
-        queued_tasks = list(map(lambda x: x.decode("utf-8"), self.count_handle().lrange(0, -1)))
-        dequeued_tasks = set(map(lambda x: x.decode("utf-8"), self.dequeue_handle().lrange(0, -1)))
+        queued_tasks = list(
+            map(lambda x: x.decode("utf-8"), self.count_handle().lrange(0, -1))
+        )
+        dequeued_tasks = set(
+            map(lambda x: x.decode("utf-8"), self.dequeue_handle().lrange(0, -1))
+        )
 
         tasks = [item for item in queued_tasks if item not in dequeued_tasks]
         if cli:
@@ -83,4 +88,3 @@ class sync_job(object):
         # stop restart job
         app.control.revoke(self.job_name)
         self.stop_handle().reset()
-

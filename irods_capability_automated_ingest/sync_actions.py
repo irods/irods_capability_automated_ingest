@@ -14,6 +14,7 @@ import textwrap
 
 uuid_ = uuid.uuid4().hex
 
+
 def stop_job(job_name, config):
     logger = sync_logging.get_sync_logger(config["log"])
     r = get_redis(config)
@@ -26,11 +27,21 @@ def stop_job(job_name, config):
             job.interrupt()
             job.cleanup()
 
+
 def list_jobs(config):
     r = get_redis(config)
     with redis_lock.Lock(r, "lock:periodic"):
-        return {"periodic":list(map(lambda job_id: job_id.decode("utf-8"), r.lrange("periodic", 0, -1))),
-                "singlepass":list(map(lambda job_id: job_id.decode("utf-8"), r.lrange("singlepass", 0, -1)))}
+        return {
+            "periodic": list(
+                map(lambda job_id: job_id.decode("utf-8"), r.lrange("periodic", 0, -1))
+            ),
+            "singlepass": list(
+                map(
+                    lambda job_id: job_id.decode("utf-8"), r.lrange("singlepass", 0, -1)
+                )
+            ),
+        }
+
 
 def monitor_job(job_name, progress, config):
     logger = sync_logging.get_sync_logger(config["log"])
@@ -42,16 +53,26 @@ def monitor_job(job_name, progress, config):
 
     if progress:
         widgets = [
-            ' [', progressbar.Timer(), '] ',
+            " [",
+            progressbar.Timer(),
+            "] ",
             progressbar.Bar(),
-            ' (', progressbar.ETA(), ') ',
-            progressbar.DynamicMessage("count"), " ",
-            progressbar.DynamicMessage("tasks"), " ",
-            progressbar.DynamicMessage("failures"), " ",
-            progressbar.DynamicMessage("retries")
+            " (",
+            progressbar.ETA(),
+            ") ",
+            progressbar.DynamicMessage("count"),
+            " ",
+            progressbar.DynamicMessage("tasks"),
+            " ",
+            progressbar.DynamicMessage("failures"),
+            " ",
+            progressbar.DynamicMessage("retries"),
         ]
 
-        with progressbar.ProgressBar(max_value=1, widgets=widgets, redirect_stdout=True, redirect_stderr=True) as bar:
+        with progressbar.ProgressBar(
+            max_value=1, widgets=widgets, redirect_stdout=True, redirect_stderr=True
+        ) as bar:
+
             def update_pbar():
                 tasks = job.tasks_handle().get_value()
                 if tasks is None:
@@ -76,7 +97,13 @@ def monitor_job(job_name, progress, config):
                 else:
                     retries = int(retries)
 
-                bar.update(percentage, count=total, tasks=tasks, failures=failures, retries=retries)
+                bar.update(
+                    percentage,
+                    count=total,
+                    tasks=tasks,
+                    failures=failures,
+                    retries=retries,
+                )
 
             while not job.done() or job.periodic():
                 update_pbar()
@@ -93,6 +120,7 @@ def monitor_job(job_name, progress, config):
         return -1
     else:
         return 0
+
 
 def start_job(data):
     config = data["config"]
@@ -112,8 +140,8 @@ def start_job(data):
 
     if s3_keypair is not None:
         with open(s3_keypair) as f:
-            data_copy['s3_access_key'] = f.readline().rstrip()
-            data_copy['s3_secret_key'] = f.readline().rstrip()
+            data_copy["s3_access_key"] = f.readline().rstrip()
+            data_copy["s3_secret_key"] = f.readline().rstrip()
         # set source
         src_abs = src_path
     else:
@@ -129,42 +157,52 @@ def start_job(data):
         event_handler_data = data.get("event_handler_data")
         event_handler_path = data.get("event_handler_path")
 
-        #investigate -- kubernetes
-        if event_handler is None and event_handler_path is not None and event_handler_data is not None:
+        # investigate -- kubernetes
+        if (
+            event_handler is None
+            and event_handler_path is not None
+            and event_handler_data is not None
+        ):
             event_handler = "event_handler" + uuid1().hex
             hdlr2 = event_handler_path + "/" + event_handler + ".py"
             with open(hdlr2, "w") as f:
                 f.write(event_handler_data)
             cleanup_list = [hdlr2.encode("utf-8")]
             data["event_handler"] = event_handler
-        #if no argument is given, use default event_handler
+        # if no argument is given, use default event_handler
         elif event_handler is None:
-            #constructing redis_key and putting default event_handler into redis
+            # constructing redis_key and putting default event_handler into redis
             uuid_ = uuid.uuid4().hex
-            event_handler_key = redis_key_handle(r, "custom_event_handler", job.name() + '::' + uuid_)
-            content_string = textwrap.dedent("""
+            event_handler_key = redis_key_handle(
+                r, "custom_event_handler", job.name() + "::" + uuid_
+            )
+            content_string = textwrap.dedent(
+                """
             from irods_capability_automated_ingest.core import Core 
             from irods_capability_automated_ingest.utils import Operation
             class event_handler(Core):
                 @staticmethod
                 def operation(session, meta, **options):
-                    return Operation.REGISTER_SYNC""")
+                    return Operation.REGISTER_SYNC"""
+            )
             event_handler_key.set_value(content_string)
 
-            #putting redis_key into meta map
+            # putting redis_key into meta map
             data_copy["event_handler_key"] = event_handler_key.get_key()
 
             cleanup_list = []
         else:
-            #constructing redis_key and putting custom_event_handler into redis
+            # constructing redis_key and putting custom_event_handler into redis
             with open(event_handler, "r") as f:
                 content_string = f.read()
 
             uuid_ = uuid.uuid4().hex
-            event_handler_key = redis_key_handle(r, "custom_event_handler", job.name() + '::' + uuid_)
+            event_handler_key = redis_key_handle(
+                r, "custom_event_handler", job.name() + "::" + uuid_
+            )
             event_handler_key.set_value(content_string)
 
-            #putting redis_key into meta map
+            # putting redis_key into meta map
             data_copy["event_handler_key"] = event_handler_key.get_key()
 
             cleanup_list = []
@@ -195,4 +233,3 @@ def start_job(data):
                 return -1
             else:
                 return monitor_job(job_name, progress, config)
-

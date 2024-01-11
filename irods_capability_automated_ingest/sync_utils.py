@@ -34,4 +34,3 @@ def get_redis(config):
         redis_connection_pool_map[url] = pool
 
     return StrictRedis(connection_pool=pool)
-
