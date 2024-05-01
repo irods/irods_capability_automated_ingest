@@ -382,7 +382,7 @@ def sync_entry(self, meta, cls, syncer, datafunc, metafunc):
                 datafunc(event_handler.get_module(), meta2, logger, syncer, True)
                 logger.info("succeeded", task=meta["task"], path=path)
             else:
-                metafunc(event_handler.get_module(), meta2, logger)
+                metafunc(event_handler.get_module(), meta2, logger, syncer)
                 logger.info("succeeded_metadata_only", task=meta["task"], path=path)
             sync_time_handle.set_value(str(t))
     except Exception as err:

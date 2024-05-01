@@ -65,7 +65,7 @@ def create_dirs(logger, session, meta, **options):
                         logger,
                         session,
                         meta,
-                        **options
+                        **options,
                     )
     else:
         raise Exception(
@@ -147,12 +147,9 @@ def register_file(hdlr_mod, logger, session, meta, **options):
     options[kw.DATA_MODIFY_KW] = str(int(meta["mtime"]))
 
     logger.info(
-        "registering object "
-        + dest_dataobj_logical_fullpath
-        + ", source_physical_fullpath: "
-        + source_physical_fullpath
-        + ", options = "
-        + str(options)
+        "registering object {}, source_physical_fullpath: {}, options = {}".format(
+            dest_dataobj_logical_fullpath, source_physical_fullpath, options
+        )
     )
     session.data_objects.register(
         phypath_to_register_in_catalog, dest_dataobj_logical_fullpath, **options
@@ -202,12 +199,7 @@ def sync_file(hdlr_mod, logger, session, meta, scanner, op, **options):
     if b64_path_str is not None:
         source_physical_fullpath = base64.b64decode(b64_path_str)
 
-    logger.info(
-        "syncing object "
-        + dest_dataobj_logical_fullpath
-        + ", options = "
-        + str(options)
-    )
+    logger.info(f"syncing object {dest_dataobj_logical_fullpath}, options = {options}")
 
     # TODO: Issue #208
     # Investigate behavior of sync_file when op is None
@@ -240,10 +232,7 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
     size = int(meta["size"])
     mtime = int(meta["mtime"])
     logger.info(
-        "updating object: "
-        + dest_dataobj_logical_fullpath
-        + ", options = "
-        + str(options)
+        f"updating object: {dest_dataobj_logical_fullpath}, options = {options}"
     )
 
     data_obj_info = {"objPath": dest_dataobj_logical_fullpath}
@@ -271,32 +260,30 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
     if not found:
         if b64_path_str is not None:
             logger.error(
-                "updating object: wrong resource or path, dest_dataobj_logical_fullpath = "
-                + dest_dataobj_logical_fullpath
-                + ", phypath_to_register_in_catalog = "
-                + phypath_to_register_in_catalog
-                + ", phypath_to_register_in_catalog = "
-                + phypath_to_register_in_catalog
-                + ", options = "
-                + str(options)
+                "updating object: wrong resource or path, "
+                "dest_dataobj_logical_fullpath = {}, phypath_to_register_in_catalog = {}, options = {}".format(
+                    dest_dataobj_logical_fullpath,
+                    phypath_to_register_in_catalog,
+                    str(options),
+                )
             )
         else:
             logger.error(
-                "updating object: wrong resource or path, dest_dataobj_logical_fullpath = "
-                + dest_dataobj_logical_fullpath
-                + ", source_physical_fullpath = "
-                + source_physical_fullpath
-                + ", phypath_to_register_in_catalog = "
-                + phypath_to_register_in_catalog
-                + ", options = "
-                + str(options)
+                "updating object: wrong resource or path, "
+                "dest_dataobj_logical_fullpath = {}, source_physical_fullpath = {}, "
+                "phypath_to_register_in_catalog = {}, options = {}".format(
+                    dest_dataobj_logical_fullpath,
+                    source_physical_fullpath,
+                    phypath_to_register_in_catalog,
+                    str(options),
+                )
             )
         raise Exception("wrong resource or path")
 
     session.data_objects.modDataObjMeta(
         data_obj_info,
         {"dataSize": size, "dataModify": mtime, "allReplStatus": 1},
-        **options
+        **options,
     )
 
     if b64_path_str is not None:
@@ -504,7 +491,7 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
                     meta,
                     scanner,
                     op,
-                    **options
+                    **options,
                 )
             else:
                 event_handler.call(
@@ -514,7 +501,7 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
                     logger,
                     session,
                     meta,
-                    **options
+                    **options,
                 )
         elif createRepl:
             options["regRepl"] = ""
@@ -526,7 +513,7 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
                 logger,
                 session,
                 meta,
-                **options
+                **options,
             )
         elif content:
             if put:
@@ -541,7 +528,7 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
                         meta,
                         scanner,
                         op,
-                        **options
+                        **options,
                     )
             else:
                 event_handler.call(
@@ -551,7 +538,7 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
                     logger,
                     session,
                     meta,
-                    **options
+                    **options,
                 )
         else:
             event_handler.call(
@@ -561,14 +548,14 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
                 logger,
                 session,
                 meta,
-                **options
+                **options,
             )
 
     start_timer()
 
 
-def sync_metadata_from_file(hdlr_mod, meta, logger, **options):
-    sync_data_from_file(hdlr_mod, meta, logger, False, **options)
+def sync_metadata_from_file(hdlr_mod, meta, logger, scanner, **options):
+    sync_data_from_file(hdlr_mod, meta, logger, scanner, False, **options)
 
 
 def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
@@ -607,7 +594,7 @@ def sync_data_from_dir(hdlr_mod, meta, logger, scanner, content, **options):
                 logger,
                 session,
                 meta,
-                **options
+                **options,
             )
     start_timer()
 
