@@ -23,7 +23,7 @@ redis==4.4.4
 scandir==1.9.0
 six==1.12.0
 structlog==18.2.0
-urllib3==1.26.5
+urllib3==1.26.18
 vine==1.1.4
 Werkzeug==2.3.8
 xmlrunner==1.7.7
