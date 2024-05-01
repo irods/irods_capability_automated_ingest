@@ -160,10 +160,7 @@ class filesystem_scanner(scanner):
         if op == Operation.PUT_APPEND and exists:
             BUFFER_SIZE = 1024
             logger.info(
-                "appending object "
-                + source_physical_fullpath
-                + " from local filesystem, options = "
-                + str(options)
+                f"appending object {source_physical_fullpath} from local filesystem, options = {options}"
             )
             tsize = size(session, dest_dataobj_logical_fullpath)
             tfd = session.data_objects.open(
@@ -186,10 +183,7 @@ class filesystem_scanner(scanner):
         # If data object does exists, we know op=PUT_SYNC, and we re-copy whole file again, so it is fine also
         else:
             logger.info(
-                "uploading object "
-                + source_physical_fullpath
-                + " from local filesystem, options = "
-                + str(options)
+                f"uploading object {source_physical_fullpath} from local filesystem, options = {options}"
             )
             session.data_objects.put(
                 source_physical_fullpath, dest_dataobj_logical_fullpath, **options
@@ -324,7 +318,7 @@ class s3_scanner(scanner):
                 dest_dataobj_logical_fullpath,
                 total_bytes,
                 target_resc_name,
-                **options
+                **options,
             )
             if bytecounts != total_bytes:
                 raise RuntimeError(
@@ -348,7 +342,7 @@ class s3_scanner(scanner):
                 object_name,
                 dest_dataobj_logical_fullpath,
                 offset=tsize,
-                **options
+                **options,
             )
 
     def parallel_upload_from_S3(
@@ -361,7 +355,7 @@ class s3_scanner(scanner):
         dest,
         total_bytes,
         target_resc_name="",
-        **options
+        **options,
     ):
         """
         Sets up threads to parallelize copying of S3 file into iRODS. Uses PRC _Multipart_close_manager to ensure
