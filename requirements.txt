@@ -4,7 +4,7 @@ billiard==3.5.0.5
 celery==5.2.2
 certifi==2022.12.7
 Click==7.0
-Flask==1.0.2
+Flask==2.2.5
 Flask-RESTful==0.3.6
 irods-capability-automated-ingest==0.3.4
 itsdangerous==1.1.0
