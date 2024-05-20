@@ -162,7 +162,11 @@ def register_file(hdlr_mod, logger, session, meta, **options):
     )
 
 
-def upload_file(hdlr_mod, logger, session, meta, scanner, op, **options):
+def upload_file(hdlr_mod, logger, session, meta, **options):
+    scanner = meta.get('scanner')
+    if scanner is None:
+        raise RuntimeError("'scanner' not found in meta. Cannot upload data.")
+
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
     b64_path_str = meta.get("b64_path_str")
@@ -176,7 +180,7 @@ def upload_file(hdlr_mod, logger, session, meta, scanner, op, **options):
 
     # Use scanner object to upload files
     # exists=False because upload_file is only called from sync_data_from_file if file does not exist yet
-    scanner.upload_file(logger, session, meta, op, exists=False, **options)
+    scanner.upload_file(logger, session, meta, exists=False, **options)
     annotate_metadata_for_special_data_objs(
         meta, session, source_physical_fullpath, dest_dataobj_logical_fullpath
     )
@@ -186,7 +190,11 @@ def no_op(hdlr_mod, logger, session, meta, **options):
     pass
 
 
-def sync_file(hdlr_mod, logger, session, meta, scanner, op, **options):
+def sync_file(hdlr_mod, logger, session, meta, **options):
+    scanner = meta.get('scanner')
+    if scanner is None:
+        raise RuntimeError("'scanner' not found in meta. Cannot sync data.")
+
     dest_dataobj_logical_fullpath = meta["target"]
     source_physical_fullpath = meta["path"]
     b64_path_str = meta.get("b64_path_str")
@@ -201,14 +209,9 @@ def sync_file(hdlr_mod, logger, session, meta, scanner, op, **options):
 
     logger.info("syncing object %s, options = %s" % (dest_dataobj_logical_fullpath, options))
 
-    # TODO: Issue #208
-    # Investigate behavior of sync_file when op is None
-    if op is None:
-        op = Operation.REGISTER_SYNC
-
     # Use scanner object to sync files
     # Ensure exists=True so that upload_file understands that it is a sync_file operation
-    scanner.upload_file(logger, session, meta, op, exists=True, **options)
+    scanner.upload_file(logger, session, meta, exists=True, **options)
 
 
 def update_metadata(hdlr_mod, logger, session, meta, **options):
@@ -417,7 +420,7 @@ def irods_session(handler_module, meta, logger, **options):
     return sess
 
 
-def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
+def sync_data_from_file(hdlr_mod, meta, logger, content, **options):
     target = meta["target"]
     path = meta["path"]
     init = meta["initial_ingest"]
@@ -475,6 +478,8 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
 
         put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
 
+        meta['op'] = op
+
         if not exists:
             meta2 = meta.copy()
             meta2["target"] = dirname(target)
@@ -489,8 +494,6 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
                     logger,
                     session,
                     meta,
-                    scanner,
-                    op,
                     **options,
                 )
             else:
@@ -526,8 +529,6 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
                         logger,
                         session,
                         meta,
-                        scanner,
-                        op,
                         **options,
                     )
             else:
@@ -554,15 +555,15 @@ def sync_data_from_file(hdlr_mod, meta, logger, scanner, content, **options):
     start_timer()
 
 
-def sync_metadata_from_file(hdlr_mod, meta, logger, scanner, **options):
-    sync_data_from_file(hdlr_mod, meta, logger, scanner, False, **options)
+def sync_metadata_from_file(hdlr_mod, meta, logger, **options):
+    sync_data_from_file(hdlr_mod, meta, logger, False, **options)
 
 
 def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
     pass
 
 
-def sync_data_from_dir(hdlr_mod, meta, logger, scanner, content, **options):
+def sync_data_from_dir(hdlr_mod, meta, logger, content, **options):
     target = meta["target"]
     path = meta["path"]
 
@@ -599,5 +600,5 @@ def sync_data_from_dir(hdlr_mod, meta, logger, scanner, content, **options):
     start_timer()
 
 
-def sync_metadata_from_dir(hdlr_mod, meta, logger, scanner, **options):
-    sync_data_from_dir(hdlr_mod, meta, logger, scanner, False, **options)
+def sync_metadata_from_dir(hdlr_mod, meta, logger, **options):
+    sync_data_from_dir(hdlr_mod, meta, logger, False, **options)
