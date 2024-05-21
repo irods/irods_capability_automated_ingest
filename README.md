@@ -95,6 +95,19 @@ These options are used at the "start" of an ingest job.
 
 Event handlers can use `logger` to write logs. See `structlog` for available logging methods and signatures.
 
+### Operation mode
+
+| operation |  new files  | updated files  |
+| ----   |   ----- | ----- |
+| `Operation.REGISTER_SYNC` (default)   |  registers in catalog | updates size in catalog |
+| `Operation.REGISTER_AS_REPLICA_SYNC`  |   registers first or additional replica | updates size in catalog |
+| `Operation.PUT`  |   copies file to target vault, and registers in catalog | no action |
+| `Operation.PUT_SYNC`  |   copies file to target vault, and registers in catalog | copies entire file again, and updates catalog |
+| `Operation.PUT_APPEND`  |   copies file to target vault, and registers in catalog | copies only appended part of file, and updates catalog |
+| `Operation.NO_OP` | no action | no action
+
+`--event_handler` usage examples can be found [in the examples directory](irods_capability_automated_ingest/examples).
+
 ### Character Mapping option
 If an application should require that iRODS logical paths produced by the ingest process exclude subsets of the
 range of possible Unicode characters, we can add a character\_map method that returns a dict object. For example:
@@ -159,26 +172,17 @@ Note that the UnicodeEncodeError type of remapping is unconditional, whereas the
 an event handler's character_map method being defined.  Also, if a UnicodeEncodeError-style ingest is performed on a
 given object, this precludes character mapping being done for the object.
 
-### operation mode ###
+## Manual Deployment
 
-| operation |  new files  | updated files  |
-| ----   |   ----- | ----- |
-| `Operation.REGISTER_SYNC` (default)   |  registers in catalog | updates size in catalog |
-| `Operation.REGISTER_AS_REPLICA_SYNC`  |   registers first or additional replica | updates size in catalog |
-| `Operation.PUT`  |   copies file to target vault, and registers in catalog | no action |
-| `Operation.PUT_SYNC`  |   copies file to target vault, and registers in catalog | copies entire file again, and updates catalog |
-| `Operation.PUT_APPEND`  |   copies file to target vault, and registers in catalog | copies only appended part of file, and updates catalog |
-| `Operation.NO_OP` | no action | no action
+### Configure `python-irodsclient` environment
 
-`--event_handler` usage examples can be found [in the examples directory](irods_capability_automated_ingest/examples).
+`python-irodsclient` (PRC) is used by the Automated Ingest tool to interact with iRODS. The configuration and client environment files used for a PRC application applies here as well.
 
-## Deployment
+If you are using PAM authentication, remember to use the [Client Settings File](https://github.com/irods/python-irodsclient/tree/71d787fe1f79d81775d892c59f3e9a9f60262c78?tab=readme-ov-file#python-irods-client-settings-file).
 
-### Basic: manual redis, Celery, pip
+`iRODSSession`s are instantiated using an iRODS client environment file. The client environment file used can be controlled with the `IRODS_ENVIRONMENT_FILE` environment variable. If no such environment variable is set, the file is expected to be found at `${HOME}/.irods/irods_environment.json`. A secure connection can be made by making the appropriate configurations in the client environment file.
 
-Running the sync job and Celery workers requires a valid iRODS environment file for an authenticated iRODS user on each node.
-
-#### Starting Redis Server
+### Starting Redis Server
 Install Redis server: [https://redis.io/docs/latest/get-started](https://redis.io/docs/latest/get-started)
 
 Starting the Redis server with package installation:
@@ -202,7 +206,7 @@ This allows the Linux kernel to overcommit virtual memory even if this exceeds t
 
 **Note:** If running in a distributed environment, make sure Redis server accepts connections by editing the `bind` line in /etc/redis/redis.conf or /etc/redis.conf.
 
-#### Setting up virtual environment
+### Setting up virtual environment
 You may need to upgrade pip:
 ```
 pip install --upgrade pip
@@ -223,7 +227,7 @@ Activate virtual environment:
 source rodssync/bin/activate
 ```
 
-#### Install this package
+### Install this package
 ```
 pip install irods_capability_automated_ingest
 ```
@@ -240,13 +244,7 @@ celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart
 ```
 **Note:** Make sure queue names match those of the ingest job (default queue names shown here).
 
-#### Run tests
-**Note:** The test suite requires Python version >=3.7.
-**Note:** The tests should be run without running Celery workers or with an unused redis database.
-```
-python -m irods_capability_automated_ingest.test.test_irods_sync
-```
-See [docker/test/README.md](docker/test/README.md) for how to run in a dockerized environment.
+### Using the sync script
 
 #### Start sync job
 ```
@@ -268,308 +266,9 @@ python -m irods_capability_automated_ingest.irods_sync stop <job name>
 python -m irods_capability_automated_ingest.irods_sync watch <job name>
 ```
 
-### Intermediate: dockerize, manually config (needs to be updated for Celery)
-See [docker/README.md](docker/README.md)
-
-### Advanced: kubernetes (needs to be updated for Celery)
-
-This does not assume that your iRODS installation is in kubernetes.
-
-#### `kubeadm`
-
-setup `Glusterfs` and `Heketi`
-
-create storage class
-
-create a persistent volume claim `data`
-
-#### install minikube and helm
-
-set memory to at least 8g and cpu to at least 4
-
+## Run tests
+**Note:** The tests start and stop their own Celery workers, and they assume a clean Redis database.
 ```
-minikube start --memory 8192 --cpus 4
+python -m irods_capability_automated_ingest.test.test_irods_sync
 ```
-
-#### enable ingress on minikube
-
-```
-minikube addons enable ingress
-```
-
-#### mount host dirs
-
-This is where you data and event handler. In this setup, we assume that your event handler is under `/tmp/host/event_handler` and you data is under `/tmp/host/data`. We will mount `/tmp/host/data` into `/host/data` in minikube which will mount `/host/data` into `/data` in containers,
-
-`/tmp/host/data` -> minikube `/host/data` -> container `/data`.
-
-and similarly,
-
-`/tmp/host/event_handler` -> minikube `/host/event_handler` -> container `/event_handler`. Your setup may differ.
-
-```
-mkdir /tmp/host/event_handler
-mkdir /tmp/host/data
-```
-
-`/tmp/host/event_handler/event_handler.py`
-```python
-from irods_capability_automated_ingest.core import Core
-from irods_capability_automated_ingest.utils import Operation
-
-class event_handler(Core):
-
-    @staticmethod
-    def target_path(session, meta, **options):
-        return path
-
-```
-
-```
-minikube mount /tmp/host:/host --gid 998 --uid 998 --9p-version=9p2000.L
-```
-
-#### enable incubator
-
-```
-helm repo add incubator https://kubernetes-charts-incubator.storage.googleapis.com/
-```
-
-#### build local docker images (optional)
-If you want to use local docker images, you can build the docker images into minikube as follows:
-
-`fish`
-```
-eval (minikube docker-env)
-```
-
-`bash`
-```
-eval $(minikube docker-env)
-```
-
-```
-cd <repo>/docker/irods-postgresql
-docker build . -t irods-provider-postgresql:4.2.2
-```
-
-```
-cd <repo>/docker/irods-cockroachdb
-docker build . -t irods-provider-cockroachdb:4.3.0
-```
-
-```
-cd <repo>/docker
-docker build . -t irods_capability_automated_ingest:0.1.0
-```
-
-```
-cd <repo>/docker/rq
-docker build . -t irods_rq:0.1.0
-```
-
-```
-cd <repo>/docker/rq-scheduler
-docker build . -t irods_rq-scheduler:0.1.0
-```
-
-#### install irods
-
-##### `postgresql`
-```
-cd <repo>/kubernetes/irods-provider-postgresql
-helm dependency update
-```
-
-```
-cd <repo>/kubernetes
-helm install ./irods-provider-postgresql --name irods
-```
-
-##### `cockroachdb`
-```
-cd <repo>/kubernetes/irods-provider-cockroachdb
-helm dependency update
-```
-
-```
-cd <repo>/kubernetes
-helm install ./irods-provider-cockroachdb --name irods
-```
-
-when reinstalling, run
-
-```
-kubectl delete --all pv
-kubectl delete --all pvc 
-```
-
-#### update irods configurations
-
-Set configurations in `<repo>/kubernetes/chart/values.yaml` or `--set` command line argument.
-
-#### install chart
-
-```
-cd <repo>/kubernetes/chart
-```
-
-We call our release `icai`.
-```
-cd <repo>/kubernetes
-helm install ./chart --name icai
-```
-
-#### scale rq workers
-```
-kubectl scale deployment.apps/icai-rq-deployment --replicas=<n>
-```
-
-#### access by REST API (recommended)
-
-##### submit job
-`submit.yaml`
-```yaml
-root: /data
-target: /tempZone/home/rods/data
-interval: <interval>
-append_json: <yaml>
-timeout: <timeout>
-all: <all>
-event_handler: <event_handler>
-event_handler_data: |
-    from irods_capability_automated_ingest.core import Core
-    from irods_capability_automated_ingest.utils import Operation
-
-    class event_handler(Core):
-
-        @staticmethod
-        def target_path(session, meta, **options):
-            return path
-
-```
-
-`fish`
-```
-curl -XPUT "http://"(minikube ip)"/job/<job name> -H "Content-Type: application/x-yaml" --data-binary=`submit.yaml`
-```
-
-`bash`
-```
-curl -XPUT "http://$(minikube ip)/job/<job name>" -H "Content-Type: application/x-yaml" --data-binary "@submit.yaml"
-```
-
-`fish`
-```
-curl -XPUT "http://"(minikube ip)"/job" -H "Content-Type: application/x-yaml" --data-binary "@submit.yaml"
-```
-
-`bash`
-```
-curl -XPUT "http://$(minikube ip)/job" -H "Content-Type: application/x-yaml" --data-binary "@submit.yaml"
-```
-
-##### list job
-`fish`
-```
-curl -XGET "http://"(minikube ip)"/job"
-```
-
-`bash`
-```
-curl -XGET "http://$(minikube ip)/job"
-```
-
-##### delete job
-`fish`
-```
-curl -XDELETE "http://"(minikube ip)"/job/<job name>"
-```
-
-`bash`
-```
-curl -XDELETE "http://$(minikube ip)/job/<job name>"
-```
-
-#### access by command line (not recommended)
-
-##### submit job
-```
-kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- start /data /tempZone/home/rods/data -i <interval> --event_handler=event_handler --job_name=<job name> --redis_host icai-redis-master
-```
-
-##### list job
-```
-kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- list --redis_host icai-redis-master
-```
-
-##### delete job
-```
-kubectl run --rm -i icai --image=irods_capability_automated_ingest:0.1.0 --restart=Never -- stop <job name> --redis_host icai-redis-master
-```
-
-#### install logging tool
-
-Install chart with set `log_level` to `INFO`.
-```
-helm del --purge icai
-```
-
-```
-cd <repo>/kubernetes
-helm install ./chart --set log_level=INFO --name icai
-```
-
-set parameters for elasticsearch
-
-```
-minikube ssh 'echo "sysctl -w vm.max_map_count=262144" | sudo tee -a /var/lib/boot2docker/bootlocal.sh'
-minikube stop
-minikube start
-```
-
-```
-cd <repo>/kubernetes
-helm install ./elk --name icai-elk
-```
-
-
-##### Grafana
-
-look for service port
-```
-kubectl get svc icai-elk-grafana
-```
-
-forward port
-```
-kubectl port-forward svc/icai-elk-grafana 8000:80
-```
-
-If `--set grafana.adminPassword=""` system generates a random password, lookup admin password
-```
-kubectl get secret --namespace default icai-elk-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
-```
-
-open browser url `localhost:8000`
-
-login with username `admin` and password `admin`
-click on `icai dashboard`
-
-
-##### Kibana
-
-Uncomment kibana sections in the yaml files under the `<repo>/kubernetes/elk` directory
-
-look for service port
-```
-kubectl get svc icai-elk-kibana
-```
-
-forward port
-```
-kubectl port-forward svc/icai-elk-kibana 8000:443
-```
-
-open browser url `localhost:8000`
-
+See [docker/ingest-test/README.md](docker/ingest-test/README.md) for how to run tests with Docker Compose.
