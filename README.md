@@ -10,12 +10,6 @@ The example diagrams below show a filesystem scanner and a landing zone.
 
 ![Automated Ingest: Landing Zone Diagram](capability_automated_ingest_landing_zone.jpg)
 
-## Supported/Tested Python versions
-- 3.7
-- 3.8
-- 3.9
-- 3.10
-
 ## Usage options
 
 ### Redis options
@@ -185,16 +179,9 @@ given object, this precludes character mapping being done for the object.
 Running the sync job and Celery workers requires a valid iRODS environment file for an authenticated iRODS user on each node.
 
 #### Starting Redis Server
-Install redis-server:
-```
-sudo yum install redis-server
-```
-```
-sudo apt-get install redis-server
-```
-Or, build it yourself: https://redis.io/topics/quickstart
+Install Redis server: [https://redis.io/docs/latest/get-started](https://redis.io/docs/latest/get-started)
 
-Start redis:
+Starting the Redis server with package installation:
 ```
 redis-server
 ```
@@ -205,6 +192,8 @@ sudo service redis-server start
 ```
 sudo systemctl start redis
 ```
+
+The Redis GitHub page also describes how to build and run Redis: [https://github.com/redis/redis?tab=readme-ov-file#running-redis](https://github.com/redis/redis?tab=readme-ov-file#running-redis)
 
 The [Redis documentation](https://redis.io/topics/admin) also recommends an additional step:
 > Make sure to set the Linux kernel overcommit memory setting to 1. Add vm.overcommit_memory = 1 to /etc/sysctl.conf and then reboot or run the command sysctl vm.overcommit_memory=1 for this to take effect immediately.
