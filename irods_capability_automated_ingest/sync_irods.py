@@ -199,7 +199,7 @@ def sync_file(hdlr_mod, logger, session, meta, scanner, op, **options):
     if b64_path_str is not None:
         source_physical_fullpath = base64.b64decode(b64_path_str)
 
-    logger.info(f"syncing object {dest_dataobj_logical_fullpath}, options = {options}")
+    logger.info("syncing object %s, options = %s" % (dest_dataobj_logical_fullpath, options))
 
     # TODO: Issue #208
     # Investigate behavior of sync_file when op is None
