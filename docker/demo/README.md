@@ -38,7 +38,7 @@ docker compose down
 
 ## Scanning an S3 bucket
 
-Change the port exposed by the `minio` service, if needed, so that the MinIO Console can be accessed. The MinIO server is being run by the user `irods` and `irodsadmin`. The place from which the job is launched should have a keypair file with these credentials:
+Change the port exposed by the `minio` service, if needed, so that the MinIO Console can be accessed. The MinIO server is being run with access key `irods` and secret key `irodsadmin`. The place from which the job is launched should have a keypair file with these credentials:
 ```
 irods
 irodsadmin
