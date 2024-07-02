@@ -24,17 +24,25 @@ This will clone the specified git repository and checkout the commit-ish specifi
 docker compose build --build-arg PIP_PACKAGE=irods-capability-automated-ingest==0.4.2
 ```
 
-## Start
+## Running the project
+
+This demo simply starts the services and leaves them running with the expectation that commands will be issued to them either through `docker exec` or via client requests to the various endpoints.
+
+It is a simple project, so starting and stopping it are straightforward.
+
+To bring the project up:
 
 ```
 docker compose up
 ```
 
-## Stop
+To bring the project down:
 
 ```
 docker compose down
 ```
+
+The other `docker compose` commands (`start`, `stop`, `restart`, etc.) should work as expected, as well.
 
 ## Scanning an S3 bucket
 
