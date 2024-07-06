@@ -2,7 +2,7 @@ amqp==2.3.2
 aniso8601==4.0.1
 billiard==3.5.0.5
 celery==5.2.2
-certifi==2023.7.22
+certifi==2024.7.4
 Click==7.0
 Flask==2.2.5
 Flask-RESTful==0.3.6
