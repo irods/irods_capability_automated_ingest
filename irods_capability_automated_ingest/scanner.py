@@ -140,7 +140,7 @@ class filesystem_scanner(scanner):
         # target2
         return join(meta["target"], relpath(path, start=meta["root"]))
 
-    def upload_file(self, logger, session, meta, exists, **options):
+    def upload_file(self, logger, session, meta, op, exists, **options):
         """
         Function called from sync_irods.sync_file and sync_irods.upload_file for local files
 
@@ -155,9 +155,6 @@ class filesystem_scanner(scanner):
         b64_path_str = meta.get("b64_path_str")
         if b64_path_str is not None:
             source_physical_fullpath = base64.b64decode(b64_path_str)
-
-        # TODO(#208): Investigate behavior of sync_file when op is None
-        op = meta.get('op', Operation.REGISTER_SYNC)
 
         # PUT_APPEND with existing file
         if op == Operation.PUT_APPEND and exists:
@@ -298,9 +295,6 @@ class s3_scanner(scanner):
         object_name = path_list[1]
 
         MAXIMUM_SINGLE_THREADED_TRANSFER_SIZE = 32 * (1024**2)
-
-        # TODO(#208): Investigate behavior of sync_file when op is None
-        op = meta.get('op', Operation.REGISTER_SYNC)
 
         total_bytes = self.client.stat_object(bucket_name, object_name).size
         # Parallelization is only viable for new files, OR if op=PUT_SYNC for existing data objects since we copy the entire file again

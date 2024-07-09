@@ -283,11 +283,7 @@ def sync_path(self, meta):
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
 
 
-def sync_entry(self, meta, cls, datafunc, metafunc):
-    syncer = meta.get('scanner')
-    if syncer is None:
-        raise RuntimeError("'scanner' not found in options. Cannot sync data.")
-
+def sync_entry(self, meta, cls, syncer, datafunc, metafunc):
     path = meta["path"]
     target = meta["target"]
     config = meta["config"]
@@ -383,10 +379,10 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
             meta2["target"] = target2
 
             if sync_time is None or mtime >= sync_time:
-                datafunc(event_handler.get_module(), meta2, logger, True)
+                datafunc(event_handler.get_module(), meta2, logger, syncer, True)
                 logger.info("succeeded", task=meta["task"], path=path)
             else:
-                metafunc(event_handler.get_module(), meta2, logger)
+                metafunc(event_handler.get_module(), meta2, logger, syncer)
                 logger.info("succeeded_metadata_only", task=meta["task"], path=path)
             sync_time_handle.set_value(str(t))
     except Exception as err:
@@ -400,11 +396,12 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
 
 @app.task(bind=True, base=IrodsTask)
 def sync_dir(self, meta):
-    meta['scanner'] = scanner.scanner_factory(meta)
+    syncer = scanner.scanner_factory(meta)
     sync_entry(
         self,
         meta,
         "dir",
+        syncer,
         sync_irods.sync_data_from_dir,
         sync_irods.sync_metadata_from_dir,
     )
@@ -414,8 +411,7 @@ def sync_dir(self, meta):
 def sync_files(self, _meta):
     chunk = _meta["chunk"]
     meta = _meta.copy()
-    meta['scanner'] = scanner.scanner_factory(meta)
-    meta["task"] = "sync_file"
+    syncer = scanner.scanner_factory(meta)
     for path, obj_stats in chunk.items():
         meta["path"] = path
         meta["is_empty_dir"] = obj_stats.get("is_empty_dir")
@@ -424,10 +420,12 @@ def sync_files(self, _meta):
         meta["mtime"] = obj_stats.get("mtime")
         meta["ctime"] = obj_stats.get("ctime")
         meta["size"] = obj_stats.get("size")
+        meta["task"] = "sync_file"
         sync_entry(
             self,
             meta,
             "file",
+            syncer,
             sync_irods.sync_data_from_file,
             sync_irods.sync_metadata_from_file,
         )
