@@ -207,7 +207,7 @@ def restart(meta):
 
 @app.task(bind=True, base=IrodsTask)
 def sync_path(self, meta):
-    scanner_instance = scanner.scanner_factory(meta)
+    syncer = scanner.scanner_factory(meta)
     path = meta["path"]
     config = meta["config"]
     logging_config = config["log"]
@@ -225,7 +225,7 @@ def sync_path(self, meta):
         meta["task"] = "sync_dir"
         chunk = {}
 
-        itr = scanner_instance.instantiate(meta)
+        itr = syncer.instantiate(meta)
 
         if meta["profile"]:
             profile_log = config.get("profile")
@@ -253,7 +253,7 @@ def sync_path(self, meta):
             obj_stats = {}
 
             try:
-                full_path, obj_stats = scanner_instance.itr(meta, obj, obj_stats)
+                full_path, obj_stats = syncer.itr(meta, obj, obj_stats)
             except ContinueException:
                 continue
 
@@ -284,8 +284,8 @@ def sync_path(self, meta):
 
 
 def sync_entry(self, meta, cls, datafunc, metafunc):
-    scanner_instance = meta.get('scanner')
-    if scanner_instance is None:
+    syncer = meta.get('scanner')
+    if syncer is None:
         raise RuntimeError("'scanner' not found in options. Cannot sync data.")
 
     path = meta["path"]
@@ -363,7 +363,7 @@ def sync_entry(self, meta, cls, datafunc, metafunc):
                 else:
                     target2 = target
             else:
-                target2 = scanner_instance.construct_path(meta2, path)
+                target2 = syncer.construct_path(meta2, path)
 
             # If the event handler has a character_map function, it should have returned a
             # structure (either a dict or a list/tuple of key-value tuples) to be used for
