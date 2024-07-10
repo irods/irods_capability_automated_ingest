@@ -23,6 +23,7 @@ from os.path import (
     isfile,
 )
 from irods.session import iRODSSession
+from irods.meta import iRODSMeta
 from irods.models import Collection, DataObject
 from tempfile import NamedTemporaryFile, mkdtemp
 from datetime import datetime
@@ -34,6 +35,7 @@ from irods_capability_automated_ingest.sync_job import sync_job
 from irods.data_object import irods_dirname, irods_basename
 import irods_capability_automated_ingest.examples
 import irods.keywords as kw
+from irods_capability_automated_ingest.utils import Operation
 
 os.environ["CELERY_BROKER_URL"] = "redis://redis:6379/0"
 
@@ -2288,6 +2290,404 @@ class Test_irods_sync_UnicodeEncodeError(
         b"test_register_with_unicode_encode_error_path_" + "\u1000".encode("utf8")[:-1]
     )
     ANNOTATION_REASON = "UnicodeEncodeError"
+
+
+class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
+    def setUp(self):
+        clear_redis()
+        delete_collection_if_exists(PATH_TO_COLLECTION)
+        irmtrash()
+        create_files(NFILES)
+
+    def tearDown(self):
+        delete_files()
+        clear_redis()
+        delete_collection_if_exists(PATH_TO_COLLECTION)
+        irmtrash()
+
+    @staticmethod
+    def create_event_handler_for_operation_from_base_event_handler(base_event_handler_path, operation_name):
+        # Get the contents from the example event handler file.
+        with open(base_event_handler_path, 'r') as eh:
+            original_eh_contents = eh.read()
+
+        # Replace the "OPERATION" with the operation being tested here.
+        eh_contents = re.sub("= Operation\.REGISTER_SYNC", f"= Operation.{operation_name}", original_eh_contents)
+
+        # Write out the contents to a temporary file which will be used as the event handler in this test.
+        temporary_event_handler = NamedTemporaryFile(delete=False)
+        with open(temporary_event_handler.name, 'w') as tf:
+            tf.write(eh_contents)
+
+        return temporary_event_handler
+
+    @staticmethod
+    def run_sync(destination_collection, event_handler_path, job_name, ignore_cache=False):
+        """Launch a pre-specified sync job and await its completion."""
+
+        command = [
+            "python",
+            "-m",
+            IRODS_SYNC_PY,
+            "start",
+            PATH_TO_SOURCE_DIR,
+            destination_collection,
+            "--event_handler",
+            event_handler_path,
+            "--job_name",
+            job_name,
+            "--log_level",
+            "INFO",
+            "--files_per_task",
+            "1",
+        ]
+
+        if ignore_cache:
+            command.append('--ignore_cache')
+
+        proc = subprocess.Popen(command)
+        proc.wait()
+        # ...and then wait for the workers to complete the tasks.
+        workers = start_workers(1)
+        wait_for(workers, job_name)
+
+    def test_data_obj_create(self):
+        """Test that the data_obj_create event handler methods work with all available Operations."""
+
+        function_name = 'data_obj_create'
+        pre_function_name = f'pre_{function_name}'
+        post_function_name = f'post_{function_name}'
+        base_job_name = f'test_{function_name}'
+        eh_name = f'{function_name}_pre_and_post'
+        original_eh_path = event_handler_path(eh_name)
+
+        # Some operations never invoke these pre/post event handler methods, or require special setups. Exclude these.
+        operations_to_skip = [Operation.NO_OP]
+        operations_to_test = [op for op in Operation if op not in operations_to_skip]
+
+        for op in operations_to_test:
+            temporary_event_handler = self.create_event_handler_for_operation_from_base_event_handler(
+                original_eh_path, op.name)
+
+            # The job name helps to identify failures after the sync job completes.
+            job_name = f'{base_job_name}_{op.name}'
+
+            # Each sync job needs to have a unique destination collection in order to differentiate the tests.
+            destination_collection = '/'.join([PATH_TO_COLLECTION, base_job_name, op.name])
+
+            # The event handler is supposed to annotate the following AVUs in the pre method:
+            #     a: name of the event handler "pre" method
+            #     v: full logical path to the data object being created
+            #     a: the name of the operation (e.g. PUT_SYNC)
+            expected_pre_avus = [
+                (pre_function_name, '/'.join([destination_collection, str(i)]), op.name) for i in range(NFILES)]
+
+            # The event handler is supposed to annotate the following AVUs in the post method:
+            #     a: name of the event handler "post" method
+            #     v: full logical path to the data object being created
+            #     a: the name of the operation (e.g. PUT_SYNC)
+            expected_post_avus = [
+                (post_function_name, '/'.join([destination_collection, str(i)]), op.name) for i in range(NFILES)]
+
+            expected_avus = expected_pre_avus + expected_post_avus
+
+            with self.subTest(f'operation: {op.name}'):
+                with iRODSSession(**get_kwargs()) as session:
+                    try:
+                        # Ensure that the destination collection does not exist so that we can create it fresh.
+                        if session.collections.exists(destination_collection):
+                            session.collections.remove(destination_collection, force=True)
+                        session.collections.create(destination_collection)
+
+                        # Run the sync job and ensure that no failures occurred.
+                        self.run_sync(destination_collection, temporary_event_handler.name, job_name)
+                        self.assertEqual(sync_job(job_name, get_redis()).failures_handle().get_value(), None)
+
+                        metadata_items = session.collections.get(destination_collection).metadata.items()
+                        self.assertNotEqual(len(metadata_items), 0)
+
+                        # Collect the AVUs from the expected set which actually got annotated.
+                        expected_avus_which_were_annotated = []
+                        for a, v, u in metadata_items:
+                            avu = (a, v, u)
+                            if avu in expected_avus:
+                                expected_avus_which_were_annotated.append(avu)
+
+                        # Assert that ALL of the expected AVUs were found to be annotated. We just collected all of
+                        # the AVUs which were annotated and are in the set of expected AVUs, so if the sets are equal,
+                        # that means all of the AVUs we expected were annotated.
+                        self.assertEqual(sorted(expected_avus_which_were_annotated), sorted(expected_avus))
+
+                    finally:
+                        if session.collections.exists(destination_collection):
+                            session.collections.remove(destination_collection, force=True)
+
+    def test_data_obj_modify(self):
+        """Test that the data_obj_modify event handler methods work with all available Operations."""
+
+        function_name = 'data_obj_modify'
+        pre_function_name = f'pre_{function_name}'
+        post_function_name = f'post_{function_name}'
+        base_job_name = f'test_{function_name}'
+        eh_name = f'{function_name}_pre_and_post'
+        original_eh_path = event_handler_path(eh_name)
+
+        # Some operations never invoke these pre/post event handler methods, or require special setups. Exclude these.
+        operations_to_skip = [Operation.NO_OP, Operation.PUT, Operation.REGISTER_AS_REPLICA_SYNC]
+        operations_to_test = [op for op in Operation if op not in operations_to_skip]
+
+        for op in operations_to_test:
+            temporary_event_handler = self.create_event_handler_for_operation_from_base_event_handler(
+                original_eh_path, op.name)
+
+            # The job name helps to identify failures after the sync job completes.
+            job_name = f'{base_job_name}_{op.name}'
+            update_job_name = f'{base_job_name}_{op.name}_update'
+
+            # Each sync job needs to have a unique destination collection in order to differentiate the tests.
+            destination_collection = '/'.join([PATH_TO_COLLECTION, base_job_name, op.name])
+
+            # The event handler is supposed to annotate the following AVUs in the pre method:
+            #     a: name of the event handler "pre" method
+            #     v: full logical path to the data object being modified
+            #     a: the name of the operation (e.g. PUT_SYNC)
+            expected_pre_avus = [
+                (pre_function_name, '/'.join([destination_collection, str(i)]), op.name) for i in range(NFILES)]
+
+            # The event handler is supposed to annotate the following AVUs in the post method:
+            #     a: name of the event handler "post" method
+            #     v: full logical path to the data object being modified
+            #     a: the name of the operation (e.g. PUT_SYNC)
+            expected_post_avus = [
+                (post_function_name, '/'.join([destination_collection, str(i)]), op.name) for i in range(NFILES)]
+
+            expected_avus = expected_pre_avus + expected_post_avus
+
+            with self.subTest(f'operation: {op.name}'):
+                with iRODSSession(**get_kwargs()) as session:
+                    try:
+                        # Ensure that the destination collection does not exist so that we can create it fresh.
+                        if session.collections.exists(destination_collection):
+                            session.collections.remove(destination_collection, force=True)
+                        session.collections.create(destination_collection)
+
+                        # Run the sync job and ensure that no failures occurred.
+                        self.run_sync(destination_collection, temporary_event_handler.name, job_name)
+                        self.assertEqual(sync_job(job_name, get_redis()).failures_handle().get_value(), None)
+
+                        # Ensure that none of the expected AVUs have been annotated yet.
+                        for a, v, u in session.collections.get(destination_collection).metadata.items():
+                            self.assertNotIn((a, v, u), expected_avus)
+
+                        # Modify each file so that the second scan updates the data objects.
+                        for i in range(NFILES):
+                            filepath = os.path.join(PATH_TO_SOURCE_DIR, str(i))
+                            with open(filepath, 'a') as f:
+                                f.write(f'updating file {i}')
+
+                        # Run the sync job again - ignoring the cache - and ensure that no failures occurred. This
+                        # time, the data objects should just be updated.
+                        self.run_sync(destination_collection, temporary_event_handler.name, update_job_name, ignore_cache=True)
+                        self.assertEqual(sync_job(update_job_name, get_redis()).failures_handle().get_value(), None)
+
+                        metadata_items = session.collections.get(destination_collection).metadata.items()
+                        self.assertNotEqual(len(metadata_items), 0)
+
+                        # Collect the AVUs from the expected set which actually got annotated.
+                        expected_avus_which_were_annotated = []
+                        for a, v, u in metadata_items:
+                            avu = (a, v, u)
+                            if avu in expected_avus:
+                                expected_avus_which_were_annotated.append(avu)
+
+                        # Assert that ALL of the expected AVUs were found to be annotated. We just collected all of
+                        # the AVUs which were annotated and are in the set of expected AVUs, so if the sets are equal,
+                        # that means all of the AVUs we expected were annotated.
+                        self.assertEqual(sorted(expected_avus_which_were_annotated), sorted(expected_avus))
+
+                    finally:
+                        if session.collections.exists(destination_collection):
+                            session.collections.remove(destination_collection, force=True)
+
+    def test_coll_create(self):
+        """Test that the coll_create event handler methods work with all available Operations."""
+
+        function_name = 'coll_create'
+        pre_function_name = f'pre_{function_name}'
+        post_function_name = f'post_{function_name}'
+        base_job_name = f'test_{function_name}'
+        eh_name = f'{function_name}_pre_and_post'
+        original_eh_path = event_handler_path(eh_name)
+
+        # Some operations never invoke these pre/post event handler methods, or require special setups. Exclude these.
+        operations_to_skip = [Operation.NO_OP, Operation.REGISTER_AS_REPLICA_SYNC]
+        operations_to_test = [op for op in Operation if op not in operations_to_skip]
+
+        for op in operations_to_test:
+            temporary_event_handler = self.create_event_handler_for_operation_from_base_event_handler(
+                original_eh_path, op.name)
+
+            # The job name helps to identify failures after the sync job completes.
+            job_name = f'{base_job_name}_{op.name}'
+
+            # Each sync job needs to have a unique destination collection in order to differentiate the tests.
+            destination_collection = '/'.join([PATH_TO_COLLECTION, base_job_name, op.name])
+
+            # Because we are testing the pre and post methods for coll_create, the collection will not exist in the
+            # pre event handler method, so we will annotate metadata to the parent collection.
+            # This is an iRODS logical path but this may be running on Windows, hence not using os.path.dirname.
+            parent_of_destination_collection = '/'.join(destination_collection.split('/')[:-1])
+
+            # The event handler is supposed to annotate the following AVUs in the pre method:
+            #     a: name of the event handler "pre" method
+            #     v: full logical path to the collection being created
+            #     a: the name of the operation (e.g. PUT_SYNC)
+            # There will only be one pre method invoked for the creation of the collection.
+            expected_pre_avus = [(pre_function_name, destination_collection, op.name)]
+
+            # The event handler is supposed to annotate the following AVUs in the post method:
+            #     a: name of the event handler "post" method
+            #     v: full logical path to the collection being created
+            #     a: the name of the operation (e.g. PUT_SYNC)
+            # There will only be one post method invoked for the creation of the collection.
+            expected_post_avus = [(post_function_name, destination_collection, op.name)]
+
+            expected_avus = expected_pre_avus + expected_post_avus
+
+            with self.subTest(f'operation: {op.name}'):
+                with iRODSSession(**get_kwargs()) as session:
+                    try:
+                        # Ensure that the destination collection does not exist so that it is created by the sync job.
+                        if session.collections.exists(parent_of_destination_collection):
+                            session.collections.remove(parent_of_destination_collection, force=True)
+
+                        # Create the parent of the destination collection so that there is something onto which metadata
+                        # can be annotated for this test.
+                        session.collections.create(parent_of_destination_collection)
+
+                        # Run the sync job and ensure that no failures occurred.
+                        self.run_sync(destination_collection, temporary_event_handler.name, job_name)
+                        self.assertEqual(sync_job(job_name, get_redis()).failures_handle().get_value(), None)
+
+                        # Because the collection is new at the start, we can assert the exact number of metadata items
+                        # we expect to be annotated to this collection.
+                        metadata_items = session.collections.get(parent_of_destination_collection).metadata.items()
+                        self.assertEqual(len(metadata_items), 2)
+
+                        # Collect the AVUs from the expected set which actually got annotated.
+                        expected_avus_which_were_annotated = []
+                        for a, v, u in metadata_items:
+                            avu = (a, v, u)
+                            if avu in expected_avus:
+                                expected_avus_which_were_annotated.append(avu)
+
+                        # Assert that ALL of the expected AVUs were found to be annotated. We just collected all of
+                        # the AVUs which were annotated and are in the set of expected AVUs, so if the sets are equal,
+                        # that means all of the AVUs we expected were annotated.
+                        self.assertEqual(sorted(expected_avus_which_were_annotated), sorted(expected_avus))
+
+                    finally:
+                        # Remove all metadata items from the parent collection for idempotency.
+                        if session.collections.exists(parent_of_destination_collection):
+                            session.collections.remove(parent_of_destination_collection, force=True)
+
+    def test_coll_modify(self):
+        """Test that the coll_modify event handler methods work with all available Operations."""
+
+        function_name = 'coll_modify'
+        pre_function_name = f'pre_{function_name}'
+        post_function_name = f'post_{function_name}'
+        base_job_name = f'test_{function_name}'
+        eh_name = f'{function_name}_pre_and_post'
+        original_eh_path = event_handler_path(eh_name)
+
+        # Some operations never invoke these pre/post event handler methods, or require special setups. Exclude these.
+        operations_to_skip = [Operation.NO_OP, Operation.PUT, Operation.REGISTER_AS_REPLICA_SYNC]
+        operations_to_test = [op for op in Operation if op not in operations_to_skip]
+
+        for op in operations_to_test:
+            temporary_event_handler = self.create_event_handler_for_operation_from_base_event_handler(
+                original_eh_path, op.name)
+
+            # The job name helps to identify failures after the sync job completes.
+            job_name = f'{base_job_name}_{op.name}'
+            update_job_name = f'{base_job_name}_{op.name}_update'
+
+            # Each sync job needs to have a unique destination collection in order to differentiate the tests.
+            destination_collection = '/'.join([PATH_TO_COLLECTION, base_job_name, op.name])
+
+            # The event handler is supposed to annotate the following AVUs in the pre method:
+            #     a: name of the event handler "pre" method
+            #     v: the job name (coll_modify is not triggered for each data object)
+            #     a: the name of the operation (e.g. PUT_SYNC)
+            expected_pre_avus = [
+                (pre_function_name, job_name, op.name),
+                (pre_function_name, update_job_name, op.name)
+            ]
+
+            # The event handler is supposed to annotate the following AVUs in the post method:
+            #     a: name of the event handler "post" method
+            #     v: the job name (coll_modify is not triggered for each data object)
+            #     a: the name of the operation (e.g. PUT_SYNC)
+            expected_post_avus = [
+                (post_function_name, job_name, op.name),
+                (post_function_name, update_job_name, op.name)
+            ]
+
+            expected_avus = expected_pre_avus + expected_post_avus
+
+            with self.subTest(f'operation: {op.name}'):
+                with iRODSSession(**get_kwargs()) as session:
+                    try:
+                        # Ensure that the destination collection does not exist so that we can create it fresh.
+                        if session.collections.exists(destination_collection):
+                            session.collections.remove(destination_collection, force=True)
+                        session.collections.create(destination_collection)
+
+                        # Run the sync job and ensure that no failures occurred.
+                        self.run_sync(destination_collection, temporary_event_handler.name, job_name)
+                        self.assertEqual(sync_job(job_name, get_redis()).failures_handle().get_value(), None)
+
+                        # Ensure that no metadata items have been annotated because the collection was not modified.
+                        #self.assertEqual(len(session.collections.get(destination_collection).metadata.items()), 0)
+
+                        # TODO(#240): coll_modify is called after coll_create or after each chunk of files is created
+                        # and I would not have expected this to happen until something was actually updated.
+                        self.assertEqual(len(session.collections.get(destination_collection).metadata.items()), 2)
+
+                        # Modify each file so that the second scan updates the data objects and consequently the
+                        # collection, as well.
+                        for i in range(NFILES):
+                            filepath = os.path.join(PATH_TO_SOURCE_DIR, str(i))
+                            with open(filepath, 'a') as f:
+                                f.write(f'updating file {i}')
+
+                        # Run the sync job again - ignoring the cache - and ensure that no failures occurred. This
+                        # time, the data objects should just be updated.
+                        self.run_sync(
+                            destination_collection, temporary_event_handler.name, update_job_name, ignore_cache=True)
+                        self.assertEqual(sync_job(update_job_name, get_redis()).failures_handle().get_value(), None)
+
+                        # Because the collection is new at the start, we can assert the exact number of metadata items
+                        # we expect to be annotated to this collection.
+                        metadata_items = session.collections.get(destination_collection).metadata.items()
+                        self.assertEqual(len(metadata_items), len(expected_avus))
+
+                        # Collect the AVUs from the expected set which actually got annotated.
+                        expected_avus_which_were_annotated = []
+                        for a, v, u in metadata_items:
+                            avu = (a, v, u)
+                            if avu in expected_avus:
+                                expected_avus_which_were_annotated.append(avu)
+
+                        # Assert that ALL of the expected AVUs were found to be annotated. We just collected all of
+                        # the AVUs which were annotated and are in the set of expected AVUs, so if the sets are equal,
+                        # that means all of the AVUs we expected were annotated.
+                        self.assertEqual(sorted(expected_avus_which_were_annotated), sorted(expected_avus))
+
+                    finally:
+                        if session.collections.exists(destination_collection):
+                            session.collections.remove(destination_collection, force=True)
 
 
 def main():
