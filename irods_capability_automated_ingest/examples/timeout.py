@@ -13,5 +13,5 @@ class event_handler(Core):
         return 1
 
     @staticmethod
-    def pre_data_obj_create(hdlr_mod, logger, session, meta, **options):
+    def pre_data_obj_create(hdlr_mod, logger, session, meta, *args, **options):
         time.sleep(2)

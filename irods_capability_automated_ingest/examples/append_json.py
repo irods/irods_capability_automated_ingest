@@ -8,6 +8,6 @@ class event_handler(Core):
         return Operation.NO_OP
 
     @staticmethod
-    def pre_data_obj_create(hdlr_mod, logger, session, meta, **options):
+    def pre_data_obj_create(hdlr_mod, logger, session, meta, *args, **options):
         if meta["append_json"] != "append_json":
             raise RuntimeError("append_json error")

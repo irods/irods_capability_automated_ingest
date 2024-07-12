@@ -17,7 +17,7 @@ class event_handler(Core):
         return Operation.NO_OP
 
     @staticmethod
-    def pre_data_obj_create(hdlr_mod, logger, session, meta, **options):
+    def pre_data_obj_create(hdlr_mod, logger, session, meta, *args, **options):
         path = meta["path"]
         target = meta["target"]
 
