@@ -207,7 +207,7 @@ def restart(meta):
 
 @app.task(bind=True, base=IrodsTask)
 def sync_path(self, meta):
-    syncer = scanner.scanner_factory(meta)
+    scanner_instance = scanner.scanner_factory(meta)
     path = meta["path"]
     config = meta["config"]
     logging_config = config["log"]
@@ -225,7 +225,7 @@ def sync_path(self, meta):
         meta["task"] = "sync_dir"
         chunk = {}
 
-        itr = syncer.instantiate(meta)
+        itr = scanner_instance.instantiate(meta)
 
         if meta["profile"]:
             profile_log = config.get("profile")
@@ -253,7 +253,7 @@ def sync_path(self, meta):
             obj_stats = {}
 
             try:
-                full_path, obj_stats = syncer.itr(meta, obj, obj_stats)
+                full_path, obj_stats = scanner_instance.itr(meta, obj, obj_stats)
             except ContinueException:
                 continue
 
@@ -283,7 +283,7 @@ def sync_path(self, meta):
         raise self.retry(max_retries=max_retries, exc=err, countdown=retry_countdown)
 
 
-def sync_entry(self, meta, cls, syncer, datafunc, metafunc):
+def sync_entry(self, meta, cls, scanner_instance, datafunc, metafunc):
     path = meta["path"]
     target = meta["target"]
     config = meta["config"]
@@ -359,7 +359,7 @@ def sync_entry(self, meta, cls, syncer, datafunc, metafunc):
                 else:
                     target2 = target
             else:
-                target2 = syncer.construct_path(meta2, path)
+                target2 = scanner_instance.construct_path(meta2, path)
 
             # If the event handler has a character_map function, it should have returned a
             # structure (either a dict or a list/tuple of key-value tuples) to be used for
@@ -379,10 +379,10 @@ def sync_entry(self, meta, cls, syncer, datafunc, metafunc):
             meta2["target"] = target2
 
             if sync_time is None or mtime >= sync_time:
-                datafunc(event_handler.get_module(), meta2, logger, syncer, True)
+                datafunc(event_handler.get_module(), meta2, logger, scanner_instance, True)
                 logger.info("succeeded", task=meta["task"], path=path)
             else:
-                metafunc(event_handler.get_module(), meta2, logger, syncer)
+                metafunc(event_handler.get_module(), meta2, logger, scanner_instance)
                 logger.info("succeeded_metadata_only", task=meta["task"], path=path)
             sync_time_handle.set_value(str(t))
     except Exception as err:
@@ -396,12 +396,12 @@ def sync_entry(self, meta, cls, syncer, datafunc, metafunc):
 
 @app.task(bind=True, base=IrodsTask)
 def sync_dir(self, meta):
-    syncer = scanner.scanner_factory(meta)
+    scanner_instance = scanner.scanner_factory(meta)
     sync_entry(
         self,
         meta,
         "dir",
-        syncer,
+        scanner_instance,
         sync_irods.sync_data_from_dir,
         sync_irods.sync_metadata_from_dir,
     )
@@ -411,7 +411,7 @@ def sync_dir(self, meta):
 def sync_files(self, _meta):
     chunk = _meta["chunk"]
     meta = _meta.copy()
-    syncer = scanner.scanner_factory(meta)
+    scanner_instance = scanner.scanner_factory(meta)
     for path, obj_stats in chunk.items():
         meta["path"] = path
         meta["is_empty_dir"] = obj_stats.get("is_empty_dir")
@@ -425,7 +425,7 @@ def sync_files(self, _meta):
             self,
             meta,
             "file",
-            syncer,
+            scanner_instance,
             sync_irods.sync_data_from_file,
             sync_irods.sync_metadata_from_file,
         )
