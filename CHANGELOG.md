@@ -17,7 +17,7 @@ to be updated by inserting the new parameter just before the
 +    def pre_data_obj_create(hdlr_mod, logger, session, meta, *args, **options):
 ```
 
-- [050.release] [main] {origin/main} [#180] Add tags to gitignore
+- [#180] Add tags to gitignore
 - [#219] Add tests for pre/post event handler methods
 - [#219] Add *args to all example pre/post event handler methods
 - [#180] Rename 'syncer' to 'scanner_instance'
