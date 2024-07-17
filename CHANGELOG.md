@@ -1,5 +1,53 @@
 # Changelog
 
+## [v0.5.0] - 2024-07-17
+
+This release adds more functionality when scanning an S3 bucket
+and updates the testing harness and a number of dependencies.
+
+Note: The signatures for all pre/post event handler methods
+(e.g. `pre_data_obj_create`) have been changed to include an
+`*args` parameter.  Any existing event handler files will need
+to be updated by inserting the new parameter just before the
+`**options` keyword argument:
+
+```diff
+     @staticmethod
+-    def pre_data_obj_create(hdlr_mod, logger, session, meta, **options):
++    def pre_data_obj_create(hdlr_mod, logger, session, meta, *args, **options):
+```
+
+- [050.release] [main] {origin/main} [#180] Add tags to gitignore
+- [#219] Add tests for pre/post event handler methods
+- [#219] Add *args to all example pre/post event handler methods
+- [#180] Rename 'syncer' to 'scanner_instance'
+- Revert "[#219] Add 'op' and 'scanner' to meta"
+- Revert "[#180] Rename 'syncer' to 'scanner_instance'"
+- Bump certifi from 2023.7.22 to 2024.7.4
+- [#180] Rename 'syncer' to 'scanner_instance'
+- [#219] Add 'op' and 'scanner' to meta
+- [#222] Use %-formatting in log statement
+- Bump urllib3 from 1.26.18 to 1.26.19
+- [#232] Update deployment instructions in README
+- [#216] Remove non-Compose test instructions
+- [#174] Update Redis instructions in README
+- Bump werkzeug from 2.3.8 to 3.0.3
+- Bump jinja2 from 3.1.3 to 3.1.4
+- Bump certifi from 2022.12.7 to 2023.7.22
+- Bump urllib3 from 1.26.5 to 1.26.18
+- Bump jinja2 from 2.11.3 to 3.1.3
+- Bump flask from 1.0.2 to 2.2.5
+- Bump werkzeug from 2.2.3 to 2.3.8
+- Bump redis from 2.10.6 to 4.4.4
+- [#215] Fix test failures
+- [#220] Update test environment
+- [#180] Update supported Python versions
+- [#180] black formatter - no functional changes
+- [#212] changed REGISTER to REGISTER_SYNC
+- [#207] multi read and write from S3 to iRODS for put, putsync
+- [#129] Added functionality for PUT, PUT_SYNC with S3 via Minio
+- [#129] put_sync functionality for data in S3
+
 ## [v0.4.2] - 2023-06-26
 
 This release fixes the exclude and post_job behavior
