@@ -77,3 +77,41 @@ python3 -m irods_capability_automated_ingest.irods_sync start \
 ```
 
 It's easiest to try out scanning things from the `ingest-celery-workers` service instance.
+
+## Performance testing
+
+While using Docker is not going to get you the best possible performance numbers, it can be useful for benchmarking certain tasks in a reproducible environment.
+
+This section will describe some interesting things you can do to test out various configurations for performance.
+
+### Celery configuration
+
+As mentioned in other sections, the `concurrency` configuration can be changed before container creation for the `ingest-celery-workers` service by overriding the `command` in the Docker Compose YAML file. This affects the number of Celery workers in a given service instance.
+
+Celery has a number of other configurations for the workers which can help with performance: [https://docs.celeryq.dev/en/stable/userguide/configuration.html#worker](https://docs.celeryq.dev/en/stable/userguide/configuration.html#worker)
+
+### Docker Compose service scaling
+
+The `ingest-celery-workers` service can be "scaled up" using the `--scale` option of `docker compose up`. The default scale is 1 service instance, but the scale can be adjusted like this:
+```bash
+docker compose up --scale ingest-celery-workers=4 # replace 4 with desired number of instances
+```
+The above line will spawn 4 instances (containers) of the `ingest-celery-workers` service with each instance having a `concurrency` of whatever has been configured. With the default configuration, this would be 2, for a total of 8 workers across the 4 containers. This can even be done when the project is already up to scale the number of instances up without affecting the existing containers. This can of course be used to scale *down* the number of instances as well.
+
+### Network manipulation with Traffic Control (`tc`)
+
+`tc` can be used to simulate network delays and other networking conditions that may not ordinarily be present. See the `tc` documentation for more information: [https://linux.die.net/man/8/tc](https://linux.die.net/man/8/tc)
+
+Network traffic manipulation requires enabling the additional capability `NET_ADMIN` in the target containers. Remember that "additional capabilities" can only be added at container creation. This can be done a number of different ways, but the simplest way for this project is to add the following `cap_add` stanza to the `ingest-celery-workers` service in the Docker Compose YAML file:
+```yaml
+cap_add:
+    - NET_ADMIN
+```
+
+Here are some useful commands to try executing inside the `ingest-celery-workers` service instance containers for manipulating network traffic:
+```bash
+tc qdisc add dev eth0 root netem delay 100ms # to add rule
+tc qdisc show dev eth0 # to show rules
+tc qdisc del dev eth0 root netem # to delete rule
+```
+Note: In order to run `tc`, the proper package must be installed in the container(s) in which the command will be running. For most Linux distributions, this is `iproute2`.
