@@ -4,7 +4,7 @@
 
 Use this Compose project to test out the ingest tool. There is a Docker volume shared between the iRODS service and the ingest workers that can be used for testing scans. There is another shared volume used to host the Minio storage.
 
-It's easiest to try out scanning things from the `ingest-celery-worker` service instance.
+It's easiest to try out scanning things from the `ingest-celery-workers` service instance.
 
 ## Build
 
@@ -12,7 +12,7 @@ It's easiest to try out scanning things from the `ingest-celery-worker` service 
 docker compose build
 ```
 
-The ingest-celery-worker service has a build argument that allows for controlling the version of the ingest package. Here's how to use it:
+The `ingest-celery-workers` service has a build argument that allows for controlling the version of the ingest package. Here's how to use it:
 
 ```
 docker compose build --build-arg IRODS_AUTOMATED_INGEST_PIP_PACKAGE=git+https://github.com/irods/irods_capability_automated_ingest@main
@@ -53,7 +53,7 @@ If you wish to adjust the Celery concurrency, modify the Compose YAML file to ad
 ```yaml
 command: ["-c", "2"] # Adjust the "2" value to whatever concurrency you want
 ```
-The `command` can only be adjusted before the container is created, so if you wish to adjust the concurrency after the project is already up, you will need to recreate the `ingest-celery-worker` service instance containers.
+The `command` can only be adjusted before the container is created, so if you wish to adjust the concurrency after the project is already up, you will need to recreate the `ingest-celery-workers` service instance containers.
 
 ## Scanning an S3 bucket
 
@@ -76,4 +76,4 @@ python3 -m irods_capability_automated_ingest.irods_sync start \
     --progress
 ```
 
-It's easiest to try out scanning things from the `ingest-celery-worker` service instance.
+It's easiest to try out scanning things from the `ingest-celery-workers` service instance.
