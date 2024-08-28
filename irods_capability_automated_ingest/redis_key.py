@@ -1,5 +1,4 @@
 import json
-from minio import Minio
 import time
 import traceback
 

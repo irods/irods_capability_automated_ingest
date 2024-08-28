@@ -4,6 +4,8 @@ from .custom_event_handler import custom_event_handler
 from uuid import uuid1
 
 from enum import Enum
+import os
+import stat
 
 
 class Operation(Enum):
@@ -37,3 +39,13 @@ def enqueue_task(task, meta):
             path=meta["path"],
             job_name=job.name(),
         )
+
+
+# Attempt to encode full physical path on local filesystem
+# Special handling required for non-encodable strings which raise UnicodeEncodeError
+def is_unicode_encode_error_path(path):
+    try:
+        _ = path.encode("utf8")
+    except UnicodeEncodeError:
+        return True
+    return False
