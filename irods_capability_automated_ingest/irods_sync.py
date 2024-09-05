@@ -179,7 +179,6 @@ def handle_start(args):
     data["src_path"] = args.src_path
     data["interval"] = args.interval
     data["job_name"] = args.job_name if args.job_name else str(uuid1())
-    data["append_json"] = args.append_json
     data["ignore_cache"] = args.ignore_cache
     data["initial_ingest"] = args.initial_ingest
     data["event_handler"] = args.event_handler
@@ -280,13 +279,6 @@ def main():
         type=str,
         default=None,
         help="Reference name for ingest job (defaults to generated uuid)",
-    )
-    parser_start.add_argument(
-        "--append_json",
-        action="store",
-        type=json.loads,
-        default=None,
-        help="Append json output",
     )
     parser_start.add_argument(
         "--ignore_cache",

@@ -538,43 +538,6 @@ class Test_event_handlers(automated_ingest_test_context, unittest.TestCase):
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
-    # append_json
-    def do_append_json(self, eh_name, job_name=DEFAULT_JOB_NAME):
-        eh = event_handler_path(eh_name)
-
-        recreate_files(NFILES)
-
-        proc = subprocess.Popen(
-            [
-                "python",
-                "-m",
-                IRODS_SYNC_PY,
-                "start",
-                PATH_TO_SOURCE_DIR,
-                PATH_TO_COLLECTION,
-                "--event_handler",
-                eh,
-                "--append_json",
-                '"append_json"',
-                "--job_name",
-                job_name,
-                "--log_level",
-                "INFO",
-                "--files_per_task",
-                "1",
-            ]
-        )
-        proc.wait()
-
-        workers = start_workers(1)
-        wait_for(workers, job_name)
-
-        self.do_assert_failed_queue(count=None, job_name=job_name)
-
-    def test_append_json(self):
-        job_name = "test_append_json"
-        self.do_append_json("append_json", job_name=job_name)
-
     # create dir
     def do_register_dir_par(
         self, eh_name, job_name=DEFAULT_JOB_NAME, resc_names=[DEFAULT_RESC]
