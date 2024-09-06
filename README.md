@@ -38,13 +38,6 @@ sudo systemctl start redis
 
 The Redis GitHub page also describes how to build and run Redis: [https://github.com/redis/redis?tab=readme-ov-file#running-redis](https://github.com/redis/redis?tab=readme-ov-file#running-redis)
 
-The [Redis documentation](https://redis.io/topics/admin) also recommends an additional step:
-> Make sure to set the Linux kernel overcommit memory setting to 1. Add vm.overcommit_memory = 1 to /etc/sysctl.conf and then reboot or run the command sysctl vm.overcommit_memory=1 for this to take effect immediately.
-
-This allows the Linux kernel to overcommit virtual memory even if this exceeds the physical memory on the host machine. See [kernel.org documentation](https://www.kernel.org/doc/Documentation/vm/overcommit-accounting) for more information.
-
-**Note:** If running in a distributed environment, make sure Redis server accepts connections by editing the `bind` line in /etc/redis/redis.conf or /etc/redis.conf.
-
 ### Setting up virtual environment
 
 You may need to upgrade pip:
@@ -681,6 +674,37 @@ class event_handler(Core):
         # Implement some actions which should occur after all tasks for a sync job complete.
         pass
 ```
+
+## Configuring Celery
+
+This section gives some pointers for how to configure Celery for effective use with the Automated Ingest framework.
+
+### Memory management
+
+The Celery documentation offers some tips on how to manage memory on the Celery worker nodes in the [Memory Usage](https://docs.celeryq.dev/en/stable/userguide/optimizing.html#memory-usage) section.
+
+### Worker task prefetch
+
+Celery workers can receive a number of tasks from the Celery coordinator up to a certain "prefetch" limit. If the tasks in a given sync job take a long time, you want to use a lower prefetch limit. If the tasks in a given sync job are quick, you want to use a higher prefetch limit in order to limit the roundtrip messaging between the workers and the coordinator. This can also be controlled with the `--files_per_task` option in the `irods_sync` script.
+
+The prefetch limit can be adjusted via the `CELERYD_PREFETCH_MULTIPLIER` environment variable. If setting the prefetch limit to 1, the Celery documentation also recommends setting the environment variable `CELERY_ACKS_LATE=True`.
+
+See [Prefetch Limits](https://docs.celeryq.dev/en/stable/userguide/optimizing.html#optimizing-prefetch-limit) in the Celery documentation for more information.
+
+## Configuring Redis
+
+This section gives some pointers for how to configure Redis for effective use with the Automated Ingest framework.
+
+### Memory management
+
+The [Redis documentation](https://redis.io/topics/admin) recommends the following:
+> Make sure to set the Linux kernel overcommit memory setting to 1. Add vm.overcommit_memory = 1 to /etc/sysctl.conf and then reboot or run the command sysctl vm.overcommit_memory=1 for this to take effect immediately.
+
+This allows the Linux kernel to overcommit virtual memory even if this exceeds the physical memory on the host machine. See [kernel.org documentation](https://www.kernel.org/doc/Documentation/vm/overcommit-accounting) for more information.
+
+### Networking
+
+If running in a distributed environment, make sure Redis server accepts connections by editing the `bind` line in /etc/redis/redis.conf or /etc/redis.conf.
 
 ## Run tests
 
