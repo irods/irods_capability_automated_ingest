@@ -1,6 +1,6 @@
 from irods_capability_automated_ingest.core import Core
 from irods_capability_automated_ingest.utils import Operation
-from irods_capability_automated_ingest.sync_utils import get_redis
+from irods_capability_automated_ingest.redis_utils import get_redis
 
 
 class event_handler(Core):

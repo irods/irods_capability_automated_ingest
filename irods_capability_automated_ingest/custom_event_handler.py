@@ -1,7 +1,7 @@
-import importlib
-import sys
 from .redis_key import redis_key_handle
-from .sync_utils import get_redis
+from .redis_utils import get_redis
+
+import importlib
 import os.path
 import sys
 

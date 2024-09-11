@@ -5,6 +5,7 @@ from irods_capability_automated_ingest.utils import Operation
 
 OPERATION = Operation.REGISTER_SYNC
 
+
 class event_handler(Core):
     @staticmethod
     def operation(session, meta, **options):
@@ -13,7 +14,9 @@ class event_handler(Core):
     @staticmethod
     def pre_data_obj_create(hdlr_mod, logger, session, meta, *args, **options):
         created_data_object_path = meta["target"]
-        parent_collection_of_created_data_object = '/'.join(created_data_object_path.split('/')[:-1])
+        parent_collection_of_created_data_object = "/".join(
+            created_data_object_path.split("/")[:-1]
+        )
 
         attribute = "pre_data_obj_create"
         value = created_data_object_path
@@ -25,7 +28,9 @@ class event_handler(Core):
     @staticmethod
     def post_data_obj_create(hdlr_mod, logger, session, meta, *args, **options):
         created_data_object_path = meta["target"]
-        parent_collection_of_created_data_object = '/'.join(created_data_object_path.split('/')[:-1])
+        parent_collection_of_created_data_object = "/".join(
+            created_data_object_path.split("/")[:-1]
+        )
 
         attribute = "post_data_obj_create"
         value = created_data_object_path
