@@ -1,5 +1,0 @@
-apiVersion: v1
-appVersion: "0.1.0"
-description: irods_capability_automated_ingest
-name: irods_capability_automated_ingest
-version: 0.1.0

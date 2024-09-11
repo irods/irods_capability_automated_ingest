@@ -41,8 +41,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         "minio",
-        "flask",
-        "flask-restful",
         "python-irodsclient>=1.1.1, <2.0.0",
         "python-redis-lock>=3.2.0",
         "redis>=3.4.1, <5.0.0",
