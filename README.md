@@ -73,7 +73,7 @@ export PYTHONPATH=`pwd`
 
 Start celery worker(s):
 ```
-celery -A irods_capability_automated_ingest.sync_task worker -l error -Q restart,path,file -c <num_workers>
+celery -A irods_capability_automated_ingest worker -l error -Q restart,path,file -c <num_workers>
 ```
 **Note:** Make sure queue names match those of the ingest job (default queue names shown here).
 

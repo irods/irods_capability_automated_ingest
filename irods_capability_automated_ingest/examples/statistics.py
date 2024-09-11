@@ -1,18 +1,9 @@
+from .. import redis_key
+from ..redis_utils import get_redis
 from irods_capability_automated_ingest.core import Core
 from irods_capability_automated_ingest.utils import Operation
+
 import time
-from ..sync_utils import (
-    get_redis,
-    get_with_key,
-    failures_key,
-    retries_key,
-    set_with_key,
-    reset_with_key,
-)
-
-
-def t0_key(a):
-    return "t0:/" + a
 
 
 class event_handler(Core):
@@ -27,7 +18,8 @@ class event_handler(Core):
         r = get_redis(config)
 
         t0 = time.time()
-        set_with_key(r, t0_key, job_name, t0)
+        t0_key_handle = redis_key.redis_key_handle(r, "t0", job_name)
+        t0_key_handle.set_value(t0)
 
     @staticmethod
     def post_job(hdlr_mod, logger, meta):
@@ -35,14 +27,15 @@ class event_handler(Core):
         config = meta["config"]
         t1 = time.time()
         r = get_redis(config)
-        t0 = get_with_key(r, t0_key, job_name, float)
-        reset_with_key(r, t0_key, job_name)
-        failures = get_with_key(r, failures_key, job_name, int)
-        retries = get_with_key(r, retries_key, job_name, int)
+        t0_key_handle = redis_key.redis_key_handle(r, "t0", job_name)
+        t0 = t0_key_handle.get_value()
+        t0_key_handle.reset()
+        failures = redis_key.failures_key_handle(r, job_name)
+        retries = redis_key.retries_key_handle(r, job_name)
         logger.info(
             "post_job",
             job_name=job_name,
-            failures=failures,
-            retries=retries,
+            failures=failures.get_value(),
+            retries=retries.get_value(),
             time_elasped=t1 - t0,
         )

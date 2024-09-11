@@ -1,5 +1,7 @@
 from . import redis_key
-from .sync_utils import get_redis, app
+from .celery import app
+from .redis_utils import get_redis
+
 import json
 import os
 import progressbar

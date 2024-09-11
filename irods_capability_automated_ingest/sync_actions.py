@@ -1,8 +1,11 @@
-from . import sync_logging, sync_irods
-from .sync_task import restart
+from . import sync_logging
 from .sync_job import sync_job
-from .sync_utils import get_redis
+from .redis_utils import get_redis
 from .redis_key import redis_key_handle
+
+from .irods import irods_utils
+from .tasks import filesystem_sync, s3_bucket_sync
+
 from os.path import realpath
 from uuid import uuid1
 import uuid
@@ -144,13 +147,15 @@ def start_job(data):
             data_copy["s3_secret_key"] = f.readline().rstrip()
         # set source
         src_abs = src_path
+        main_task = s3_bucket_sync.s3_bucket_main_task
     else:
         src_abs = realpath(src_path)
+        main_task = filesystem_sync.filesystem_main_task
 
     data_copy["root"] = src_abs
     data_copy["path"] = src_abs
 
-    sync_irods.validate_target_collection(data_copy, logger)
+    irods_utils.validate_target_collection(data_copy, logger)
 
     def store_event_handler(data, job):
         event_handler = data.get("event_handler")
@@ -220,13 +225,13 @@ def start_job(data):
     if interval is not None:
         r.rpush("periodic", job_name.encode("utf-8"))
 
-        restart.s(data_copy).apply_async(queue=restart_queue, task_id=job_name)
+        main_task.s(data_copy).apply_async(queue=restart_queue, task_id=job_name)
     else:
         r.rpush("singlepass", job_name.encode("utf-8"))
         if not sychronous:
-            restart.s(data_copy).apply_async(queue=restart_queue)
+            main_task.s(data_copy).apply_async(queue=restart_queue)
         else:
-            res = restart.s(data_copy).apply()
+            res = main_task.s(data_copy).apply()
             if res.failed():
                 print(res.traceback)
                 job.cleanup()

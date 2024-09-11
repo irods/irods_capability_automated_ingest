@@ -1,3 +1,18 @@
+from datetime import datetime
+from os import makedirs, listdir, remove
+from os.path import (
+    join,
+    realpath,
+    getmtime,
+    getsize,
+    dirname,
+    basename,
+    relpath,
+    isfile,
+)
+from shutil import rmtree
+from signal import SIGINT
+from tempfile import NamedTemporaryFile, mkdtemp
 import base64
 import glob
 import os
@@ -9,33 +24,21 @@ import sys
 import time
 import traceback
 import unittest
-from signal import SIGINT
-from os import makedirs, listdir, remove
-from shutil import rmtree
-from os.path import (
-    join,
-    realpath,
-    getmtime,
-    getsize,
-    dirname,
-    basename,
-    relpath,
-    isfile,
-)
-from irods.session import iRODSSession
+
+from irods.data_object import irods_dirname, irods_basename
 from irods.meta import iRODSMeta
 from irods.models import Collection, DataObject
-from tempfile import NamedTemporaryFile, mkdtemp
-from datetime import datetime
-from irods_capability_automated_ingest.sync_utils import size, app
-from irods_capability_automated_ingest.sync_utils import (
-    get_redis as sync_utils_get_redis,
+from irods.session import iRODSSession
+import irods.keywords as kw
+
+from irods_capability_automated_ingest.celery import app
+from irods_capability_automated_ingest.irods.irods_utils import size
+from irods_capability_automated_ingest.redis_utils import (
+    get_redis as get_redis_with_config,
 )
 from irods_capability_automated_ingest.sync_job import sync_job
-from irods.data_object import irods_dirname, irods_basename
-import irods_capability_automated_ingest.examples
-import irods.keywords as kw
 from irods_capability_automated_ingest.utils import Operation
+import irods_capability_automated_ingest.examples
 
 os.environ["CELERY_BROKER_URL"] = "redis://redis:6379/0"
 
@@ -147,7 +150,7 @@ def get_redis(host="redis", port=6379, db=0):
     redis_config["db"] = db
     config = {}
     config["redis"] = redis_config
-    return sync_utils_get_redis(config)
+    return get_redis_with_config(config)
 
 
 def clear_redis():
@@ -159,7 +162,7 @@ def start_workers(n, args=[]):
         [
             "celery",
             "-A",
-            "irods_capability_automated_ingest.sync_task",
+            "irods_capability_automated_ingest",
             "worker",
             "-c",
             str(n),

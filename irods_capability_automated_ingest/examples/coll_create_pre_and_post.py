@@ -5,6 +5,7 @@ from irods_capability_automated_ingest.utils import Operation
 
 OPERATION = Operation.REGISTER_SYNC
 
+
 class event_handler(Core):
     @staticmethod
     def operation(session, meta, **options):
@@ -13,7 +14,7 @@ class event_handler(Core):
     @staticmethod
     def pre_coll_create(hdlr_mod, logger, session, meta, *args, **options):
         created_collection = meta["target"]
-        parent_of_created_collection = '/'.join(created_collection.split('/')[:-1])
+        parent_of_created_collection = "/".join(created_collection.split("/")[:-1])
 
         attribute = "pre_coll_create"
         value = created_collection
@@ -25,7 +26,7 @@ class event_handler(Core):
     @staticmethod
     def post_coll_create(hdlr_mod, logger, session, meta, *args, **options):
         created_collection = meta["target"]
-        parent_of_created_collection = '/'.join(created_collection.split('/')[:-1])
+        parent_of_created_collection = "/".join(created_collection.split("/")[:-1])
 
         attribute = "post_coll_create"
         value = created_collection
