@@ -135,6 +135,122 @@ The `irods_capability_automated_ingest.irods_sync` script is used to manage sync
 
 The Event Handler file is a Python file that is imported as a module by Celery workers and used to modify and extend the behavior provided by the Automated Ingest framework. The contents of the Python file are stored in Redis so that the file needs only to exist locally to the `irods_sync` script rather than on every host on which Celery workers are running. Most supported event handler methods have example implementations in the `irods_capability_automated_ingest/examples` directory. More information about the methods which can be implemented in an Event Handler file can be found in [Event Handler behavioral overrides](#event-handler-behavioral-overrides) and [Event Handlers](#event-handlers).
 
+### `meta` dict
+
+Almost all of the Celery tasks, internal functions, and event handler methods take a parameter called `meta`. `meta` is a Python `dict` which holds the context surrounding an ingest job as well as information for specific tasks. While `meta` holds a lot of different information that is useful at various times, there are a few very important keys which would be good to note.
+
+#### `root`
+
+The `root` key maps to the path in the source storage that is being synced. Let's say that the `irods_sync` script being run had the following options:
+```
+python3 -m irods_capability_automated_ingest.irods_sync start \
+    /source/data /tempZone/home/rods/data
+```
+
+The value of `meta["root"]` would be "/source/data". This value does not change for the duration of the overall sync job or in any constituent task.
+
+#### `path`
+
+The `path` key maps to the current path on the source storage which is being synced. The value changes in different tasks depending on what is being synced. For most cases, `path` values will always be a subdirectory or file under the path to which `root` is mapped.
+
+If a file is being synced from a filesystem, the `path` key maps to the path of that file. If a directory is being synced from a filesystem, the `path` key maps to the path of that directory.
+
+Let's say that the `irods_sync` script being run had the following options:
+```
+python3 -m irods_capability_automated_ingest.irods_sync start \
+    /source/data /tempZone/home/rods/data
+```
+If a file at the path `/source/data/subdir/file1` is being synced, `/source/data/subdir/file1` would be the value of `path`.
+
+If a path being synced requires modification due to a `character_map` Event Handler method or cannot be represented due to a `UnicodeEncodeError`, `path` will be updated accordingly.
+
+#### `target`
+
+The `target` key maps to the current logical path in iRODS to which data is being synced. The value changes in different tasks depending on what is being synced.
+
+If a file is being synced from a filesystem, the `target` key maps to the logical path of the data object to which the data is being synced. If a directory is being synced from a filesystem, the `target` key maps to the logical path of the collection to which the data is being synced.
+
+The iRODS logical path used as a value for `target` is constructed based on the path of the source storage being synced. Let's say that the `irods_sync` script being run had the following options:
+```
+python3 -m irods_capability_automated_ingest.irods_sync start \
+    /source/data /tempZone/home/rods/data
+```
+If a file at the path `/source/data/subdir/file1` is being synced (note: this would be the value of `path` at this point), `/tempZone/home/rods/data/subdir/file1` would be the value for `target`.
+
+#### `job_name`
+
+The `job_name` key maps to the name of the overall sync job to which the current task being executed belongs. This can be useful for fetching information about the sync job from the Redis database, or for annotating metadata regarding the sync job to data objects or collections.
+
+#### `restart_queue`, `path_queue`, and `file_queue`
+
+The `restart_queue`, `path_queue`, and `file_queue` keys map to the queue names for the `restart`, `path`, and `file` queues.
+
+#### `config`
+
+The `config` key maps to another Python `dict` which holds configuration information about the sync job. There are 3 keys in this dict.
+
+The `log` key configures the Python logger used by Celery workers. See [`sync_logger`](#sync_logger) below for more information about the `log` configuration.
+
+The `profile` key configures information for the `profile` feature. Its value is a `dict` similar to the `log` configuration whose keys correspond to the `--profile_filename`, `--profile_when`, `--profile_interval`, and `--profile_level` options of the `irods_sync` script. See [Profiling options](#profiling-options) for more information.
+
+The `redis` key configures communication with the Redis database. Its value is a `dict` that looks like this:
+```javascript
+{
+    // ... Other stuff ...
+
+    "config": {
+        // ... Other stuff ...
+
+        "redis": {
+            "host": "<string>",
+            "port": <int>,
+            "db": <int>
+        }
+
+        // ... Other stuff ...
+    }
+
+    // ... Other stuff ...
+}
+```
+The `host`, `port`, and `db` correspond to the `--redis_host`, `--redis_port`, and `--redis_db` options for the `irods_sync` script. See [Redis configuration options](#redis-configuration-options) for more information.
+
+### `sync_logger`
+
+The `sync_logger` is the logger used by the Celery workers while executing tasks. The client submitting a job (e.g. the `irods_sync` script) configures the logger in `meta`. This is what the configuration looks like in `meta`:
+```javascript
+{
+    // ... Other stuff ...
+
+    "config": {
+        // ... Other stuff ...
+
+        "log": {
+            "filename": "<string>" or None,
+            "log_when": "<string>" or None,
+            "interval": "<string>" or None,
+            "level": "<string>" or None
+        }
+
+        // ... Other stuff ...
+    }
+
+    // ... Other stuff ...
+}
+```
+Each member of the `dict` corresponds with the [Logging Options](#logging-options) described below.
+
+To instantiate the `sync_logger` for use, do something like this:
+```python
+# Get the "config" from meta...
+config = meta["config"]
+# Get the "log" from the config...
+log_config = config.get("log")
+# Get the sync_logger based on the log_config.
+logger = sync_logging.get_sync_logger(log_config)
+```
+The returned logger can then be used to log messages in a standard way. Note: This should only be done inside a Celery task or Event Handler method.
+
 ## `irods_sync start`
 
 `irods_sync start` is used to start a sync job by enqueueing the main task of the overall sync job. The main task is run asynchronously by default, but can be run synchronously with the `--synchronous` option.
