@@ -59,24 +59,26 @@ def irods_session(handler_module, meta, logger, **options):
     env_file = os.environ.get("IRODS_ENVIRONMENT_FILE")
 
     kwargs = {}
-    if (
-        env_irods_host is None
-        or env_irods_port is None
-        or env_irods_user_name is None
-        or env_irods_zone_name is None
-        or env_irods_password is None
+    if all(
+        [
+            env_irods_host,
+            env_irods_port,
+            env_irods_user_name,
+            env_irods_zone_name,
+            env_irods_password,
+        ]
     ):
-        if env_file is None:
-            # TODO(#250): This will not work on Windows.
-            env_file = os.path.expanduser("~/.irods/irods_environment.json")
-
-        kwargs["irods_env_file"] = env_file
-    else:
         kwargs["host"] = env_irods_host
         kwargs["port"] = env_irods_port
         kwargs["user"] = env_irods_user_name
         kwargs["zone"] = env_irods_zone_name
         kwargs["password"] = env_irods_password
+    else:
+        if not env_file:
+            # TODO(#250): This will not work on Windows.
+            env_file = os.path.expanduser("~/.irods/irods_environment.json")
+
+        kwargs["irods_env_file"] = env_file
 
     if hasattr(handler_module, "as_user"):
         client_zone, client_user = handler_module.as_user(meta, **options)
@@ -86,6 +88,11 @@ def irods_session(handler_module, meta, logger, **options):
     key = json.dumps(kwargs)  # todo add timestamp of env file to key
 
     if env_file:
+        if not os.path.exists(env_file):
+            raise FileNotFoundError(
+                f"Specified iRODS client environment file [{env_file}] does not exist."
+            )
+
         with open(env_file) as irods_env:
             irods_env_as_json = json.load(irods_env)
             verify_server = irods_env_as_json.get("irods_ssl_verify_server")
@@ -98,7 +105,9 @@ def irods_session(handler_module, meta, logger, **options):
                     cadata=None,
                 )
 
-    if not key in irods_session_map:
+    if key in irods_session_map:
+        sess = irods_session_map.get(key)
+    else:
         # TODO: #42 - pull out 10 into configuration
         for i in range(10):
             try:
@@ -106,12 +115,7 @@ def irods_session(handler_module, meta, logger, **options):
                 irods_session_map[key] = sess
                 break
             except NetworkException:
-                if i < 10:
-                    time.sleep(0.1)
-                else:
-                    raise
-    else:
-        sess = irods_session_map.get(key)
+                time.sleep(0.1)
 
     # =-=-=-=-=-=-=-
     # disconnect timer
