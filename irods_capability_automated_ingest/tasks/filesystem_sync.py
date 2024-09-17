@@ -21,23 +21,8 @@ import traceback
 
 
 def exclude_file_type(ex_list, dir_regex, file_regex, full_path, logger, mode=None):
-    if len(ex_list) <= 0 and None == dir_regex and None == file_regex:
+    if len(ex_list) <= 0 and not dir_regex and not file_regex:
         return False
-
-    ret_val = False
-    mode = None
-
-    dir_match = None
-    for d in dir_regex:
-        dir_match = None != d.match(full_path)
-        if dir_match == True:
-            break
-
-    file_match = None
-    for f in file_regex:
-        file_match = None != f.match(full_path)
-        if file_match == True:
-            return True
 
     try:
         if mode is None:
@@ -45,29 +30,32 @@ def exclude_file_type(ex_list, dir_regex, file_regex, full_path, logger, mode=No
     except FileNotFoundError:
         return False
 
-    if stat.S_ISREG(mode):
-        if "regular" in ex_list or file_match:
-            ret_val = True
-    elif stat.S_ISDIR(mode):
-        if "directory" in ex_list or dir_match:
-            ret_val = True
-    elif stat.S_ISCHR(mode):
-        if "character" in ex_list or file_match:
-            ret_val = True
-    elif stat.S_ISBLK(mode):
-        if "block" in ex_list or file_match:
-            ret_val = True
-    elif stat.S_ISSOCK(mode):
-        if "socket" in ex_list or file_match:
-            ret_val = True
-    elif stat.S_ISFIFO(mode):
-        if "pipe" in ex_list or file_match:
-            ret_val = True
-    elif stat.S_ISLNK(mode):
-        if "link" in ex_list or file_match:
-            ret_val = True
+    if stat.S_ISDIR(mode):
+        dir_match = any(d.match(full_path) for d in dir_regex)
+        return dir_match or "directory" in ex_list
 
-    return ret_val
+    file_match = any(f.match(full_path) for f in file_regex)
+    file_type_match_to_file_type_string_map = {
+        stat.S_ISREG: "regular",
+        stat.S_ISCHR: "character",
+        stat.S_ISBLK: "block",
+        stat.S_ISSOCK: "socket",
+        stat.S_ISFIFO: "pipe",
+        stat.S_ISLNK: "link",
+    }
+
+    for (
+        file_type_match,
+        file_type_string,
+    ) in file_type_match_to_file_type_string_map.items():
+        if file_type_match(mode):
+            return file_match or file_type_string in ex_list
+
+    # We will only reach this point if the st_mode of the file at full_path is not in the map above.
+    logger.warning(
+        f"File [{full_path}] will not be excluded: st_mode [{mode}] is not recognized."
+    )
+    return False
 
 
 @app.task(base=RestartTask)
