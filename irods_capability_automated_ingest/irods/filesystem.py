@@ -261,25 +261,21 @@ def sync_file_meta(hdlr_mod, logger, session, meta, **options):
 def sync_data_from_file(hdlr_mod, meta, logger, content, **options):
     target = meta["target"]
     path = meta["path"]
-    init = meta["initial_ingest"]
 
     event_handler = custom_event_handler.custom_event_handler(meta)
     session = irods_utils.irods_session(
         event_handler.get_module(), meta, logger, **options
     )
 
-    if init:
+    if meta.get("initial_ingest"):
+        # If the initial_ingest option has been specified, no checking is done for the existence
+        # of the logical path for performance reasons. If the option is specified and the logical
+        # path exists, an error will occur; this behavior is expected.
         exists = False
-
     else:
-        if session.data_objects.exists(target):
-            exists = True
-        elif session.collections.exists(target):
-            raise Exception(
-                "sync: cannot sync file " + path + " to collection " + target
-            )
-        else:
-            exists = False
+        exists = session.data_objects.exists(target)
+        if not exists and session.collections.exists(target):
+            raise Exception(f"sync: cannot sync file {path} to collection {target}")
 
     op = event_handler.operation(session, **options)
 
@@ -293,10 +289,10 @@ def sync_data_from_file(hdlr_mod, meta, logger, content, **options):
                 "on_data_obj_modify", logger, no_op, logger, session, meta, **options
             )
     else:
+        createRepl = False
         if op is None:
             op = Operation.REGISTER_SYNC
-        createRepl = False
-        if exists and op == Operation.REGISTER_AS_REPLICA_SYNC:
+        elif exists and op == Operation.REGISTER_AS_REPLICA_SYNC:
             resc_name = event_handler.to_resource(session, **options)
             if resc_name is None:
                 raise Exception("no resource name defined")
@@ -308,13 +304,12 @@ def sync_data_from_file(hdlr_mod, meta, logger, content, **options):
                     found = True
                     if replica.path == path:
                         foundPath = True
-            if found:
-                if not foundPath:
-                    raise Exception(
-                        "there is at least one replica under resource but all replicas have wrong paths"
-                    )
-            else:
+            if not found:
                 createRepl = True
+            elif not foundPath:
+                raise Exception(
+                    f"Data object [{target}] has at least one replica under resource [{resc_name}], but none of the replicas have physical paths which match [{path}]."
+                )
 
         put = op in [Operation.PUT, Operation.PUT_SYNC, Operation.PUT_APPEND]
 
