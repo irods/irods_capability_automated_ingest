@@ -289,6 +289,12 @@ def sync_data_from_file(hdlr_mod, meta, logger, content, **options):
                 "on_data_obj_modify", logger, no_op, logger, session, meta, **options
             )
     else:
+        # allow_redirect will cause PRC to establish a direct connection between the client and the server hosting the
+        # resource to which the data is being uploaded. This can cause problems if the hostnames being used in the
+        # client environment and the hostname used for the "location" of the resource differ despite referring to the
+        # same host. As such, we set the allow_redirect option to False in order to prevent this redirect.
+        options["allow_redirect"] = False
+
         createRepl = False
         if op is None:
             op = Operation.REGISTER_SYNC

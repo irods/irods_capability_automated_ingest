@@ -16,9 +16,7 @@ The example diagrams below show a filesystem scanner and a landing zone.
 
 `python-irodsclient` (PRC) is used by the Automated Ingest tool to interact with iRODS. The configuration and client environment files used for a PRC application apply here as well.
 
-If you are using PAM authentication, remember to use the [Client Settings File](https://github.com/irods/python-irodsclient/tree/71d787fe1f79d81775d892c59f3e9a9f60262c78?tab=readme-ov-file#python-irods-client-settings-file).
-
-`iRODSSession`s are instantiated using an iRODS client environment file. The client environment file used can be controlled with the `IRODS_ENVIRONMENT_FILE` environment variable. If no such environment variable is set, the file is expected to be found at `${HOME}/.irods/irods_environment.json`. A secure connection can be made by making the appropriate configurations in the client environment file.
+More information about configuring the iRODS client environment can be found in [Configuring iRODS and `python-irodsclient` (PRC)](#configuring-irods-and-python-irodsclient-prc).
 
 ### Starting Redis Server
 
@@ -789,6 +787,37 @@ class event_handler(Core):
     def post_job(hdlr_mod, logger, meta):
         # Implement some actions which should occur after all tasks for a sync job complete.
         pass
+```
+
+## Configuring iRODS and `python-irodsclient` (PRC)
+
+### iRODS client environment file
+
+`iRODSSession`s can be instantiated using an iRODS client environment file. The client environment file used can be controlled with the `IRODS_ENVIRONMENT_FILE` environment variable. If no such environment variable is set, the file is expected to be found at `${HOME}/.irods/irods_environment.json`. A secure connection can be made by making the appropriate configurations in the client environment file.
+
+### PAM authentication
+
+If you are using PAM authentication, remember to use the [Client Settings File](https://github.com/irods/python-irodsclient/tree/71d787fe1f79d81775d892c59f3e9a9f60262c78?tab=readme-ov-file#python-irods-client-settings-file).
+
+### Redirection for data transfers
+
+By default, the Automated Ingest framework has disabled redirection for data transfers. This means that no direct connection between the client host and destination server for the data will be established. This redirection is intended to speed up large data transfers by reducing the number of server-to-server connections required to transfer the data to its destination vault. The main use case for the Automated Ingest capability is to quickly ingest many small files into iRODS, so this redirection actually harms the majority of use cases.
+
+If you wish to use the redirection feature for data uploads in a particular sync job, use a "pre" Event Handler to set the `allow_redirect` value to `True` in the `**options` keyword argument. Here's what that would look like for a `data_obj_create` event:
+```python
+from irods_capability_automated_ingest.core import Core
+class event_handler(Core):
+    @staticmethod
+    def operation(session, meta, **options):
+        # PUT, PUT_SYNC, and PUT_APPEND are the data uploading functions which are affected.
+        return Operation.PUT_SYNC
+
+    @staticmethod
+    def pre_data_obj_create(hdlr_mod, logger, session, meta, *args, **options):
+        # This overrides the default value set by the Automated Ingest framework to allow
+        # direct connections between the client and server. You could also do this
+        # conditionally based on the size of the file.
+        options["allow_redirect"] = True
 ```
 
 ## Configuring Celery
