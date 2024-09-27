@@ -51,6 +51,10 @@ services:
       - "IRODS_PASSWORD"
     volumes:
       - "/tmp/mountdir:/tmp/testdir"
+      - shared_volume:/data/ufs
     depends_on:
       - some-redis
       - irods-catalog-provider
+
+volumes:
+    shared_volume:
