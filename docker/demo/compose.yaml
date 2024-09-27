@@ -45,7 +45,7 @@ services:
                 condition: service_started
             irods-catalog-provider:
                 condition: service_healthy
-        command: ["-c", "2"] # Configure Celery options here. Note: Only takes effect at container creation.
+        command: ["-c", "2", "--loglevel", "INFO"] # Configure Celery options here. Note: Only takes effect at container creation.
 
     minio:
         image: minio/minio:RELEASE.2024-06-28T09-06-49Z
