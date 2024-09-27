@@ -606,6 +606,20 @@ class event_handler(Core):
 ```
 The default operation is `Operation.REGISTER_SYNC`.
 
+### `delete_mode`
+
+This method returns a member of the `DeleteMode` enumeration specifying the type of delete mode the sync job should be performing on a data object or collection in the destination iRODS collection which does not have a corresponding entry in the storage being traversed. More information about the accepted values can be found in [Event Handler Delete Modes](#event-handler-delete-modes). Here is what the method should look like:
+```python
+from irods_capability_automated_ingest.core import Core
+from irods_capability_automated_ingest.utils import DeleteMode
+class event_handler(Core):
+    @staticmethod
+    def delete_mode(meta):
+        # Replace DeleteMode.DO_NOT_DELETE with the desired DeleteMode value.
+        return DeleteMode.DO_NOT_DELETE
+```
+The default delete mode is `DeleteMode.DO_NOT_DELETE`.
+
 ## Event Handler Operations
 
 One of the most important overrides supported by the custom event handler file is the `operation` method. In this section, we detail the supported operation types and what they are used for. The `Operation` enum is defined in `irods_capability_automated_ingest.utils`, so be sure to import this module when using these.
@@ -661,6 +675,63 @@ If the target logical path exists but does not have a replica on the target reso
 ### `Operation.NO_OP`
 
 This operation does not sync data in any way. It exists to allow Event Handlers to execute without populating the catalog.
+
+## Event Handler Delete Modes
+
+In this section, we detail the supported delete mode types and what they are used for. The `DeleteMode` enum is defined in `irods_capability_automated_ingest.utils`, so be sure to import this module when using these.
+
+The delete mode defines what happens when a data object or collection is found in the target iRODS collection for a sync job which does not exist in the entries in the storage being traversed. The use case for this feature is syncing a storage system with iRODS which has had entries (e.g. files and directories) removed since it was last synced with iRODS; the data objects and collections mapped to these missing entries will be deleted.
+
+### `DeleteMode.DO_NOT_DELETE`
+
+Any data object or collection found in the target iRODS collection which does not exist in the storage being synced will **not** be deleted when `DO_NOT_DELETE` is the defined delete mode.
+
+`DO_NOT_DELETE` is the default delete mode if no `delete_mode` method is defined in the custom event handler.
+
+### `DeleteMode.UNREGISTER`
+
+If `UNREGISTER` is the defined delete mode, any data object or collection found in the target iRODS collection which does not exist in the storage being synced will be unregistered from the iRODS catalog and the data in storage for its replicas will remain in storage. This is equivalent to calling `iunreg` on these data objects and collections.
+
+### `DeleteMode.TRASH`
+
+If `TRASH` is the defined delete mode, any data object or collection found in the target iRODS collection which does not exist in the storage being synced will be removed according to the trash policy defined in the server. If a trash collection is in use, the data objects and collections will be renamed to reside within the trash collection. If the trash policy specifies that no trash collection shall exist, the data objects and collections will be unregistered from the iRODS catalog and the data removed from storage. This is equivalent to calling `irm` on these data objects and collections.
+
+### `DeleteMode.NO_TRASH`
+
+If `NO_TRASH` is the defined delete mode, any data object or collection found in the target iRODS collection which does not exist in the storage being synced will be unlinked. The data objects and collections will be unregistered from the iRODS catalog and the data removed from storage. This is equivalent to calling `irm -f` on these data objects and collections.
+
+## Compatibility of Operations and Delete Modes
+
+Not all Operations and Delete Modes are compatible with one another. If an Operation and an incompatible Delete Mode are provided in the Event Handler file for a sync job, the main sync task will fail with an error and no data will be synced.
+
+This table shows every combination of Operation and Delete Mode and the result of using them together:
+
+| case | Operation | Delete Mode | Compatible? | Result |
+| ---- | ---- | ---- | ---- | ---- |
+| 0 | NO_OP | DO_NOT_DELETE | Yes | No data will be synced. NO_OP does not sync data. |
+| 1 | NO_OP | UNREGISTER | No | An error occurs and the main task for the sync job fails. No data will be synced. |
+| 2 | NO_OP | TRASH | No | An error occurs and the main task for the sync job fails. No data will be synced. |
+| 3 | NO_OP | NO_TRASH | No | An error occurs and the main task for the sync job fails. No data will be synced. |
+| 4 | REGISTER_SYNC | DO_NOT_DELETE | Yes | On sync, any items in the destination collection which are missing from the source remain in the iRODS catalog. |
+| 5 | REGISTER_SYNC | UNREGISTER | Yes | On sync, any items in the destination collection which are missing from the source are unregistered from the iRODS catalog. |
+| 6 | REGISTER_SYNC | TRASH | No | An error occurs and the main task for the sync job fails. No data will be synced. |
+| 7 | REGISTER_SYNC | NO_TRASH | No | An error occurs and the main task for the sync job fails. No data will be synced. |
+| 8 | REGISTER_AS_REPLICA_SYNC | DO_NOT_DELETE | Yes | On sync, any items in the destination collection which are missing from the source remain in the iRODS catalog. |
+| 9 | REGISTER_AS_REPLICA_SYNC | UNREGISTER | Yes | On sync, any items in the destination collection which are missing from the source are unregistered from the iRODS catalog. |
+| 10 | REGISTER_AS_REPLICA_SYNC | TRASH | No | An error occurs and the main task for the sync job fails. No data will be synced. |
+| 11 | REGISTER_AS_REPLICA_SYNC | NO_TRASH | No | An error occurs and the main task for the sync job fails. No data will be synced. |
+| 12 | PUT | DO_NOT_DELETE | Yes | PUT does not sync data; it only creates new collections and data objects. |
+| 13 | PUT | UNREGISTER | No | An error occurs and the main task for the sync job fails. No data will be created. |
+| 14 | PUT | TRASH | No | An error occurs and the main task for the sync job fails. No data will be created. |
+| 15 | PUT | NO_TRASH | No | An error occurs and the main task for the sync job fails. No data will be created. |
+| 16 | PUT_SYNC | DO_NOT_DELETE | Yes | On sync, any items in the destination collection which are missing from the source remain in the iRODS catalog. |
+| 17 | PUT_SYNC | UNREGISTER | No | An error occurs and the main task for the sync job fails. No data will be synced. |
+| 18 | PUT_SYNC | TRASH | Yes | On sync, any items in the destination collection which are missing from the source are removed according to the iRODS server's trash policy. By default, this is a rename to reside within the trash collection. |
+| 19 | PUT_SYNC | NO_TRASH | Yes | On sync, any items in the destination collection which are missing from the source are unlinked. |
+| 20 | PUT_APPEND | DO_NOT_DELETE | Yes | On sync, any items in the destination collection which are missing from the source remain in the iRODS catalog. |
+| 21 | PUT_APPEND | UNREGISTER | No | An error occurs and the main task for the sync job fails. No data will be synced. |
+| 22 | PUT_APPEND | TRASH | Yes | On sync, any items in the destination collection which are missing from the source are removed according to the iRODS server's trash policy. By default, this is a rename to reside within the trash collection. |
+| 23 | PUT_APPEND | NO_TRASH | Yes | On sync, any items in the destination collection which are missing from the source are unlinked. |
 
 ## Event Handlers
 
@@ -720,6 +791,36 @@ class event_handler(Core):
         pass
 ```
 
+### `pre_data_obj_delete` and `post_data_obj_delete`
+
+A `data_obj_delete` event occurs whenever an existing data object is deleted as a result of a data syncing operation in a sync job. In order for a `data_obj_delete` event to occur, a custom event handler must be provided with the `delete_mode` method defined and returning one of the following values: `UNREGISTER`, `TRASH`, `NO_TRASH`.
+
+This event only occurs once per data object per sync job because after that the data object has been unregistered from the catalog or renamed to reside within the trash collection depending on the defined delete mode.
+
+Here is what the methods should look like:
+```python
+from irods_capability_automated_ingest.core import Core
+from irods_capability_automated_ingest.utils import DeleteMode
+class event_handler(Core):
+    @staticmethod
+    def delete_mode(meta):
+        # This value should be updated to the desired delete mode based on the
+        # defined operation.
+        return DeleteMode.UNREGISTER
+
+    @staticmethod
+    def pre_data_obj_delete(hdlr_mod, session, meta, *args, **options):
+        # Implement some actions which should occur before a data object is deleted.
+        target_logical_path = meta["target"]
+        pass
+
+    @staticmethod
+    def post_data_obj_delete(hdlr_mod, session, meta, *args, **options):
+        # Implement some actions which should occur after a data object is deleted.
+        target_logical_path = meta["target"]
+        pass
+```
+
 ### `pre_coll_create` and `post_coll_create`
 
 A `coll_create` event occurs whenever a collection is created as a result of syncing a path in a sync job. The following operations can trigger a `coll_create` event: `NO_OP`, `REGISTER_SYNC`, `REGISTER_AS_REPLICA_SYNC`, `PUT`, `PUT_SYNC`, and `PUT_APPEND`.
@@ -767,6 +868,36 @@ class event_handler(Core):
         # Implement some actions which should occur after a collection is modified.
         destination_logical_path = meta["target"]
         source_physical_path = meta["path"]
+        pass
+```
+
+### `pre_coll_delete` and `post_coll_delete`
+
+A `coll_delete` event occurs whenever an existing collection is deleted in a sync job. In order for a `coll_delete` event to occur, a custom event handler must be provided with the `delete_mode` method defined and returning one of the following values: `UNREGISTER`, `TRASH`, `NO_TRASH`.
+
+This event only occurs once per collection per sync job. This event only occurs for filesystem scans. This event does not occur for S3 bucket scans because S3 has no concept of "directories" that is acknowledged by the Automated Ingest framework.
+
+Here is what the methods should look like:
+```python
+from irods_capability_automated_ingest.core import Core
+from irods_capability_automated_ingest.utils import DeleteMode
+class event_handler(Core):
+    @staticmethod
+    def delete_mode(meta):
+        # This value should be updated to the desired delete mode based on the
+        # defined operation.
+        return DeleteMode.UNREGISTER
+
+    @staticmethod
+    def pre_coll_delete(hdlr_mod, session, meta, *args, **options):
+        # Implement some actions which should occur before a collection is deleted.
+        target_logical_path = meta["target"]
+        pass
+
+    @staticmethod
+    def post_coll_delete(hdlr_mod, session, meta, *args, **options):
+        # Implement some actions which should occur after a collection is deleted.
+        target_logical_path = meta["target"]
         pass
 ```
 
