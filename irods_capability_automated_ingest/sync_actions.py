@@ -1,19 +1,18 @@
 from . import sync_logging
-from .sync_job import sync_job
-from .redis_utils import get_redis
-from .redis_key import redis_key_handle
-
 from .irods import irods_utils
-from .tasks import filesystem_sync, s3_bucket_sync
+from .redis_key import redis_key_handle
+from .redis_utils import get_redis
+from .sync_job import sync_job
+from .tasks import filesystem_tasks, s3_bucket_tasks
 
 from os.path import realpath
 from uuid import uuid1
-import uuid
 import json
 import progressbar
 import redis_lock
-import time
 import textwrap
+import time
+import uuid
 
 uuid_ = uuid.uuid4().hex
 
@@ -147,10 +146,10 @@ def start_job(data):
             data_copy["s3_secret_key"] = f.readline().rstrip()
         # set source
         src_abs = src_path
-        main_task = s3_bucket_sync.s3_bucket_main_task
+        main_task = s3_bucket_tasks.s3_bucket_main_task
     else:
         src_abs = realpath(src_path)
-        main_task = filesystem_sync.filesystem_main_task
+        main_task = filesystem_tasks.filesystem_main_task
 
     data_copy["root"] = src_abs
     data_copy["path"] = src_abs
