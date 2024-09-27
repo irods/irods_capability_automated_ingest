@@ -183,11 +183,15 @@ def start_job(data):
             content_string = textwrap.dedent(
                 """
             from irods_capability_automated_ingest.core import Core 
-            from irods_capability_automated_ingest.utils import Operation
+            from irods_capability_automated_ingest.utils import Operation, DeleteMode
             class event_handler(Core):
                 @staticmethod
-                def operation(session, meta, **options):
-                    return Operation.REGISTER_SYNC"""
+                def operation(session, meta, *args, **options):
+                    return Operation.REGISTER_SYNC
+
+                @staticmethod
+                def delete_mode(meta):
+                    return DeleteMode.DO_NOT_DELETE"""
             )
             event_handler_key.set_value(content_string)
 

@@ -109,3 +109,11 @@ class custom_event_handler(object):
         if self.hasattr("target_path"):
             return self.get_module().target_path(session, self.meta, **options)
         return None
+
+    def delete_mode(self):
+        if self.hasattr("delete_mode"):
+            return self.get_module().delete_mode(self.meta)
+
+        from .utils import DeleteMode
+
+        return DeleteMode.DO_NOT_DELETE
