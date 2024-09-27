@@ -17,6 +17,43 @@ class Operation(Enum):
     NO_OP = 5
 
 
+class DeleteMode(Enum):
+    DO_NOT_DELETE = 0
+    UNREGISTER = 1
+    TRASH = 2
+    NO_TRASH = 3
+
+
+def delete_mode_is_compatible_with_operation(delete_mode, operation):
+    operation_to_acceptable_delete_modes = {
+        Operation.NO_OP: [
+            DeleteMode.DO_NOT_DELETE,
+        ],
+        Operation.REGISTER_SYNC: [
+            DeleteMode.DO_NOT_DELETE,
+            DeleteMode.UNREGISTER,
+        ],
+        Operation.REGISTER_AS_REPLICA_SYNC: [
+            DeleteMode.DO_NOT_DELETE,
+            DeleteMode.UNREGISTER,
+        ],
+        Operation.PUT: [
+            DeleteMode.DO_NOT_DELETE,
+        ],
+        Operation.PUT_SYNC: [
+            DeleteMode.DO_NOT_DELETE,
+            DeleteMode.TRASH,
+            DeleteMode.NO_TRASH,
+        ],
+        Operation.PUT_APPEND: [
+            DeleteMode.DO_NOT_DELETE,
+            DeleteMode.TRASH,
+            DeleteMode.NO_TRASH,
+        ],
+    }
+    return delete_mode in operation_to_acceptable_delete_modes.get(operation, [])
+
+
 def enqueue_task(task, meta):
     logger = sync_logging.get_sync_logger(meta["config"]["log"])
     job = sync_job.from_meta(meta)
