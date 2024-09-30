@@ -8,6 +8,8 @@ import irods.keywords as kw
 from minio import Minio
 
 import base64
+import hashlib
+import io
 import os
 
 
@@ -271,7 +273,7 @@ def register_file(hdlr_mod, logger, session, meta, **options):
     )
 
 
-def upload_file(logger, session, meta, op, **options):
+def _upload_file(logger, session, meta, op, exists=False, **options):
     """
     Function called from sync_irods.sync_file and sync_irods.upload_file, for S3 objects
 
@@ -359,7 +361,7 @@ def upload_file(logger, session, meta, op, **options):
     # Single stream should happen for files <= 32MiB or for op=PUT_APPEND
     else:
         # Ensures tsize is not None
-        tsize = size(session, dest_dataobj_logical_fullpath) or 0
+        tsize = irods_utils.size(session, dest_dataobj_logical_fullpath) or 0
         logger.info(
             "Single stream put",
             task="irods_S3upload_file",
@@ -378,8 +380,38 @@ def upload_file(logger, session, meta, op, **options):
         )
 
 
+def upload_file(hdlr_mod, logger, session, meta, op, **options):
+    _upload_file(logger, session, meta, op, exists=False, **options)
+
+
 def no_op(hdlr_mod, logger, session, meta, **options):
     pass
+
+
+def sync_file(hdlr_mod, logger, session, meta, scanner, op, **options):
+    dest_dataobj_logical_fullpath = meta["target"]
+    source_physical_fullpath = meta["path"]
+    b64_path_str = meta.get("b64_path_str")
+
+    event_handler = custom_event_handler.custom_event_handler(meta)
+    resc_name = event_handler.to_resource(session, **options)
+    if resc_name is not None:
+        options["destRescName"] = resc_name
+
+    if b64_path_str is not None:
+        source_physical_fullpath = base64.b64decode(b64_path_str)
+
+    logger.info(
+        "syncing object %s, options = %s" % (dest_dataobj_logical_fullpath, options)
+    )
+
+    # TODO(#208): Investigate behavior of sync_file when op is None
+    if op is None:
+        op = Operation.REGISTER_SYNC
+
+    # Use scanner object to sync files
+    # Ensure exists=True so that upload_file understands that it is a sync_file operation
+    _upload_file(logger, session, meta, op, exists=True, **options)
 
 
 def update_metadata(hdlr_mod, logger, session, meta, **options):

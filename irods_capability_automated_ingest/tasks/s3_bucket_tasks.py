@@ -301,7 +301,7 @@ def s3_bucket_sync_entry(self, meta_input, datafunc, metafunc):
             # Construct S3 "logical path"
             target2 = "/".join([meta["target"], reg_path])
             # Construct S3 "physical path" as: /bucket/objectname
-            meta["path"] = f"/{meta['root']}/{path}"
+            meta2["path"] = f"/{meta['root']}/{path}"
 
         # If the event handler has a character_map function, it should have returned a
         # structure (either a dict or a list/tuple of key-value tuples) to be used for
