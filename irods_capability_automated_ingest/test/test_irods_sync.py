@@ -49,7 +49,7 @@ RODSADMIN = "rods"
 
 IRODS_SYNC_PY = "irods_capability_automated_ingest.irods_sync"
 
-PATH_TO_SOURCE_DIR = join("/", "tmp", "testdir", "a")
+PATH_TO_SOURCE_DIR = join("/", "data", "ufs", "a")
 A_REMOTE = "a_remote"
 PATH_TO_COLLECTION = "/" + ZONENAME + "/home/" + RODSADMIN + "/" + A_REMOTE
 
@@ -1928,7 +1928,7 @@ class _Test_irods_sync_with_bad_filename:
         if self.BAD_FILENAME is None:
             self.skipTest("Need BAD_FILENAME, ie test vector, that is not None")
         basename = str(int(time.time()))
-        self.source_dir_path = join("/", "tmp", "testdir", basename)
+        self.source_dir_path = join("/", "data", "ufs", basename)
         os.makedirs(self.source_dir_path)
         self.dest_coll_path = join("/tempZone/home/rods", basename)
         self.bad_filepath = join(self.source_dir_path.encode("utf8"), self.BAD_FILENAME)

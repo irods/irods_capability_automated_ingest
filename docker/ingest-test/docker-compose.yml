@@ -33,7 +33,7 @@ services:
         aliases:
           - icat.example.org
     volumes:
-      - "/tmp/mountdir:/tmp/testdir:ro"
+      - shared_volume:/data/ufs
     depends_on:
       - icat
 
@@ -50,7 +50,6 @@ services:
       - "IRODS_ENVIRONMENT_FILE"
       - "IRODS_PASSWORD"
     volumes:
-      - "/tmp/mountdir:/tmp/testdir"
       - shared_volume:/data/ufs
     depends_on:
       - some-redis
