@@ -289,7 +289,14 @@ class automated_ingest_test_context(object):
             delete_resources(session, HIERARCHY1)
 
     # utilities
-    def do_register(self, eh_name, job_name=DEFAULT_JOB_NAME, resc_name=[DEFAULT_RESC]):
+    def do_register(
+        self,
+        eh_name,
+        job_name=DEFAULT_JOB_NAME,
+        resc_name=[DEFAULT_RESC],
+        source_directory=PATH_TO_SOURCE_DIR,
+        destination_collection=PATH_TO_COLLECTION,
+    ):
         eh = event_handler_path(eh_name)
 
         proc = subprocess.Popen(
@@ -298,8 +305,8 @@ class automated_ingest_test_context(object):
                 "-m",
                 IRODS_SYNC_PY,
                 "start",
-                PATH_TO_SOURCE_DIR,
-                PATH_TO_COLLECTION,
+                source_directory,
+                destination_collection,
                 "--event_handler",
                 eh,
                 "--job_name",
@@ -311,21 +318,41 @@ class automated_ingest_test_context(object):
             ]
         )
         proc.wait()
-        self.do_register2(job_name, resc_names=resc_name)
+        self.do_register2(
+            job_name,
+            resc_names=resc_name,
+            source_directory=source_directory,
+            destination_collection=destination_collection,
+        )
 
-    def do_register2(self, job_name=DEFAULT_JOB_NAME, resc_names=[DEFAULT_RESC]):
+    def do_register2(
+        self,
+        job_name=DEFAULT_JOB_NAME,
+        resc_names=[DEFAULT_RESC],
+        source_directory=PATH_TO_SOURCE_DIR,
+        destination_collection=PATH_TO_COLLECTION,
+    ):
         workers = start_workers(1)
         wait_for(workers, job_name)
-        self.do_assert_register(resc_names)
+        self.do_assert_register(
+            resc_names,
+            source_directory=source_directory,
+            destination_collection=destination_collection,
+        )
 
-    def do_assert_register(self, resc_names):
+    def do_assert_register(
+        self,
+        resc_names,
+        source_directory=PATH_TO_SOURCE_DIR,
+        destination_collection=PATH_TO_COLLECTION,
+    ):
         with iRODSSession(
             **test_lib.get_test_irods_client_environment_dict()
         ) as session:
-            self.assertTrue(session.collections.exists(PATH_TO_COLLECTION))
-            for i in listdir(PATH_TO_SOURCE_DIR):
-                path = join(PATH_TO_SOURCE_DIR, i)
-                rpath = PATH_TO_COLLECTION + "/" + i
+            self.assertTrue(session.collections.exists(destination_collection))
+            for i in listdir(source_directory):
+                path = join(source_directory, i)
+                rpath = destination_collection + "/" + i
                 self.assertTrue(session.data_objects.exists(rpath))
                 a1 = read_file(path)
 
@@ -1772,6 +1799,23 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
             return
         else:
             self.fail("target collection should fail to ingest")
+
+    def test_register_to_deep_nonexistent_subcollection_does_not_hang_forever__issue_124(
+        self,
+    ):
+        job_name = "test_register_to_deep_nonexistent_subcollection_does_not_hang_forever__issue_124"
+        source_directory = PATH_TO_SOURCE_DIR
+        # The destination collection needs to have enough path elements to exceed the number of path elements in
+        # source_directory in order to demonstrate the bug.
+        destination_collection = "/".join([PATH_TO_COLLECTION, "a", "b", "c", "d", "e"])
+        self.do_register(
+            "register",
+            job_name=job_name,
+            source_directory=source_directory,
+            destination_collection=destination_collection,
+        )
+        self.do_assert_failed_queue(count=None, job_name=job_name)
+        self.do_assert_retry_queue(count=None, job_name=job_name)
 
 
 class test_exclude_options(automated_ingest_test_context, unittest.TestCase):
