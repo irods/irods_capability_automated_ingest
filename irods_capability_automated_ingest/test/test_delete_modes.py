@@ -20,6 +20,8 @@ from irods_capability_automated_ingest.sync_job import sync_job
 from irods_capability_automated_ingest.utils import DeleteMode, Operation
 import irods_capability_automated_ingest.examples
 
+from . import test_lib
+
 # TODO(#286): Derive from the environment?
 # This must be set as an environment variable in order for the Celery workers to communicate with the broker.
 # Update this value if the hostname, port, or database for the Redis service needs to change.
@@ -27,35 +29,6 @@ os.environ["CELERY_BROKER_URL"] = "redis://redis:6379/0"
 
 # These are useful to have as a global because delete modes only have an effect for sync operations.
 non_sync_operations = [Operation.NO_OP, Operation.PUT]
-
-
-def get_test_irods_client_environment_dict():
-    # TODO(#286): Derive from the environment?
-    return {
-        "host": os.environ.get("IRODS_HOST"),
-        "port": os.environ.get("IRODS_PORT"),
-        "user": os.environ.get("IRODS_USER_NAME"),
-        "zone": os.environ.get("IRODS_ZONE_NAME"),
-        "password": os.environ.get("IRODS_PASSWORD"),
-    }
-
-
-# This is a global in order to take advantage of "caching" the Redis configuration.
-# Modify get_redis_config if changes are needed.
-redis_config = {}
-
-
-# TODO(#286): Derive from the environment?
-def get_redis_config(host="redis", port=6379, db=0):
-    global redis_config
-    if redis_config:
-        return redis_config
-    redis_config = {"redis": {"host": host, "port": port, "db": db}}
-    return redis_config
-
-
-def clear_redis():
-    get_redis(get_redis_config()).flushdb()
 
 
 def start_workers(n=2, args=[]):
@@ -76,7 +49,7 @@ def start_workers(n=2, args=[]):
 
 
 def wait_for_job_to_finish(workers, job_name, timeout=60):
-    r = get_redis(get_redis_config())
+    r = get_redis(test_lib.get_redis_config())
     t0 = time.time()
     while timeout is None or time.time() - t0 < timeout:
         restart = r.llen("restart")
@@ -97,31 +70,14 @@ def wait_for_job_to_finish(workers, job_name, timeout=60):
     )
 
 
-def irmtrash():
-    # TODO(irods/python-irodsclient#182): Needs irmtrash endpoint
-    with iRODSSession(**get_test_irods_client_environment_dict()) as session:
-        rods_trash_path = "/".join(
-            ["", session.zone, "trash", "home", session.username]
-        )
-        rods_trash_coll = session.collections.get(rods_trash_path)
-        for coll in rods_trash_coll.subcollections:
-            delete_collection_if_exists(coll.path, recurse=True, force=True)
-
-
-def delete_collection_if_exists(coll, recurse=True, force=False):
-    with iRODSSession(**get_test_irods_client_environment_dict()) as session:
-        if session.collections.exists(coll):
-            session.collections.remove(coll, recurse=recurse, force=force)
-
-
 class test_delete_modes_with_sync_operations(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.restart_queue_name = "delete_op_restart"
         cls.path_queue_name = "delete_op_path"
         cls.file_queue_name = "delete_op_file"
-        clear_redis()
-        irmtrash()
+        test_lib.clear_redis()
+        test_lib.irmtrash()
         cls.workers = start_workers(
             args=[
                 "-l",
@@ -131,13 +87,15 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
             ]
         )
 
-        cls.irods_session = iRODSSession(**get_test_irods_client_environment_dict())
+        cls.irods_session = iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        )
         cls.job_name = "test_delete_modes_job"
 
     @classmethod
     def tearDownClass(cls):
-        clear_redis()
-        irmtrash()
+        test_lib.clear_redis()
+        test_lib.irmtrash()
         cls.irods_session.cleanup()
         cls.workers.send_signal(signal.SIGINT)
         cls.workers.wait()
@@ -246,7 +204,7 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.source_directory, ignore_errors=True)
-        delete_collection_if_exists(
+        test_lib.delete_collection_if_exists(
             self.destination_collection, recurse=True, force=True
         )
 
@@ -335,7 +293,7 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
         # Assert that the expected number of failed tasks for this job are found. A value of None means no tasks
         # failed for this job.
         self.assertEqual(
-            sync_job(job_name, get_redis(get_redis_config()))
+            sync_job(job_name, get_redis(test_lib.get_redis_config()))
             .failures_handle()
             .get_value(),
             expected_failure_count,

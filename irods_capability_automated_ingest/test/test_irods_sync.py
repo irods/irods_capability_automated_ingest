@@ -33,12 +33,12 @@ import irods.keywords as kw
 
 from irods_capability_automated_ingest.celery import app
 from irods_capability_automated_ingest.irods.irods_utils import size
-from irods_capability_automated_ingest.redis_utils import (
-    get_redis as get_redis_with_config,
-)
+from irods_capability_automated_ingest.redis_utils import get_redis
 from irods_capability_automated_ingest.sync_job import sync_job
 from irods_capability_automated_ingest.utils import Operation
 import irods_capability_automated_ingest.examples
+
+from . import test_lib
 
 os.environ["CELERY_BROKER_URL"] = "redis://redis:6379/0"
 
@@ -112,51 +112,6 @@ HIERARCHY1 = {
 }
 
 
-def get_irods_environment_file():
-    env_file = os.environ.get("IRODS_ENVIRONMENT_FILE")
-    if env_file is None:
-        env_file = os.path.expanduser("~/.irods/irods_environment.json")
-        if not os.exists(env_file):
-            env_file = None
-    return env_file
-
-
-def get_kwargs():
-    kwargs = {}
-    # env_file = get_irods_environment_file()
-    # if env_file:
-    # kwargs['irods_env_file'] = env_file
-    # return kwargs
-
-    env_irods_host = os.environ.get("IRODS_HOST")
-    env_irods_port = os.environ.get("IRODS_PORT")
-    env_irods_user_name = os.environ.get("IRODS_USER_NAME")
-    env_irods_zone_name = os.environ.get("IRODS_ZONE_NAME")
-    env_irods_password = os.environ.get("IRODS_PASSWORD")
-
-    kwargs["host"] = env_irods_host
-    kwargs["port"] = env_irods_port
-    kwargs["user"] = env_irods_user_name
-    kwargs["zone"] = env_irods_zone_name
-    kwargs["password"] = env_irods_password
-
-    return kwargs
-
-
-def get_redis(host="redis", port=6379, db=0):
-    redis_config = {}
-    redis_config["host"] = host
-    redis_config["port"] = port
-    redis_config["db"] = db
-    config = {}
-    config["redis"] = redis_config
-    return get_redis_with_config(config)
-
-
-def clear_redis():
-    get_redis().flushdb()
-
-
 def start_workers(n, args=[]):
     workers = subprocess.Popen(
         [
@@ -177,7 +132,7 @@ def start_workers(n, args=[]):
 
 
 def wait_for(workers, job_name=DEFAULT_JOB_NAME):
-    r = get_redis()
+    r = get_redis(test_lib.get_redis_config())
     t0 = time.time()
     while TIMEOUT is None or time.time() - t0 < TIMEOUT:
         restart = r.llen("restart")
@@ -296,26 +251,6 @@ def delete_resources(session, hierarchy, root=None):
         delete_resource(session, resc_name, resc_dict, root)
 
 
-def irmtrash():
-    # TODO: irods/python-irodsclient#182 Needs irmtrash endpoint
-    with iRODSSession(**get_kwargs()) as session:
-        rods_trash_path = join("/", session.zone, "trash", "home", session.username)
-        rods_trash_coll = session.collections.get(rods_trash_path)
-        for coll in rods_trash_coll.subcollections:
-            delete_collection_if_exists(coll.path, recurse=True, force=True)
-
-
-def delete_collection(coll, recurse=True, force=False):
-    with iRODSSession(**get_kwargs()) as session:
-        session.collections.remove(coll)
-
-
-def delete_collection_if_exists(coll, recurse=True, force=False):
-    with iRODSSession(**get_kwargs()) as session:
-        if session.collections.exists(coll):
-            session.collections.remove(coll, recurse=recurse, force=force)
-
-
 def modify_time(session, path):
     for row in session.query(DataObject.modify_time).filter(
         Collection.name == dirname(path), DataObject.name == basename(path)
@@ -332,21 +267,25 @@ def event_handler_path(eh_name):
 
 class automated_ingest_test_context(object):
     def setUp(self):
-        irmtrash()
-        clear_redis()
-        delete_collection_if_exists(PATH_TO_COLLECTION)
+        test_lib.irmtrash()
+        test_lib.clear_redis()
+        test_lib.delete_collection_if_exists(PATH_TO_COLLECTION)
         create_files(NFILES)
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             create_resources(session, HIERARCHY1)
 
         self.logfile = NamedTemporaryFile()
 
     def tearDown(self):
         delete_files()
-        clear_redis()
-        delete_collection_if_exists(PATH_TO_COLLECTION)
-        irmtrash()
-        with iRODSSession(**get_kwargs()) as session:
+        test_lib.clear_redis()
+        test_lib.delete_collection_if_exists(PATH_TO_COLLECTION)
+        test_lib.irmtrash()
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             delete_resources(session, HIERARCHY1)
 
     # utilities
@@ -380,7 +319,9 @@ class automated_ingest_test_context(object):
         self.do_assert_register(resc_names)
 
     def do_assert_register(self, resc_names):
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             self.assertTrue(session.collections.exists(PATH_TO_COLLECTION))
             for i in listdir(PATH_TO_SOURCE_DIR):
                 path = join(PATH_TO_SOURCE_DIR, i)
@@ -436,7 +377,9 @@ class automated_ingest_test_context(object):
         self.do_assert_put(resc_names, resc_roots)
 
     def do_assert_put(self, resc_names, resc_roots):
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             self.assertTrue(session.collections.exists(PATH_TO_COLLECTION))
             for i in listdir(PATH_TO_SOURCE_DIR):
                 path = join(PATH_TO_SOURCE_DIR, i)
@@ -465,14 +408,20 @@ class automated_ingest_test_context(object):
         self, error_message=None, count=NFILES, job_name=DEFAULT_JOB_NAME
     ):
         self.assertEqual(
-            sync_job(job_name, get_redis()).failures_handle().get_value(), count
+            sync_job(job_name, get_redis(test_lib.get_redis_config()))
+            .failures_handle()
+            .get_value(),
+            count,
         )
 
     def do_assert_retry_queue(
         self, error_message=None, count=NFILES, job_name=DEFAULT_JOB_NAME
     ):
         self.assertEqual(
-            sync_job(job_name, get_redis()).retries_handle().get_value(), count
+            sync_job(job_name, get_redis(test_lib.get_redis_config()))
+            .retries_handle()
+            .get_value(),
+            count,
         )
 
 
@@ -571,7 +520,9 @@ class Test_event_handlers(automated_ingest_test_context, unittest.TestCase):
         workers = start_workers(NWORKERS)
         wait_for(workers, job_name)
 
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             self.assertTrue(session.collections.exists(PATH_TO_COLLECTION))
             for i in glob.glob(PATH_TO_SOURCE_DIR + "/**/*", recursive=True):
                 if isfile(i):
@@ -815,7 +766,9 @@ class Test_no_sync(automated_ingest_test_context, unittest.TestCase):
         workers = start_workers(1)
         wait_for(workers, job_name)
 
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             for i in listdir(PATH_TO_SOURCE_DIR):
                 path = join(PATH_TO_SOURCE_DIR, i)
                 rpath = PATH_TO_COLLECTION + "/" + i
@@ -920,7 +873,9 @@ class Test_update(automated_ingest_test_context, unittest.TestCase):
     def do_update(self, eh_name, job_name=DEFAULT_JOB_NAME, resc_name=[DEFAULT_RESC]):
         recreate_files(NFILES)
         self.do_register(eh_name, job_name, resc_name=resc_name)
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             for i in listdir(PATH_TO_SOURCE_DIR):
                 path = join(PATH_TO_SOURCE_DIR, i)
                 rpath = PATH_TO_COLLECTION + "/" + i
@@ -1266,7 +1221,9 @@ class Test_pep_callbacks(automated_ingest_test_context, unittest.TestCase):
             workers = start_workers(1)
             wait_for(workers, job_name=job_name)
             # Assert that the collections were created
-            with iRODSSession(**get_kwargs()) as session:
+            with iRODSSession(
+                **test_lib.get_test_irods_client_environment_dict()
+            ) as session:
                 self.assertTrue(session.collections.exists(PATH_TO_COLLECTION))
                 for subdir in subdir_names:
                     self.assertTrue(
@@ -1303,7 +1260,7 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     def do_register_as_replica_no_assertions(self, eh_name, job_name=DEFAULT_JOB_NAME):
         eh = event_handler_path(eh_name)
 
-        clear_redis()
+        test_lib.clear_redis()
         recreate_files(NFILES)
 
         proc = subprocess.Popen(
@@ -1333,7 +1290,9 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
         self, eh_name, job_name=DEFAULT_JOB_NAME, resc_names=[DEFAULT_RESC]
     ):
         self.do_register_as_replica_no_assertions(eh_name)
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             self.assertTrue(session.collections.exists(PATH_TO_COLLECTION))
             for i in os.listdir(PATH_TO_SOURCE_DIR):
                 physical_path_to_new_file = os.path.join(PATH_TO_SOURCE_DIR, i)
@@ -1506,7 +1465,9 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
         self.do_assert_retry_queue(count=None, job_name=update_replica_job)
 
     def do_put_to_child(self, job_name=DEFAULT_JOB_NAME):
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             session.resources.remove_child(REGISTER_RESC2, REGISTER_RESC2A)
         self.do_put(
             "put_with_resc_name",
@@ -1514,7 +1475,9 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
             resc_names=[REGISTER_RESC2A],
             resc_roots=[REGISTER_RESC_PATH2A],
         )
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             session.resources.add_child(REGISTER_RESC2, REGISTER_RESC2A)
 
     # replica with another replica in hier
@@ -1582,7 +1545,9 @@ class Test_update_metadata(automated_ingest_test_context, unittest.TestCase):
     ):
         ctime_files(NFILES)
         self.do_register(eh_name, job_name, resc_name=resc_name)
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             for i in listdir(PATH_TO_SOURCE_DIR):
                 path = join(PATH_TO_SOURCE_DIR, i)
                 rpath = PATH_TO_COLLECTION + "/" + i
@@ -1822,7 +1787,9 @@ class test_exclude_options(automated_ingest_test_context, unittest.TestCase):
         destination_coll=PATH_TO_COLLECTION,
         excluded_files=[],
     ):
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             self.assertTrue(session.collections.exists(destination_coll))
             for i in listdir(source_dir):
                 logical_path = destination_coll + "/" + i
@@ -1954,14 +1921,14 @@ class _Test_irods_sync_with_bad_filename:
         pass
 
     def tearDown(self):
-        delete_collection_if_exists(self.dest_coll_path)
+        test_lib.delete_collection_if_exists(self.dest_coll_path)
         rmtree(self.source_dir_path, ignore_errors=True)
         delete_files()
-        clear_redis()
+        test_lib.clear_redis()
 
     # TODO: eh?
     def do_register_as_replica_no_assertions(self, eh, job_name=DEFAULT_JOB_NAME):
-        clear_redis()
+        test_lib.clear_redis()
 
     # Helper member functions
     def assert_logical_path(self, session, allow_suffix=False):
@@ -2029,14 +1996,20 @@ class _Test_irods_sync_with_bad_filename:
         self, error_message=None, count=NFILES, job_name=DEFAULT_JOB_NAME
     ):
         self.assertEqual(
-            sync_job(job_name, get_redis()).failures_handle().get_value(), count
+            sync_job(job_name, get_redis(test_lib.get_redis_config()))
+            .failures_handle()
+            .get_value(),
+            count,
         )
 
     def do_assert_retry_queue(
         self, error_message=None, count=NFILES, job_name=DEFAULT_JOB_NAME
     ):
         self.assertEqual(
-            sync_job(job_name, get_redis()).retries_handle().get_value(), count
+            sync_job(job_name, get_redis(test_lib.get_redis_config()))
+            .retries_handle()
+            .get_value(),
+            count,
         )
 
     def create_bad_file(self):
@@ -2083,7 +2056,9 @@ class _Test_irods_sync_with_bad_filename:
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             self.assert_logical_path(
                 session, allow_suffix=self.ALLOW_LOGICAL_NAME_SUFFIX
             )
@@ -2112,7 +2087,9 @@ class _Test_irods_sync_with_bad_filename:
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             self.assert_logical_path(
                 session, allow_suffix=self.ALLOW_LOGICAL_NAME_SUFFIX
             )
@@ -2133,14 +2110,16 @@ class _supplementary_tests_with_bad_filename:
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
-        clear_redis()
+        test_lib.clear_redis()
 
         self.run_scan_with_event_handler("replica_with_resc_name")
 
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             # import irods.keywords as kw
             # obj = session.data_objects.get(self.expected_logical_path)
             # options = {kw.REPL_NUM_KW: str(0), kw.COPIES_KW: str(1)}
@@ -2183,7 +2162,9 @@ class _supplementary_tests_with_bad_filename:
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             self.assert_logical_path(session)
             self.assert_physical_path_and_resource(session, expected_physical_path)
             self.assert_data_object_contents(session)
@@ -2211,7 +2192,9 @@ class _supplementary_tests_with_bad_filename:
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
-        with iRODSSession(**get_kwargs()) as session:
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
             self.assert_logical_path(session)
             self.assert_physical_path_and_resource(session, expected_physical_path)
             self.assert_data_object_contents(session)
@@ -2260,16 +2243,16 @@ class Test_irods_sync_UnicodeEncodeError(
 
 class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
     def setUp(self):
-        clear_redis()
-        delete_collection_if_exists(PATH_TO_COLLECTION)
-        irmtrash()
+        test_lib.clear_redis()
+        test_lib.delete_collection_if_exists(PATH_TO_COLLECTION)
+        test_lib.irmtrash()
         create_files(NFILES)
 
     def tearDown(self):
         delete_files()
-        clear_redis()
-        delete_collection_if_exists(PATH_TO_COLLECTION)
-        irmtrash()
+        test_lib.clear_redis()
+        test_lib.delete_collection_if_exists(PATH_TO_COLLECTION)
+        test_lib.irmtrash()
 
     @staticmethod
     def create_event_handler_for_operation_from_base_event_handler(
@@ -2379,7 +2362,9 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
             expected_avus = expected_pre_avus + expected_post_avus
 
             with self.subTest(f"operation: {op.name}"):
-                with iRODSSession(**get_kwargs()) as session:
+                with iRODSSession(
+                    **test_lib.get_test_irods_client_environment_dict()
+                ) as session:
                     try:
                         # Ensure that the destination collection does not exist so that we can create it fresh.
                         if session.collections.exists(destination_collection):
@@ -2395,7 +2380,7 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
                             job_name,
                         )
                         self.assertEqual(
-                            sync_job(job_name, get_redis())
+                            sync_job(job_name, get_redis(test_lib.get_redis_config()))
                             .failures_handle()
                             .get_value(),
                             None,
@@ -2486,7 +2471,9 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
             expected_avus = expected_pre_avus + expected_post_avus
 
             with self.subTest(f"operation: {op.name}"):
-                with iRODSSession(**get_kwargs()) as session:
+                with iRODSSession(
+                    **test_lib.get_test_irods_client_environment_dict()
+                ) as session:
                     try:
                         # Ensure that the destination collection does not exist so that we can create it fresh.
                         if session.collections.exists(destination_collection):
@@ -2502,7 +2489,7 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
                             job_name,
                         )
                         self.assertEqual(
-                            sync_job(job_name, get_redis())
+                            sync_job(job_name, get_redis(test_lib.get_redis_config()))
                             .failures_handle()
                             .get_value(),
                             None,
@@ -2529,7 +2516,9 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
                             ignore_cache=True,
                         )
                         self.assertEqual(
-                            sync_job(update_job_name, get_redis())
+                            sync_job(
+                                update_job_name, get_redis(test_lib.get_redis_config())
+                            )
                             .failures_handle()
                             .get_value(),
                             None,
@@ -2614,7 +2603,9 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
             expected_avus = expected_pre_avus + expected_post_avus
 
             with self.subTest(f"operation: {op.name}"):
-                with iRODSSession(**get_kwargs()) as session:
+                with iRODSSession(
+                    **test_lib.get_test_irods_client_environment_dict()
+                ) as session:
                     try:
                         # Ensure that the destination collection does not exist so that it is created by the sync job.
                         if session.collections.exists(parent_of_destination_collection):
@@ -2633,7 +2624,7 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
                             job_name,
                         )
                         self.assertEqual(
-                            sync_job(job_name, get_redis())
+                            sync_job(job_name, get_redis(test_lib.get_redis_config()))
                             .failures_handle()
                             .get_value(),
                             None,
@@ -2723,7 +2714,9 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
             expected_avus = expected_pre_avus + expected_post_avus
 
             with self.subTest(f"operation: {op.name}"):
-                with iRODSSession(**get_kwargs()) as session:
+                with iRODSSession(
+                    **test_lib.get_test_irods_client_environment_dict()
+                ) as session:
                     try:
                         # Ensure that the destination collection does not exist so that we can create it fresh.
                         if session.collections.exists(destination_collection):
@@ -2739,7 +2732,7 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
                             job_name,
                         )
                         self.assertEqual(
-                            sync_job(job_name, get_redis())
+                            sync_job(job_name, get_redis(test_lib.get_redis_config()))
                             .failures_handle()
                             .get_value(),
                             None,
@@ -2775,7 +2768,9 @@ class test_event_handler_methods_for_pre_and_post(unittest.TestCase):
                             ignore_cache=True,
                         )
                         self.assertEqual(
-                            sync_job(update_job_name, get_redis())
+                            sync_job(
+                                update_job_name, get_redis(test_lib.get_redis_config())
+                            )
                             .failures_handle()
                             .get_value(),
                             None,
