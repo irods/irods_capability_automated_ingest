@@ -169,7 +169,7 @@ def create_dirs(logger, session, meta, **options):
     if target.startswith("/"):
         r = get_redis(config)
         if not session.collections.exists(target):
-            with redis_lock.Lock(r, "create_dirs:" + path):
+            with redis_lock.Lock(r, "create_dirs:" + target):
                 if not session.collections.exists(target):
                     meta2 = meta.copy()
                     # TODO(#250): This will not work on Windows.
