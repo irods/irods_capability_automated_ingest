@@ -409,6 +409,31 @@ class test_s3_sync_operations(unittest.TestCase):
             finally:
                 self.minio_client.remove_object(self.bucket_name, new_object_name)
 
+    def test_register_to_deep_nonexistent_subcollection_does_not_hang_forever__issue_124(
+        self,
+    ):
+        operation = Operation.REGISTER_SYNC
+        event_handler_contents = test_s3_sync_operations.get_event_handler(operation)
+        # The destination collection needs to have enough path elements to exceed the number of path elements in
+        # the "path" to the S3 object.
+        nested_destination_collection = "/".join(
+            [self.destination_collection, "a", "b", "c", "d", "e"]
+        )
+        with tempfile.NamedTemporaryFile() as tf:
+            event_handler_path = tf.name
+            with open(event_handler_path, "w") as f:
+                f.write(event_handler_contents)
+            # Run the first sync and confirm that everything was ingested properly.
+            self.run_sync(
+                self.source_path, nested_destination_collection, event_handler_path
+            )
+            for obj in self.objects_list:
+                self.assertTrue(
+                    self.irods_session.data_objects.exists(
+                        "/".join([nested_destination_collection, obj])
+                    )
+                )
+
 
 def main():
     unittest.main()
