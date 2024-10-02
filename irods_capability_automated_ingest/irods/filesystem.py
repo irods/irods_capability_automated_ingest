@@ -362,8 +362,12 @@ def sync_data_from_file(hdlr_mod, meta, logger, content, **options):
             )
         elif content:
             if put:
-                sync = op in [Operation.PUT_SYNC, Operation.PUT_APPEND]
-                if sync:
+                if Operation.PUT == op:
+                    logger.debug(
+                        f"PUT operation will ignore existing data object [{meta['target']}]"
+                    )
+                else:
+                    # PUT_SYNC and PUT_APPEND sync data on existing data objects.
                     event_handler.call(
                         "on_data_obj_modify",
                         logger,

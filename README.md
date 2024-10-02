@@ -652,7 +652,7 @@ This operation creates only new data objects by writing the data to the vault of
 
 If the target logical path does not exist at the time of sync, this operation writes the data to the vault of the target resource and registers it in the catalog as a new data object.
 
-If the target logical path exists and has a replica on the target resource, this operation emits an error. Use `PUT_SYNC` or `PUT_APPEND` to sync data to existing replicas.
+If the target logical path exists and has a replica on the target resource, no data is synced. `PUT` will only create new data objects which do not already exist. Use `PUT_SYNC` or `PUT_APPEND` to sync data to existing replicas.
 
 If the target logical path exists but does not have a replica on the target resource, this operation emits an error. The "put"-type operations are not allowed to create new replicas of existing data objects.
 
