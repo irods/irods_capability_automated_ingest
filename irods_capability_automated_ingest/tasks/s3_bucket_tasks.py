@@ -18,6 +18,7 @@ import os
 import re
 import redis_lock
 import stat
+import time
 import traceback
 
 
@@ -50,6 +51,7 @@ def s3_bucket_main_task(meta):
             )
 
             job.reset()
+            job.start_time_handle().set_value(time.time())
             meta = meta.copy()
             meta["task"] = "s3_bucket_sync_path"
             meta["queue_name"] = meta["path_queue"]
