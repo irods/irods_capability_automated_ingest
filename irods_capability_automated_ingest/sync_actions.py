@@ -28,13 +28,17 @@ def stop_job(job_name, config):
         job.stop()
 
 
-def list_jobs(config, include_stopped_jobs=False):
+def list_jobs(config):
     r = get_redis(config)
     with redis_lock.Lock(r, "lock:periodic"):
+        periodic_jobs = list(
+            map(lambda job_id: job_id.decode("utf-8"), r.lrange("periodic", 0, -1))
+        )
+        singlepass_jobs = list(
+            map(lambda job_id: job_id.decode("utf-8"), r.lrange("singlepass", 0, -1))
+        )
         jobs_map = {
-            "periodic": [
-                sync_job(job_name, r).asdict() for job_name in periodic_jobs
-            ],
+            "periodic": [sync_job(job_name, r).asdict() for job_name in periodic_jobs],
             "singlepass": [
                 sync_job(job_name, r).asdict() for job_name in singlepass_jobs
             ],
@@ -75,36 +79,35 @@ def monitor_job(job_name, progress, config):
             " (",
             progressbar.ETA(),
             ") ",
-            progressbar.Variable("count"),
+            progressbar.Variable("total"),
             " ",
-            progressbar.Variable("tasks"),
+            progressbar.Variable("remaining"),
             " ",
-            progressbar.Variable("failures"),
+            progressbar.Variable("failed"),
             " ",
-            progressbar.Variable("retries"),
+            progressbar.Variable("retried"),
         ]
         with progressbar.ProgressBar(
             max_value=1, widgets=widgets, redirect_stdout=True, redirect_stderr=True
         ) as bar:
 
             def update_pbar():
-                elapsed_time = progressbar.widgets.utils.format_time(
-                    time.time() - start_time
-                )
-                tasks = int(job.tasks_handle().get_value() or 0)
-                total = job.count_handle().llen()
-                percentage = (
-                    0 if total == 0 else max(0, min(1, (total - tasks) / total))
-                )
-                failures = int(job.failures_handle().get_value() or 0)
-                retries = int(job.retries_handle().get_value() or 0)
+                job_info = job.asdict()
+                total_tasks = job_info["total_tasks"]
+                remaining_tasks = job_info["remaining_tasks"]
+                if total_tasks == 0:
+                    percentage = 0
+                else:
+                    percentage = max(
+                        0, min(1, (total_tasks - remaining_tasks) / total_tasks)
+                    )
                 bar.update(
                     percentage,
-                    timer=elapsed_time,
-                    count=total,
-                    tasks=tasks,
-                    failures=failures,
-                    retries=retries,
+                    timer=job_info["elapsed_time"],
+                    total=total_tasks,
+                    remaining=remaining_tasks,
+                    failed=job_info["failed_tasks"],
+                    retried=job_info["retried_tasks"],
                 )
 
             while not job.done() or job.periodic():
@@ -114,7 +117,8 @@ def monitor_job(job_name, progress, config):
                 logger.warning(
                     f"Job [{job.name()}] was stopped and may not have finished."
                 )
-            update_pbar()
+            else:
+                update_pbar()
         failures = job.failures_handle().get_value()
         if failures is not None and failures != 0:
             return -1
