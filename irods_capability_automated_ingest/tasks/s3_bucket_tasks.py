@@ -28,7 +28,7 @@ def s3_bucket_main_task(meta):
     restart_queue = meta["restart_queue"]
     interval = meta["interval"]
     if interval is not None:
-        restart.s(meta).apply_async(
+        s3_bucket_main_task.s(meta).apply_async(
             task_id=job_name, queue=restart_queue, countdown=interval
         )
 
