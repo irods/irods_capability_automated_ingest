@@ -47,13 +47,18 @@ def list_jobs(config):
 
 def monitor_job(job_name, progress, config):
     logger = sync_logging.get_sync_logger(config["log"])
-
     job = sync_job(job_name, get_redis(config))
     if job.cleanup_handle().get_value() is None:
         logger.error("job [{0}] does not exist".format(job.name()))
         raise Exception("job [{0}] does not exist".format(job.name()))
-
-    if progress:
+    try:
+        if not progress:
+            while not job.done() or job.periodic():
+                time.sleep(1)
+            failures = job.failures_handle().get_value()
+            if failures is not None and failures != 0:
+                return -1
+            return 0
         widgets = [
             " [",
             progressbar.Timer(),
@@ -70,11 +75,9 @@ def monitor_job(job_name, progress, config):
             " ",
             progressbar.DynamicMessage("retries"),
         ]
-
         with progressbar.ProgressBar(
             max_value=1, widgets=widgets, redirect_stdout=True, redirect_stderr=True
         ) as bar:
-
             def update_pbar():
                 tasks = job.tasks_handle().get_value()
                 if tasks is None:
@@ -98,7 +101,6 @@ def monitor_job(job_name, progress, config):
                     retries = 0
                 else:
                     retries = int(retries)
-
                 bar.update(
                     percentage,
                     count=total,
@@ -106,21 +108,17 @@ def monitor_job(job_name, progress, config):
                     failures=failures,
                     retries=retries,
                 )
-
             while not job.done() or job.periodic():
                 update_pbar()
                 time.sleep(1)
-
             update_pbar()
-
-    else:
-        while not job.done() or job.periodic():
-            time.sleep(1)
-
-    failures = job.failures_handle().get_value()
-    if failures is not None and failures != 0:
-        return -1
-    else:
+        failures = job.failures_handle().get_value()
+        if failures is not None and failures != 0:
+            return -1
+        else:
+            return 0
+    except KeyboardInterrupt:
+        logger.info(f"KeyboardInterrupt stopped monitoring of job [{job.name()}].")
         return 0
 
 
