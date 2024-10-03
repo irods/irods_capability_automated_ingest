@@ -95,11 +95,9 @@ class list_redis_key_handle(redis_key_handle):
         return self.retry(self.redis_handle.llen, self.get_key())
 
 
-# TODO: python metaclasses - see PRC
-# sync_time_key - float with last time particular path was sync'd
-class sync_time_key_handle(redis_key_handle):
-    def __init__(self, redis_handle, path):
-        super().__init__(redis_handle, "sync_time", path)
+class float_redis_key_handle(redis_key_handle):
+    def __init__(self, redis_handle, key_category, identifier, delimiter=":/"):
+        super().__init__(redis_handle, key_category, identifier, delimiter)
 
     def get_value(self):
         val = super().get_value()
@@ -108,14 +106,24 @@ class sync_time_key_handle(redis_key_handle):
         return float(val)
 
 
-# cleanup_key - JSON object with list of event_handlers that need to be cleaned up
+# TODO(#292): python metaclasses - see PRC
+class sync_time_key_handle(float_redis_key_handle):
+    """Float indicating the last time path was synced."""
+
+    def __init__(self, redis_handle, path):
+        super().__init__(redis_handle, "sync_time", path)
+
+
 class cleanup_key_handle(json_redis_key_handle):
+    """JSON object with list of event_handlers that need to be cleaned up."""
+
     def __init__(self, redis_handle, job_name):
         super().__init__(redis_handle, "cleanup", job_name)
 
 
-# stop_key - value:empty string (job_name needs to be stopped)
 class stop_key_handle(redis_key_handle):
+    """Empty string indicating that the job job_name_to_stop is being stopped."""
+
     def __init__(self, redis_handle, job_name_to_stop):
         super().__init__(redis_handle, "stop", job_name_to_stop)
 
@@ -126,32 +134,37 @@ class stop_key_handle(redis_key_handle):
         return str(val)
 
 
-# tasks_key - value:int task count for job name
 class tasks_key_handle(incremental_redis_key_handle):
+    """Integer indicating the task count for job_name."""
+
     def __init__(self, redis_handle, job_name):
         super().__init__(redis_handle, "tasks", job_name)
 
 
-# count_key - value:list of task_ids for job name
 class count_key_handle(list_redis_key_handle):
+    """List of task IDs associated with job_name."""
+
     def __init__(self, redis_handle, job_name):
         super().__init__(redis_handle, "count", job_name)
 
 
-# dequeue_key - value:list of tasks for a particular job_name
 # TODO: What is the difference between this list and the set of stop_keys?
 class dequeue_key_handle(list_redis_key_handle):
+    """List of tasks for a particular job_name."""
+
     def __init__(self, redis_handle, job_name):
         super().__init__(redis_handle, "dequeue", job_name)
 
 
-# failures_key - value:int with count of failed tasks
 class failures_key_handle(incremental_redis_key_handle):
+    """Integer indicating the count of failed tasks for job_name."""
+
     def __init__(self, redis_handle, job_name):
         super().__init__(redis_handle, "failures", job_name)
 
 
-# retries_key - value:int number of retries attempted for job_name
 class retries_key_handle(incremental_redis_key_handle):
+    """Integer indicating the count of tasks which were retried for job_name."""
+
     def __init__(self, redis_handle, job_name):
         super().__init__(redis_handle, "retries", job_name)

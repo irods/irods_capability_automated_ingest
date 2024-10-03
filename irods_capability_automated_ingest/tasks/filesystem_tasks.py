@@ -24,6 +24,7 @@ import os
 import re
 import redis_lock
 import stat
+import time
 import traceback
 
 
@@ -129,6 +130,7 @@ def filesystem_main_task(meta):
             )
 
             job.reset()
+            job.start_time_handle().set_value(time.time())
             meta = meta.copy()
             meta["task"] = "filesystem_sync_path"
             meta["queue_name"] = meta["path_queue"]

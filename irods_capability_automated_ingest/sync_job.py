@@ -69,6 +69,7 @@ class sync_job(object):
         self.tasks_handle().reset()
         self.failures_handle().reset()
         self.retries_handle().reset()
+        self.start_time_handle().reset()
 
     def interrupt(self, cli=True, terminate=True):
         self.stop_handle().set_value("")
@@ -90,3 +91,8 @@ class sync_job(object):
         # stop restart job
         app.control.revoke(self.job_name)
         self.stop_handle().reset()
+
+    def start_time_handle(self):
+        return redis_key.float_redis_key_handle(
+            self.r, "irods_ingest_job_start_time", self.job_name
+        )

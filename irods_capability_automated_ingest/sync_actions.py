@@ -59,50 +59,46 @@ def monitor_job(job_name, progress, config):
             if failures is not None and failures != 0:
                 return -1
             return 0
+        start_time = job.start_time_handle().get_value()
+        if start_time is None:
+            logger.error(
+                f"Job [{job.name()}] has no start time. Cannot display progress."
+            )
+            return -1
         widgets = [
             " [",
-            progressbar.Timer(),
+            progressbar.Variable("timer"),
             "] ",
             progressbar.Bar(),
             " (",
             progressbar.ETA(),
             ") ",
-            progressbar.DynamicMessage("count"),
+            progressbar.Variable("count"),
             " ",
-            progressbar.DynamicMessage("tasks"),
+            progressbar.Variable("tasks"),
             " ",
-            progressbar.DynamicMessage("failures"),
+            progressbar.Variable("failures"),
             " ",
-            progressbar.DynamicMessage("retries"),
+            progressbar.Variable("retries"),
         ]
         with progressbar.ProgressBar(
             max_value=1, widgets=widgets, redirect_stdout=True, redirect_stderr=True
         ) as bar:
+
             def update_pbar():
-                tasks = job.tasks_handle().get_value()
-                if tasks is None:
-                    tasks = 0
-                else:
-                    tasks = int(tasks)
+                elapsed_time = progressbar.widgets.utils.format_time(
+                    time.time() - start_time
+                )
+                tasks = int(job.tasks_handle().get_value() or 0)
                 total = job.count_handle().llen()
-                if total == 0:
-                    percentage = 0
-                else:
-                    percentage = max(0, min(1, (total - tasks) / total))
-
-                failures = job.failures_handle().get_value()
-                if failures is None:
-                    failures = 0
-                else:
-                    failures = int(failures)
-
-                retries = job.retries_handle().get_value()
-                if retries is None:
-                    retries = 0
-                else:
-                    retries = int(retries)
+                percentage = (
+                    0 if total == 0 else max(0, min(1, (total - tasks) / total))
+                )
+                failures = int(job.failures_handle().get_value() or 0)
+                retries = int(job.retries_handle().get_value() or 0)
                 bar.update(
                     percentage,
+                    timer=elapsed_time,
                     count=total,
                     tasks=tasks,
                     failures=failures,
