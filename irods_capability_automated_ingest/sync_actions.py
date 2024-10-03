@@ -2,7 +2,7 @@ from . import sync_logging
 from .irods import irods_utils
 from .redis_key import redis_key_handle
 from .redis_utils import get_redis
-from .sync_job import sync_job
+from .sync_job import get_stopped_jobs_list, sync_job
 from .tasks import filesystem_tasks, s3_bucket_tasks
 
 from os.path import realpath
@@ -25,24 +25,22 @@ def stop_job(job_name, config):
         if job.cleanup_handle().get_value() is None:
             logger.error("job [{0}] does not exist".format(job_name))
             raise Exception("job [{0}] does not exist".format(job_name))
-        else:
-            job.interrupt()
-            job.cleanup()
+        job.stop()
 
 
-def list_jobs(config):
+def list_jobs(config, include_stopped_jobs=False):
     r = get_redis(config)
     with redis_lock.Lock(r, "lock:periodic"):
-        return {
-            "periodic": list(
-                map(lambda job_id: job_id.decode("utf-8"), r.lrange("periodic", 0, -1))
-            ),
-            "singlepass": list(
-                map(
-                    lambda job_id: job_id.decode("utf-8"), r.lrange("singlepass", 0, -1)
-                )
-            ),
+        jobs_map = {
+            "periodic": [
+                sync_job(job_name, r).asdict() for job_name in periodic_jobs
+            ],
+            "singlepass": [
+                sync_job(job_name, r).asdict() for job_name in singlepass_jobs
+            ],
+            "stopped": get_stopped_jobs_list(r),
         }
+        return jobs_map
 
 
 def monitor_job(job_name, progress, config):
@@ -55,6 +53,10 @@ def monitor_job(job_name, progress, config):
         if not progress:
             while not job.done() or job.periodic():
                 time.sleep(1)
+            if job.stopped():
+                logger.warning(
+                    f"Job [{job.name()}] was stopped and may not have finished."
+                )
             failures = job.failures_handle().get_value()
             if failures is not None and failures != 0:
                 return -1
@@ -104,9 +106,14 @@ def monitor_job(job_name, progress, config):
                     failures=failures,
                     retries=retries,
                 )
+
             while not job.done() or job.periodic():
                 update_pbar()
                 time.sleep(1)
+            if job.stopped():
+                logger.warning(
+                    f"Job [{job.name()}] was stopped and may not have finished."
+                )
             update_pbar()
         failures = job.failures_handle().get_value()
         if failures is not None and failures != 0:

@@ -168,3 +168,10 @@ class retries_key_handle(incremental_redis_key_handle):
 
     def __init__(self, redis_handle, job_name):
         super().__init__(redis_handle, "retries", job_name)
+
+
+class stopped_jobs_key_handle(json_redis_key_handle):
+    """JSON object with list of sync_job dicts."""
+
+    def __init__(self, redis_handle):
+        super().__init__(redis_handle, "irods_ingest_stopped_jobs", "")
