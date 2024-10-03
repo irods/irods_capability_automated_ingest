@@ -15,7 +15,7 @@ def timestamper(logger, log_method, event_dict):
     event_dict["@timestamp"] = (
         datetime.datetime.now()
         .replace(tzinfo=datetime.timezone(offset=utc_offset))
-        .isoformat()
+        .isoformat(timespec="milliseconds")
     )
     return event_dict
 

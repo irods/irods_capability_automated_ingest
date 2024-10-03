@@ -2,9 +2,33 @@ from . import redis_key
 from .celery import app
 from .redis_utils import get_redis
 
+import datetime
 import json
 import os
 import progressbar
+import time
+
+
+def add_stopped_job(redis_handle, stopped_job_dict):
+    """Add the sync_job dict to the JSON array of stopped jobs tracked in the Redis database."""
+    stopped_jobs_handle = redis_key.stopped_jobs_key_handle(redis_handle)
+    stopped_jobs_value = stopped_jobs_handle.get_value()
+    if stopped_jobs_value is None:
+        stopped_jobs_list = []
+    else:
+        stopped_jobs_list = json.loads(stopped_jobs_value.decode("utf-8"))
+    stopped_jobs_list.append(stopped_job_dict)
+    # TODO(#297): Is it really the caller's responsibility to dump to a string?
+    # stopped_jobs_handle is a json_redis_key_handle, so it ought to handle this for us...
+    stopped_jobs_handle.set_value(json.dumps(stopped_jobs_list))
+
+
+def get_stopped_jobs_list(redis_handle):
+    """Get the JSON array of stopped jobs tracked in the Redis database."""
+    stopped_jobs_value = redis_key.stopped_jobs_key_handle(redis_handle).get_value()
+    if stopped_jobs_value is None:
+        return []
+    return json.loads(stopped_jobs_value.decode("utf-8"))
 
 
 class sync_job(object):
@@ -96,3 +120,37 @@ class sync_job(object):
         return redis_key.float_redis_key_handle(
             self.r, "irods_ingest_job_start_time", self.job_name
         )
+
+    def stop(self):
+        add_stopped_job(self.r, self.asdict())
+        self.interrupt()
+        self.cleanup()
+        self.reset()
+
+    def stopped(self):
+        stopped_jobs_list = get_stopped_jobs_list(self.r)
+        for job in stopped_jobs_list:
+            if self.job_name == job["job_name"]:
+                return True
+        return False
+
+    def asdict(self):
+        start_time = self.start_time_handle().get_value() or 0
+        formatted_start_time = datetime.datetime.fromtimestamp(
+            start_time, tz=datetime.timezone.utc
+        ).isoformat(timespec="milliseconds")
+        elapsed_time = time.time() - start_time if start_time else 0
+        elapsed_time_str = str(datetime.timedelta(milliseconds=elapsed_time * 1000))
+        tasks = int(self.tasks_handle().get_value() or 0)
+        total = self.count_handle().llen()
+        failures = int(self.failures_handle().get_value() or 0)
+        retries = int(self.retries_handle().get_value() or 0)
+        return {
+            "job_name": self.job_name,
+            "total_tasks": total,
+            "remaining_tasks": tasks,
+            "failed_tasks": failures,
+            "retried_tasks": retries,
+            "elapsed_time": elapsed_time_str,
+            "start_time": formatted_start_time,
+        }
