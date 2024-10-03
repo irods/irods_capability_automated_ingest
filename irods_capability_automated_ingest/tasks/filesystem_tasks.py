@@ -107,7 +107,7 @@ def filesystem_main_task(meta):
     interval = meta["interval"]
     meta["root_target_collection"] = meta["target"]
     if interval is not None:
-        restart.s(meta).apply_async(
+        filesystem_main_task.s(meta).apply_async(
             task_id=job_name, queue=restart_queue, countdown=interval
         )
 
