@@ -249,7 +249,69 @@ logger = sync_logging.get_sync_logger(log_config)
 ```
 The returned logger can then be used to log messages in a standard way. Note: This should only be done inside a Celery task or Event Handler method.
 
-## `irods_sync start`
+## `irods_sync` script
+
+### Common options
+
+#### Redis configuration options
+
+These options can be used in lieu of the `CELERY_BROKER_URL` environment variable to point the `irods_sync` script at a particular Redis instance.
+
+##### `--redis_host`
+
+`--redis_host REDIS_HOSTNAME` will use `REDIS_HOSTNAME` as the hostname for the Redis database with which the `irods_sync` script will communicate. The default `REDIS_HOSTNAME` used in the absence of any other input is `localhost`.
+
+##### `--redis_port`
+
+`--redis_port REDIS_PORT` will use `REDIS_PORT` as the port number on which the Redis database is listening for incoming requests. The default `REDIS_PORT` used in the absence of any other input is 6379, which is the official default Redis port number.
+
+##### `--redis_db`
+
+`--redis_db REDIS_DB` will use `REDIS_DB` as the database number where essential Automated Ingest information is stored. The default `REDIS_DB` used in the absence of any other input is 0, which is the official default Redis database number.
+
+#### Logging options
+
+##### `--log_level`
+
+`--log_level LOG_LEVEL` specifies that only messages of level `LOG_LEVEL` or higher should be logged by the `irods_sync` script. `LOG_LEVEL` must be one of the following string values (listed in ascending order):
+
+ - NOTSET
+ - DEBUG
+ - INFO
+ - WARNING
+ - ERROR
+ - CRITICAL
+
+By default, only messages of level `WARNING` or higher will be logged.
+
+Celery worker log messages are not affected by this option. To specify a log level for the Celery workers, the `--loglevel` option should be used when running the `worker`. See [Celery documentation](https://docs.celeryq.dev/en/stable/reference/cli.html#cmdoption-celery-worker-l) for more information.
+
+##### `--log_filename`
+
+`--log_filename /path/to/log_file.txt` will use `/path/to/log_file.txt` as the destination for log messages emitted by the `irods_sync` script. The default value is `None`, which means that log messages go to `stdout`.
+
+Celery worker log messages are not affected by this option. To specify a log file for the Celery workers, the `--logfile` option should be used when running the `worker`. See [Celery documentation](https://docs.celeryq.dev/en/stable/reference/cli.html#cmdoption-celery-worker-f) for more information.
+
+##### `--log_when`
+
+`--log_when WHEN` will use `WHEN` as the value passed to the `when` parameter of the `TimedRotatingFileHandler` used for managing log files. See [Python `TimedRotatingFileHandler` documentation](https://docs.python.org/3/library/logging.handlers.html#logging.handlers.TimedRotatingFileHandler) for more information. This option only has an effect if `--log_filename` is used.
+
+##### `--log_interval`
+
+`--log_interval INTERVAL` will use `INTERVAL` as the value passed to the `interval` parameter of the `TimedRotatingFileHandler` used for managing log files. See [Python `TimedRotatingFileHandler` documentation](https://docs.python.org/3/library/logging.handlers.html#logging.handlers.TimedRotatingFileHandler) for more information. This option only has an effect if `--log_when` is used. The default value is **1**.
+
+#### Profiling options
+
+`--profile` allows you to use [vis](https://visjs.org) to visualize a profile of Celery workers over time of ingest job.
+
+| option | effect | default |
+| ----   |  ----- |  ----- |
+| profile_filename | Specify name of profile filename (JSON output) | None |
+| profile_level | Minimum level of message to log for profiling | None |
+| profile_interval | Time interval with which to rollover ingest profile file | None |
+| profile_when | Type/units of profile_interval (see TimedRotatingFileHandler) | None |
+
+### `irods_sync start`
 
 `irods_sync start` is used to start a sync job by enqueueing the main task of the overall sync job. The main task is run asynchronously by default, but can be run synchronously with the `--synchronous` option.
 
@@ -259,73 +321,73 @@ The source path must point to a path for a supported storage type. Right now, fi
 
 The destination path must point to an iRODS collection. The root collection (`/`) cannot be used as the destination collection.
 
-### Celery task options
+#### Celery task options
 
 These options are used to control various aspects of the sync job and resultant individual Celery tasks.
 
 In this section, wherever a word with all uppercase letters follows an option name, it is meant to signify a placeholder for a value meant to accompany the option. For example, if the option name is `--option`, `--option VALUE` means that `VALUE` is the placeholder for the value to be provided.
 
-#### `--job_name`
+##### `--job_name`
 
 `--job_name JOB_NAME` will use the name `JOB_NAME` as the reference name for the overall sync job which is used to track individual tasks spawned from the main task. The default name for the sync job is a generated UUID.
 
-#### `--restart_queue`
+##### `--restart_queue`
 
 `--restart_queue RESTART_QUEUE_NAME` will use the name `RESTART_QUEUE_NAME` for the `restart` queue. The default name for the `restart` queue is "restart". Remember: The `restart` queue is where the task for the main sync job is enqueued.
 
-#### `--path_queue`
+##### `--path_queue`
 
 `--path_queue PATH_QUEUE_NAME` will use the name `PATH_QUEUE_NAME` for the `path` queue. The default name for the `path` queue is "path".
 
-#### `--file_queue`
+##### `--file_queue`
 
 `--file_queue FILE_QUEUE_NAME` will use the name `FILE_QUEUE_NAME` for the `file` queue. The default name for the `file` queue is "file".
 
-#### `--interval`
+##### `--interval`
 
 `--interval INTERVAL_IN_SECONDS` will enqueue - or, "restart" - the main task of the sync job repeatedly with an interval of `INTERVAL_IN_SECONDS` seconds. If absent, the sync job will only be run once. To stop a recurring job, `irods_sync stop JOB_NAME` can be used on the job specified by `JOB_NAME`. Note: Scheduling sync jobs using a dedicated job scheduling tool such as `cron` has been shown to be very effective as an alternative to this option. Consider using an external tool for scheduling regularly occurring sync jobs.
 
-#### `--ignore_cache`
+##### `--ignore_cache`
 
 `--ignore_cache` will ignore the cache maintained in Redis by the Automated Ingest framework. The sync tasks will not consult the Redis cache to "sync" data but rather will treat all data as new, even if it is not. This is useful if you wish to scan a source after having already scanned it but need to sync the data to the same destination again. Notice that this option will not work with certain `Operation` types (e.g. `PUT`).
 
-#### `--event_handler`
+##### `--event_handler`
 
 `--event_handler /path/to/event_handler.py` will use the specified `/path/to/event_handler.py` Python file as a custom event handler to modify the default behavior of the Automated Ingest framework as well as allow for other custom behavior to be implemented. The event handler methods are detailed below in [Event Handler behavioral overrides](#event-handler-behavioral-overrides) and [Event Handlers](#event-handlers).
 
-### Script options
+#### Script options
 
 These options are used to control various aspects of the `irods_sync` script itself.
 
-#### `--synchronous`
+##### `--synchronous`
 
 `--synchronous` specifies that the `irods_sync` script should not exit until the scheduled sync job is complete. By default, the `irods_sync` script will exit as soon as the main sync job Celery task has been enqueued.
 
-#### `--progress`
+##### `--progress`
 
 `--progress` specifies that a progress bar and Celery task counts associated with the enqueued sync job should be shown. This option requires the `--synchronous` option in order to have any effect.
 
-### Optimization options
+#### Optimization options
 
 These options are used for optimizing job completion for speed and resilience.
 
-#### `--files_per_task`
+##### `--files_per_task`
 
 `--files_per_task NUMBER_OF_FILES_PER_TASK` will use `NUMBER_OF_FILES_PER_TASK` as the number of files to sync in a given Celery task. A value of 1 means that 1 Celery task will be enqueued for every file or object that is synced. This number must be a positive integer. The default value is **50** files per task due to experiments which found that this number of files per task optimally balances the amount of work required of a worker by each task against the overhead of completing the task and fetching a new one from the queue. Your results may vary, so adjust the value based on your own use case.
 
-#### `--initial_ingest`
+##### `--initial_ingest`
 
 `--initial_ingest` specifies that the destination iRODS path to which data is being synced does not need to be checked before syncing the data. Use this option on the first time a sync occurs to a new destination iRODS path to avoid the unnecessary calls to the iRODS API. By default, the destination iRODS path is checked to ensure that it does not already exist in order to avoid unnecessary syncs or syncs which would result in errors (e.g. a `PUT` operation to an existing path will not overwrite the data - it will produce an error).
 
-#### `--irods_idle_disconnect_seconds`
+##### `--irods_idle_disconnect_seconds`
 
 `--irods_idle_disconnect_seconds SECONDS_BEFORE_IDLE_DISCONNECT` will disconnect an iRODS session after `SECONDS_BEFORE_IDLE_DISCONNECT` seconds of being idle. This is useful for refreshing iRODS connections in the pool maintained by the Automated Ingest framework. The default value is **60** seconds.
 
-### Selective syncing options
+#### Selective syncing options
 
 These options are used to filter out certain files and directories from being synced to iRODS. These are useful if a type of file or name of a directory / file is unwanted in iRODS for whatever reason.
 
-#### `--exclude_file_type`
+##### `--exclude_file_type`
 
 `--exclude_file_type FILE_TYPE` will exclude any file detected as being of type `FILE_TYPE`. `FILE_TYPE` must be one of the following strings:
 
@@ -341,35 +403,19 @@ The way the Automated Ingest framework tests for these types of files follows th
 
 The default behavior is to include all types of files; or, put another way, the default behavior is to exclude no file types. This option is only valid for filesystem syncs.
 
-#### `--exclude_file_name`
+##### `--exclude_file_name`
 
 `--exclude_file_name EXCLUDE_FILES_MATCHING_REGEX` will exclude any file whose path matches the regular expression specified by `EXCLUDE_FILES_MATCHING_REGEX`. See the [Python Regular Expression Syntax documentation](https://docs.python.org/3/library/re.html#regular-expression-syntax) for more information.
 
-#### `--exclude_directory_name`
+##### `--exclude_directory_name`
 
 `--exclude_directory_name EXCLUDE_DIRECTORIES_MATCHING_REGEX` will exclude any directory whose path matches the regular expression specified by `EXCLUDE_DIRECTORIES_MATCHING_REGEX`. See the [Python Regular Expression Syntax documentation](https://docs.python.org/3/library/re.html#regular-expression-syntax) for more information. Note: This will exclude syncing the directory and any of its files and subdirectories. This option is only valid for filesystem syncs.
 
-### Redis configuration options
-
-These options can be used in lieu of the `CELERY_BROKER_URL` environment variable to point the `irods_sync` script at a particular Redis instance.
-
-#### `--redis_host`
-
-`--redis_host REDIS_HOSTNAME` will use `REDIS_HOSTNAME` as the hostname for the Redis database with which the `irods_sync` script will communicate to submit the main task for the sync job. The default `REDIS_HOSTNAME` used in the absence of any other input is `localhost`.
-
-#### `--redis_port`
-
-`--redis_port REDIS_PORT` will use `REDIS_PORT` as the port number on which the Redis database is listening for incoming requests. The default `REDIS_PORT` used in the absence of any other input is 6379, which is the official default Redis port number.
-
-#### `--redis_db`
-
-`--redis_db REDIS_DB` will use `REDIS_DB` as the database number to which the `irods_sync` tasks will be submitted. The default `REDIS_DB` used in the absence of any other input is 0, which is the official default Redis database number.
-
-### S3 options
+#### S3 options
 
 These options are used to specify that `irods_sync` is using an S3 bucket as a source. In order to sync an S3 bucket, the `--s3_keypair` option and a source path of the form `/bucket_name/path/to/root/folder` are the minimum requirements.
 
-#### `--s3_keypair`
+##### `--s3_keypair`
 
 `--s3_keypair /path/to/s3_keypair` will use `/path/to/s3_keypair` to authenticate with the S3 endpoint where the source bucket exists. There is no default value for this option and it *must* be specified when syncing an S3 bucket. The keypair file must exist on a filesystem accessible from the host running the `irods_sync` script and should have exactly the following form:
 ```
@@ -378,63 +424,63 @@ SECRET_KEY
 ```
 `ACCESS_KEY` should be the S3 access key (sometimes this is used as a username). `SECRET_KEY` should be the S3 secret key (sometimes this is used as a password).
 
-#### `--s3_endpoint_domain`
+##### `--s3_endpoint_domain`
 
 `--s3_endpoint_domain S3_ENDPOINT_DOMAIN` will use `S3_ENDPOINT_DOMAIN` as the domain name of the S3 endpoint. The default value is "s3.amazonaws.com", which would indicate an AWS bucket.
 
-#### `--s3_region_name`
+##### `--s3_region_name`
 
 `--s3_region_name S3_REGION_NAME` will use `S3_REGION_NAME` as the region name for the S3 endpoint. The default value is "us-east-1".
 
-#### `--s3_proxy_url`
+##### `--s3_proxy_url`
 
 `--s3_proxy_url S3_PROXY_URL` will use `S3_PROXY_URL` as the URL for a proxy host for S3 access. This could be useful if your organization requires S3 access through a centralized location.
 
-#### `--s3_insecure_connection`
+##### `--s3_insecure_connection`
 
 `--s3_insecure_connection` specifies that SSL should not be used when connecting to the S3 endpoint. The default value is `False`, which means that SSL is used for S3 endpoint communications when this option is *not* specified. **This option is not recommended for use in production deployments.**
 
-### Logging options
+### `irods_sync list`
 
-#### `--log_level`
+The `list` subcommand of the `irods_sync` script is used to list active sync jobs. The output divides sync jobs into "periodic", "singlepass", and "stopped".
 
-`--log_level LOG_LEVEL` specifies that only messages of level `LOG_LEVEL` or higher should be logged by the `irods_sync` script. `LOG_LEVEL` must be one of the following string values (listed in ascending order):
+"periodic" jobs are those which were started with an interval specified, meaning, the job will be run repeatedly on said interval.
 
- - NOTSET
- - DEBUG
- - INFO
- - WARNING
- - ERROR
- - CRITICAL
+"singlepass" jobs are those which were started without an interval specified, meaning, the job will be run only once.
 
-By default, only messages of level `WARNING` or higher will be logged.
+"stopped" jobs are jobs which were interrupted with the `stop` subcommand of the `irods_sync` script.
 
-Celery worker log messages are not affected by this option. To specify a log level for the Celery workers, the `--loglevel` option should be used when running the `worker`. See [Celery documentation](https://docs.celeryq.dev/en/stable/reference/cli.html#cmdoption-celery-worker-l) for more information.
+Each listed job includes information about the job like its name, total task count, remaining task count, failed task count, retried task count, time elapsed since it was started, and the start time.
 
-#### `--log_filename`
+#### Subcommand options
 
-`--log_filename /path/to/log_file.txt` will use `/path/to/log_file.txt` as the destination for log messages emitted by the `irods_sync` script. The default value is `None`, which means that log messages go to `stdout` by default.
+The `list` subcommand has the options available in the [Common Options](#common-options).
 
-Celery worker log messages are not affected by this option. To specify a log file for the Celery workers, the `--logfile` option should be used when running the `worker`. See [Celery documentation](https://docs.celeryq.dev/en/stable/reference/cli.html#cmdoption-celery-worker-f) for more information.
+### `irods_sync stop`
 
-#### `--log_when`
+The `stop` subcommand of the `irods_sync` script is used to stop running jobs before they have completed. Stopping a job means that the main task and any other tasks associated with that sync job are "revoked" by Celery. If the tasks are being run actively, they are interrupted and removed from the Redis database. If the tasks are enqueued but have not become active, they are removed from the queue.
 
-`--log_when WHEN` will use `WHEN` as the value passed to the `when` parameter of the `TimedRotatingFileHandler` used for managing log files. See [Python `TimedRotatingFileHandler` documentation](https://docs.python.org/3/library/logging.handlers.html#logging.handlers.TimedRotatingFileHandler) for more information. This option only has an effect if `--log_filename` is used.
+When a job is stopped, the job's name is added to a list of stopped jobs tracked in Redis with the `irods_ingest_stopped_jobs` key. The `list` subcommand can view these stopped jobs with the `--include-stopped-jobs` option.
 
-#### `--log_interval`
+#### Subcommand options
 
-`--log_interval INTERVAL` will use `INTERVAL` as the value passed to the `interval` parameter of the `TimedRotatingFileHandler` used for managing log files. See [Python `TimedRotatingFileHandler` documentation](https://docs.python.org/3/library/logging.handlers.html#logging.handlers.TimedRotatingFileHandler) for more information. This option only has an effect if `--log_when` is used. The default value is **1**.
+The `stop` subcommand has the options available in the [Common Options](#common-options).
 
-### Profiling options
+#### Clearing the stopped jobs list
 
-`--profile` allows you to use vis to visualize a profile of Celery workers over time of ingest job.
+If the stopped jobs list needs to be cleared, the list can be removed from the Redis database. There is no built-in way to do this with the `irods_sync` script, but it can be done with a `DEL` command on the `irods_ingest_stopped_jobs` key. This is simple by using the `redis-cli`. Here's what this looks like:
+```
+redis-cli DEL "irods_ingest_stopped_jobs:/"
+```
+`redis-cli` has a `--help` option to show other options available to the tool which may be useful. You can also read about the commands on the [Redis Commands Cheat Sheet](https://redis.io/learn/howtos/quick-start/cheat-sheet).
 
-| option | effect | default |
-| ----   |  ----- |  ----- |
-| profile_filename | Specify name of profile filename (JSON output) | None |
-| profile_level | Minimum level of message to log for profiling | None |
-| profile_interval | Time interval with which to rollover ingest profile file | None |
-| profile_when | Type/units of profile_interval (see TimedRotatingFileHandler) | None |
+### `irods_sync watch`
+
+The `watch` subcommand shows information about a currently running job. The information includes progress bar, time elapsed, total task count, remaining task count, failed task count, and retried task count. The output is identical to when one runs the `start` subcommand with the `--synchronous` and `--progress` options specified.
+
+#### Subcommand options
+
+The `watch` subcommand has the options available in the [Common Options](#common-options).
 
 ## Event Handler behavioral overrides
 
