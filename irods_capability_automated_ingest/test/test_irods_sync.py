@@ -1931,7 +1931,7 @@ class test_exclude_options(automated_ingest_test_context, unittest.TestCase):
         ]
         try:
             # Create the test file and modify permissions such that it is unreadable.
-            with open(unreadable_file_path, "w") as f: 
+            with open(unreadable_file_path, "w") as f:
                 f.write("this will not be read!")
             os.chmod(unreadable_file_path, 0o000)
             # Run the sync job...
