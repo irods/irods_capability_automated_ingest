@@ -70,6 +70,37 @@ def wait_for_job_to_finish(workers, job_name, timeout=60):
     )
 
 
+def get_event_handler(operation, delete_mode):
+    operation_strings = {
+        Operation.NO_OP: "NO_OP",
+        Operation.REGISTER_SYNC: "REGISTER_SYNC",
+        Operation.REGISTER_AS_REPLICA_SYNC: "REGISTER_AS_REPLICA_SYNC",
+        Operation.PUT: "PUT",
+        Operation.PUT_SYNC: "PUT_SYNC",
+        Operation.PUT_APPEND: "PUT_APPEND",
+    }
+    delete_mode_strings = {
+        DeleteMode.DO_NOT_DELETE: "DO_NOT_DELETE",
+        DeleteMode.UNREGISTER: "UNREGISTER",
+        DeleteMode.TRASH: "TRASH",
+        DeleteMode.NO_TRASH: "NO_TRASH",
+    }
+    return textwrap.dedent(
+        f"""
+        from irods_capability_automated_ingest.core import Core
+        from irods_capability_automated_ingest.utils import DeleteMode, Operation
+        class event_handler(Core):
+            @staticmethod
+            def operation(session, meta, **options):
+                return Operation.{operation_strings[operation]}
+
+            @staticmethod
+            def delete_mode(meta):
+                return DeleteMode.{delete_mode_strings[delete_mode]}
+        """
+    )
+
+
 class test_delete_modes_with_sync_operations(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -208,37 +239,6 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
             self.destination_collection, recurse=True, force=True
         )
 
-    @staticmethod
-    def get_event_handler(operation, delete_mode):
-        operation_strings = {
-            Operation.NO_OP: "NO_OP",
-            Operation.REGISTER_SYNC: "REGISTER_SYNC",
-            Operation.REGISTER_AS_REPLICA_SYNC: "REGISTER_AS_REPLICA_SYNC",
-            Operation.PUT: "PUT",
-            Operation.PUT_SYNC: "PUT_SYNC",
-            Operation.PUT_APPEND: "PUT_APPEND",
-        }
-        delete_mode_strings = {
-            DeleteMode.DO_NOT_DELETE: "DO_NOT_DELETE",
-            DeleteMode.UNREGISTER: "UNREGISTER",
-            DeleteMode.TRASH: "TRASH",
-            DeleteMode.NO_TRASH: "NO_TRASH",
-        }
-        return textwrap.dedent(
-            f"""
-            from irods_capability_automated_ingest.core import Core
-            from irods_capability_automated_ingest.utils import DeleteMode, Operation
-            class event_handler(Core):
-                @staticmethod
-                def operation(session, meta, **options):
-                    return Operation.{operation_strings[operation]}
-
-                @staticmethod
-                def delete_mode(meta):
-                    return DeleteMode.{delete_mode_strings[delete_mode]}
-            """
-        )
-
     def run_sync(
         self,
         source_directory,
@@ -341,11 +341,7 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
             raise ValueError(
                 f"Provided operation [{operation}] does not sync, so it cannot be used here."
             )
-        event_handler_contents = (
-            test_delete_modes_with_sync_operations.get_event_handler(
-                operation, delete_mode
-            )
-        )
+        event_handler_contents = get_event_handler(operation, delete_mode)
         with tempfile.NamedTemporaryFile() as tf:
             event_handler_path = tf.name
             with open(event_handler_path, "w") as f:
@@ -374,11 +370,7 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
             raise ValueError(
                 f"Provided operation [{operation}] does not sync, so it cannot be used here."
             )
-        event_handler_contents = (
-            test_delete_modes_with_sync_operations.get_event_handler(
-                operation, delete_mode
-            )
-        )
+        event_handler_contents = get_event_handler(operation, delete_mode)
         with tempfile.NamedTemporaryFile() as tf:
             event_handler_path = tf.name
             with open(event_handler_path, "w") as f:
@@ -402,11 +394,7 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
             # TODO(#287): Also confirm that the data remains in storage. The physical path is fetched beforehand.
 
     def do_TRASH_or_NO_TRASH_deletes_collections(self, operation, delete_mode):
-        event_handler_contents = (
-            test_delete_modes_with_sync_operations.get_event_handler(
-                operation, delete_mode
-            )
-        )
+        event_handler_contents = get_event_handler(operation, delete_mode)
         with tempfile.NamedTemporaryFile() as tf:
             event_handler_path = tf.name
             with open(event_handler_path, "w") as f:
@@ -432,11 +420,7 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
 
     def do_incompatible_operation_and_delete_mode(self, operation, delete_mode):
         # This test ensures that the provided sync operation is incompatible with the provided delete mode.
-        event_handler_contents = (
-            test_delete_modes_with_sync_operations.get_event_handler(
-                operation, delete_mode
-            )
-        )
+        event_handler_contents = get_event_handler(operation, delete_mode)
         with tempfile.NamedTemporaryFile() as tf:
             event_handler_path = tf.name
             with open(event_handler_path, "w") as f:
@@ -591,6 +575,56 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
         self.do_TRASH_or_NO_TRASH_deletes_collections(
             Operation.PUT_APPEND, DeleteMode.NO_TRASH
         )
+
+    def test_deleting_all_files_from_directory_but_not_the_directory_itself_does_not_delete_collection__issue_288(
+        self,
+    ):
+        event_handler_contents = get_event_handler(
+            Operation.REGISTER_SYNC, DeleteMode.UNREGISTER
+        )
+        target_files_for_removal = [
+            os.path.join(self.target_subdirectory_for_removal, file)
+            for file in self.directory_tree["subdirectories"][0]["files"]
+        ]
+        with tempfile.NamedTemporaryFile() as tf:
+            event_handler_path = tf.name
+            with open(event_handler_path, "w") as f:
+                f.write(event_handler_contents)
+            # Run the first sync and confirm that everything was registered properly.
+            self.run_sync(
+                self.source_directory, self.destination_collection, event_handler_path
+            )
+            self.assert_ingested_contents_exist_in_irods()
+            for target_file in target_files_for_removal:
+                file = os.path.basename(target_file)
+                self.assertTrue(
+                    self.irods_session.data_objects.exists(
+                        "/".join([self.target_subcollection_for_removal, file])
+                    ),
+                )
+            # TODO(#287): Run a query to get the physical path of the data object in the target subdirectory for removal.
+            # Now delete all the files in a subdirectory from the source, but not the subdirectory itself...
+            for file in target_files_for_removal:
+                os.unlink(file)
+            self.assertTrue(os.path.exists(self.target_subdirectory_for_removal))
+            # Run the job again (sync) and confirm that the deleted files sync caused the collection NOT to be deleted.
+            self.run_sync(
+                self.source_directory, self.destination_collection, event_handler_path
+            )
+            # The data objects in the collection should no longer exist.
+            for target_file in target_files_for_removal:
+                file = os.path.basename(target_file)
+                self.assertFalse(
+                    self.irods_session.data_objects.exists(
+                        "/".join([self.target_subcollection_for_removal, file])
+                    ),
+                )
+            # The collection should still exist.
+            self.assertTrue(
+                self.irods_session.collections.exists(
+                    self.target_subcollection_for_removal
+                ),
+            )
 
 
 def main():
