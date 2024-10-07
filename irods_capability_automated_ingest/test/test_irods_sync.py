@@ -1911,6 +1911,43 @@ class test_exclude_options(automated_ingest_test_context, unittest.TestCase):
             excluded_files=[exclude_file_name]
         )
 
+    def test_registering_directory_with_unreadable_file_does_not_cause_task_to_fail__issue_277(
+        self,
+    ):
+        job_name = "test_registering_directory_with_unreadable_file_does_not_cause_task_to_fail__issue_277"
+        unreadable_file_name = "this_file_is_unreadable"
+        unreadable_file_path = os.path.join(PATH_TO_SOURCE_DIR, unreadable_file_name)
+        sync_cmd = [
+            "python",
+            "-m",
+            IRODS_SYNC_PY,
+            "start",
+            PATH_TO_SOURCE_DIR,
+            PATH_TO_COLLECTION,
+            "--job_name",
+            job_name,
+            "--log_level",
+            "INFO",
+        ]
+        try:
+            # Create the test file and modify permissions such that it is unreadable.
+            with open(unreadable_file_path, "w") as f: 
+                f.write("this will not be read!")
+            os.chmod(unreadable_file_path, 0o000)
+            # Run the sync job...
+            proc = subprocess.Popen(sync_cmd)
+            proc.wait()
+            workers = start_workers(1)
+            wait_for(workers, job_name)
+            # Make sure no jobs fail...
+            self.do_assert_failed_queue(count=None, job_name=job_name)
+            # Ensure that the unreadable file was not synced to the destination collection.
+            self.assert_that_source_files_are_excluded_in_collection(
+                excluded_files=[unreadable_file_name]
+            )
+        finally:
+            os.unlink(unreadable_file_path)
+
 
 # TODO base64 transform should be the same for each of the current types of test
 
