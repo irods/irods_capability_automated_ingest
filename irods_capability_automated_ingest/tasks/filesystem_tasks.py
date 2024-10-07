@@ -240,16 +240,8 @@ def filesystem_sync_path(self, meta):
                 continue
 
             if not obj.is_symlink() and not bool(mode & stat.S_IRGRP):
-                error = f"physical path is not readable [{full_path}]"
-                logger.error(error)
-
-                # TODO(#277): Should this raise an Exception?
-                # raise RuntimeError(error)
-
-                # TODO(#277): ...or put it in the chunk, like we've been doing?
-                chunk[full_path] = {}
-
-                # TODO(#277): ...or ONLY continue?
+                # TODO(#296): Add this path to a "failed" task to alert user to the problem.
+                logger.error(f"physical path is not readable [{full_path}]")
                 continue
 
             # If we see a destination logical path which is being synced, remove it from the list. Whatever is left
