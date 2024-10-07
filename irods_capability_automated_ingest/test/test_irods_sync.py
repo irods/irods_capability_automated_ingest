@@ -1817,6 +1817,33 @@ class Test_register(automated_ingest_test_context, unittest.TestCase):
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
+    def test_adding_metadata_to_data_object_with_grave_character_in_path_works__issue_100(
+        self,
+    ):
+        job_name = "test_adding_metadata_to_data_object_with_grave_character_in_path_works__issue_100"
+        # The destination collection needs to have a grave character in it to demonstrate this issue.
+        destination_collection = "/".join([PATH_TO_COLLECTION, "grave`collection"])
+        self.do_register(
+            "metadata",
+            job_name=job_name,
+            destination_collection=destination_collection,
+        )
+        self.do_assert_failed_queue(count=None, job_name=job_name)
+        self.do_assert_retry_queue(count=None, job_name=job_name)
+        # Now check each data object in the destination collection and see that it has the metadata annotated.
+        with iRODSSession(
+            **test_lib.get_test_irods_client_environment_dict()
+        ) as session:
+            for file_number in range(NFILES):
+                file_stat = os.stat(os.path.join(PATH_TO_SOURCE_DIR, str(file_number)))
+                data_object = "/".join([destination_collection, str(file_number)])
+                obj = session.data_objects.get(data_object)
+                metadata_items = obj.metadata.items()
+                self.assertEqual(1, len(metadata_items))
+                self.assertEqual("filesystem::mode", metadata_items[0].name)
+                self.assertEqual(str(file_stat.st_mode), metadata_items[0].value)
+                self.assertIsNone(metadata_items[0].units)
+
 
 class test_exclude_options(automated_ingest_test_context, unittest.TestCase):
     def setUp(self):
