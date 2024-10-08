@@ -1,4 +1,4 @@
-from .. import sync_logging
+from .. import sync_logging, utils
 from ..celery import app, RestartTask
 from ..char_map_util import translate_path
 from ..custom_event_handler import custom_event_handler
@@ -80,6 +80,8 @@ def s3_bucket_sync_path(self, meta):
 
     logger = sync_logging.get_sync_logger(logging_config)
 
+    event_handler = custom_event_handler(meta)
+
     proxy_url = meta.get("s3_proxy_url")
     if proxy_url is None:
         httpClient = None
@@ -112,6 +114,15 @@ def s3_bucket_sync_path(self, meta):
         meta = meta.copy()
         meta["task"] = "s3_bucket_sync_dir"
         chunk = {}
+
+        # Check to see whether the provided operation and delete_mode are compatible.
+        delete_mode = event_handler.delete_mode()
+        logger.debug(f"delete_mode: {delete_mode}")
+        # TODO(#282): S3 bucket syncs do not support DeleteMode (yet)
+        if utils.DeleteMode.DO_NOT_DELETE != delete_mode:
+            raise RuntimeError(
+                f"S3 bucket syncs do not support DeleteMode [{delete_mode}]. Only DeleteMode.DO_NOT_DELETE is supported."
+            )
 
         path_list = meta["path"].lstrip("/").split("/", 1)
         bucket_name = path_list[0]
