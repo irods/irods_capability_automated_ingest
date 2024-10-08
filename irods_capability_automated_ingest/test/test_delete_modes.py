@@ -51,7 +51,7 @@ def start_workers(n=2, args=[]):
     return workers
 
 
-def wait_for_job_to_finish(workers, job_name, timeout=60):
+def wait_for_job_to_finish(job_name, timeout=60):
     r = get_redis(test_lib.get_redis_config())
     t0 = time.time()
     while timeout is None or time.time() - t0 < timeout:
@@ -288,7 +288,7 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
         proc.wait()
         # ...and then wait for the workers to complete the tasks.
         try:
-            wait_for_job_to_finish(self.workers, job_name)
+            wait_for_job_to_finish(job_name)
         except TimeoutError as e:
             self.fail(e)
         # Assert that the expected number of failed tasks for this job are found. A value of None means no tasks
