@@ -42,6 +42,9 @@ def start_workers(n=2, args=[]):
             "worker",
             "-c",
             str(n),
+            # This option is needed because the worker coordination takes too long for running the tests between
+            # standing up the workers and their being ready to execute tasks.
+            "--without-mingle",
         ]
         + args
     )
@@ -135,8 +138,6 @@ class test_s3_sync_operations(unittest.TestCase):
 
     def setUp(self):
         self.create_objects(self.objects_list)
-        # TODO(#280): The sync job fails without this sleep because the Celery workers don't yet see the S3 objects.
-        time.sleep(1)
         self.destination_collection = "/".join(
             [
                 "",

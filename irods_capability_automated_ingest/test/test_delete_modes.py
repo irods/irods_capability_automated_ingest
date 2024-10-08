@@ -42,6 +42,9 @@ def start_workers(n=2, args=[]):
             "worker",
             "-c",
             str(n),
+            # This option is needed because the worker coordination takes too long for running the tests between
+            # standing up the workers and their being ready to execute tasks.
+            "--without-mingle",
         ]
         + args
     )
@@ -201,8 +204,6 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
             "files": ["top_level_file.txt"],
         }
         test_delete_modes_with_sync_operations.create_directory(self.directory_tree)
-        # TODO(#280): The sync job fails without this sleep because the Celery workers don't yet see the directories.
-        time.sleep(1)
         self.destination_collection = "/".join(
             [
                 "",
