@@ -1,5 +1,54 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project **only** adheres to the following _(as defined at [Semantic Versioning](https://semver.org/spec/v2.0.0.html))_:
+
+> Given a version number MAJOR.MINOR.PATCH, increment the:
+> 
+> - MAJOR version when you make incompatible API changes
+> - MINOR version when you add functionality in a backward compatible manner
+> - PATCH version when you make backward compatible bug fixes
+
+## [0.6.0] - 2024-10-11
+
+This release adds the ability to delete data objects and collections from iRODS which DO NOT exist in the source being ingested. The feature exposes two new events and an event handler method for controlling the delete mode.
+
+### Changed
+
+- Improve documentation (#23, #137, #140, #150, #183, #214, #257, #289).
+- Display more information about jobs in `list` subcommand output (#91).
+- Improve testing, Docker demo, and code formatting (#100, #132, #180).
+- Replace Celery application and tasks (#211).
+- Remove /tmp mount directory from Docker test harness (#235).
+- Bump PRC dependency version to <3.0.0 (#263).
+- Refactor and clean up code (#180, #272, #274).
+- Improve handling of irods_session (#269).
+- Disable mingling for Celery works in tests (#280).
+- Replace use of "sync" with "tasks" in Celery tasks names (#281).
+
+### Removed
+
+- Remove --append_json option (#60).
+- Remove unnecessary directories and files (#245, #246, #247, #248, #262).
+
+### Fixed
+
+- Handle KeyboardInterrupt for `watch` subcommand (#93).
+- Use logical path for redis_lock key in create_dirs (#124).
+- Do not allow data transfers to redirect by default (#276).
+- Do not add unreadable files to sync chunks (#277).
+- Restore syncs from S3 bucket to iRODS (#285).
+- Fix periodic task name (#293).
+
+### Added
+
+- Add Delete mode (#48, #261, #288).
+- Track start time of sync jobs (#92).
+- Track jobs stopped by "irods_sync stop" (#210).
+- Add Docker Compose project for testing (#244).
+
 ## [v0.5.0] - 2024-07-17
 
 This release adds more functionality when scanning an S3 bucket
