@@ -217,17 +217,36 @@ def filesystem_sync_path(self, meta):
 
         delete_extraneous_items = utils.DeleteMode.DO_NOT_DELETE != delete_mode
         if delete_extraneous_items:
-            subcollections_in_collection, data_objects_in_collection = (
-                get_collections_and_data_objects_in_collection(
-                    meta, destination_collection
+            # TODO(#261): Prevent Delete Mode usage with character_map until support is implemented.
+            character_map = getattr(event_handler.get_module(), "character_map", None)
+            if character_map:
+                logger.warning(
+                    "character_map and non-default Delete Mode are incompatible at this time. "
+                    "Delete Mode will be disabled for this task."
                 )
-            )
+                delete_extraneous_items = False
+            else:
+                subcollections_in_collection, data_objects_in_collection = (
+                    get_collections_and_data_objects_in_collection(
+                        meta, destination_collection
+                    )
+                )
         else:
             subcollections_in_collection = []
             data_objects_in_collection = []
 
         for obj in itr:
             full_path = os.path.abspath(obj.path)
+
+            # TODO(#261): Prevent Delete Mode usage when any path is modified due to UnicodeEncodeError until support is
+            # implemented.
+            if delete_extraneous_items:
+                if utils.is_unicode_encode_error_path(full_path):
+                    logger.warning(
+                        "Found a path which will be modified due to UnicodeEncodeError. "
+                        "Delete Mode does not support this and so will be disabled for this task."
+                    )
+                    delete_extraneous_items = False
 
             mode = obj.stat(follow_symlinks=False).st_mode
 
