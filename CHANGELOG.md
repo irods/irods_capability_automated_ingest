@@ -13,7 +13,7 @@ and this project **only** adheres to the following _(as defined at [Semantic Ver
 
 ## [0.6.0] - 2024-10-08
 
-This release adds the ability to delete data objects and collections from iRODS which DO NOT exist in the source tree. The feature exposes two new events and an event handler method for controlling the delete mode.
+This release adds the ability to delete data objects and collections from iRODS which DO NOT exist in the source being ingested. The feature exposes two new events and an event handler method for controlling the delete mode.
 
 ### Added
 
@@ -25,12 +25,12 @@ This release adds the ability to delete data objects and collections from iRODS 
 ### Changed
 
 - Improve documentation (23, 137, 140, 150, 183, 214, 257, 289).
-- list subcommand displays more information about jobs (91).
+- `list` subcommand displays more information about jobs (91).
 - Improve testing, Docker demo, and code formatting (100, 132, 180).
 - Replace Celery application and tasks (211).
 - Remove /tmp mount directory from Docker test harness (235).
 - Bump PRC dependency version to <3.0.0 (263).
-- Code refactor and clean up (180, 272, 274).
+- Refactor and clean up code (180, 272, 274).
 - Improve handling of irods_session (269).
 - Disable mingling for Celery works in tests (280).
 - Replace use of "sync" with "tasks" in Celery tasks names (281).
@@ -42,7 +42,7 @@ This release adds the ability to delete data objects and collections from iRODS 
 
 ### Fixed
 
-- Handle KeyboardInterrupt for watch subcommand (93).
+- Handle KeyboardInterrupt for `watch` subcommand (93).
 - Use logical path for redis_lock key in create_dirs (124).
 - Do not allow data transfers to redirect by default (276).
 - Do not add unreadable files to sync chunks (277).
