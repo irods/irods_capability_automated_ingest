@@ -44,11 +44,10 @@ setup(
         "python-irodsclient<3.0.0",
         "python-redis-lock>=3.2.0",
         "redis>=3.4.1, <5.0.0",
-        "celery[redis]>=5.2.2, <5.3.0",
+        "celery[redis]<6.0.0",
         "scandir",
         "structlog>=18.1.0",
         "progressbar2",
-        "billiard>=3.6.4.0, <4.0",
     ],
     setup_requires=["setuptools>=38.6.0"],
     entry_points={
