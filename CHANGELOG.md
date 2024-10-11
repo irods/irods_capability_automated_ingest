@@ -11,7 +11,7 @@ and this project **only** adheres to the following _(as defined at [Semantic Ver
 > - MINOR version when you add functionality in a backward compatible manner
 > - PATCH version when you make backward compatible bug fixes
 
-## [0.6.0] - 2024-10-11
+## [0.6.0] - 2024-10-14
 
 This release adds the ability to delete data objects and collections from iRODS which DO NOT exist in the source being ingested. The feature exposes two new events and an event handler method for controlling the delete mode.
 
@@ -24,6 +24,7 @@ This release adds the ability to delete data objects and collections from iRODS 
 - Remove /tmp mount directory from Docker test harness (#235).
 - Bump PRC dependency version to <3.0.0 (#263).
 - Refactor and clean up code (#180, #272, #274).
+- Bump Celery dependency version to <6.0.0 (#266).
 - Improve handling of irods_session (#269).
 - Disable mingling for Celery works in tests (#280).
 - Replace use of "sync" with "tasks" in Celery tasks names (#281).
