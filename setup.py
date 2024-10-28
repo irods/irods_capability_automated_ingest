@@ -45,7 +45,6 @@ setup(
         "python-redis-lock>=3.2.0",
         "redis>=3.4.1, <5.0.0",
         "celery[redis]<6.0.0",
-        "scandir",
         "structlog>=18.1.0",
         "progressbar2",
     ],
