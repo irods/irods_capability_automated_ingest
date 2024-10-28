@@ -23,7 +23,6 @@ python-irodsclient==2.2.0
 python-redis-lock==4.0.0
 python-utils==3.9.0
 redis==4.6.0
-scandir==1.10.0
 six==1.16.0
 structlog==24.4.0
 typing_extensions==4.12.2
