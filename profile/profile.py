@@ -3,15 +3,29 @@ from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 import argparse
 
-parser = argparse.ArgumentParser(description='Ingest profile data into Elasticsearch')
-parser.add_argument('input_file', metavar='INPUT FILE', type=str,
-                    help='input file')
-parser.add_argument('--elasticsearch_host', metavar='ELASTICSEARCH HOST', type=str, default="localhost",
-                    help='elasticsearch host')
-parser.add_argument('elasticsearch_index', metavar='ELASTICSEARCH INDEX', type=str,
-                    help='elasticsearch index')
-parser.add_argument('--additional_key', dest='keys', action='store', nargs="*", default=[],
-                    help='additional key')
+parser = argparse.ArgumentParser(description="Ingest profile data into Elasticsearch")
+parser.add_argument("input_file", metavar="INPUT FILE", type=str, help="input file")
+parser.add_argument(
+    "--elasticsearch_host",
+    metavar="ELASTICSEARCH HOST",
+    type=str,
+    default="localhost",
+    help="elasticsearch host",
+)
+parser.add_argument(
+    "elasticsearch_index",
+    metavar="ELASTICSEARCH INDEX",
+    type=str,
+    help="elasticsearch index",
+)
+parser.add_argument(
+    "--additional_key",
+    dest="keys",
+    action="store",
+    nargs="*",
+    default=[],
+    help="additional key",
+)
 
 args = parser.parse_args()
 
@@ -23,28 +37,22 @@ index = args.elasticsearch_index
 es = Elasticsearch(output)
 
 try:
-    es.indices.create(index, body={
-        "mappings": {
-            "document": {
-                "properties": {
-                    "hostname": {
-                        "type": "keyword"
-                    }
-                }
-            }
-        }
-    })
+    es.indices.create(
+        index,
+        body={
+            "mappings": {"document": {"properties": {"hostname": {"type": "keyword"}}}}
+        },
+    )
 except Exception as e:
     print(e)
-    
-def task_action():
 
+
+def task_action():
     task_buf = {}
     task_counter = {}
 
     i = 0
     with open(input_file, "r") as f:
-    
         line = f.readline().rstrip("\n")
         while line != "":
             obj = json.loads(line)
@@ -72,17 +80,13 @@ def task_action():
                     "event_name": event_name,
                     "event_id": obj["event_id"],
                     "path": obj.get("path"),
-                    "target": obj.get("target")
+                    "target": obj.get("target"),
                 }
 
                 for key in keys:
                     di[key] = obj[key]
 
-                d = {
-                    "_index": index,
-                    "_type": "document",
-                    "_source": di
-                }
+                d = {"_index": index, "_type": "document", "_source": di}
                 i += 1
                 print(i)
                 if event_name in task_counter:
