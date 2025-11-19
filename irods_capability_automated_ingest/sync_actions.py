@@ -138,10 +138,7 @@ def start_job(data):
     restart_queue = data["restart_queue"]
     sychronous = data["synchronous"]
     progress = data["progress"]
-    s3_region_name = data["s3_region_name"]
-    s3_endpoint_domain = data["s3_endpoint_domain"]
     s3_keypair = data["s3_keypair"]
-    s3_multipart_chunksize = data["s3_multipart_chunksize_in_mib"]
     logger = sync_logging.get_sync_logger(logging_config)
     data_copy = data.copy()
 

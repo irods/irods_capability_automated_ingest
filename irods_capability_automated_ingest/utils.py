@@ -4,8 +4,6 @@ from .custom_event_handler import custom_event_handler
 from uuid import uuid1
 
 from enum import Enum
-import os
-import stat
 
 
 class Operation(Enum):

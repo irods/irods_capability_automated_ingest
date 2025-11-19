@@ -1,4 +1,3 @@
-import os
 
 from irods_capability_automated_ingest.core import Core
 from irods_capability_automated_ingest.utils import Operation

@@ -12,7 +12,7 @@ from os.path import (
 )
 from shutil import rmtree
 from signal import SIGINT
-from tempfile import NamedTemporaryFile, mkdtemp
+from tempfile import NamedTemporaryFile
 import base64
 import glob
 import os
@@ -22,11 +22,9 @@ import stat
 import subprocess
 import sys
 import time
-import traceback
 import unittest
 
 from irods.data_object import irods_dirname, irods_basename
-from irods.meta import iRODSMeta
 from irods.models import Collection, DataObject
 from irods.session import iRODSSession
 import irods.keywords as kw
@@ -36,7 +34,6 @@ from irods_capability_automated_ingest.irods.irods_utils import size
 from irods_capability_automated_ingest.redis_utils import get_redis
 from irods_capability_automated_ingest.sync_job import sync_job
 from irods_capability_automated_ingest.utils import Operation
-import irods_capability_automated_ingest.examples
 
 from . import test_lib
 
@@ -193,7 +190,10 @@ def read_file(path):
 
 def hierarchy_string_for_leaf(session, logical_path, leafName):
     ptn = re.compile(";" + leafName + "$")
-    equals_or_is_leaf_of = lambda leaf, hierstr: leaf == hierstr or ptn.search(hierstr)
+
+    def equals_or_is_leaf_of(leaf, hierstr):
+        return leaf == hierstr or ptn.search(hierstr)
+
     q = session.query(DataObject).filter(
         DataObject.name == irods_basename(logical_path),
         Collection.name == irods_dirname(logical_path),
@@ -1523,6 +1523,9 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
 
     @unittest.skip("irods/irods#3517 - this is not allowed")
     def test_register_as_replica_root_with_resc_name_with_another_replica_in_hier(self):
+        job_name = (
+            "test_register_as_replica_root_with_resc_name_with_another_replica_in_hier"
+        )
         self.do_put_to_child()
         self.do_register_as_replica_no_assertions("replica_root_with_resc_name")
         self.do_assert_failed_queue("wrong paths", job_name=job_name)
@@ -1531,6 +1534,7 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     def test_register_as_replica_non_leaf_non_root_with_resc_name_with_another_replica_in_hier(
         self,
     ):
+        job_name = "test_register_as_replica_non_leaf_non_root_with_resc_name_with_another_replica_in_hier"
         self.do_put_to_child()
         self.do_register_as_replica_no_assertions(
             "replica_with_non_root_non_leaf_resc_name"
@@ -1540,12 +1544,14 @@ class Test_register_as_replica(automated_ingest_test_context, unittest.TestCase)
     # register with as replica event handler
     @unittest.skip("irods/irods#4623")
     def test_register_with_as_replica_event_handler_with_resc_name(self):
+        job_name = "test_register_with_as_replica_event_handler_with_resc_name"
         self.do_register("replica_with_resc_name", resc_name=[REGISTER_RESC2A])
         self.do_assert_failed_queue(count=None, job_name=job_name)
         self.do_assert_retry_queue(count=None, job_name=job_name)
 
     @unittest.skip("irods/irods#4623")
     def test_register_with_as_replica_event_handler_root_with_resc_name(self):
+        job_name = "test_register_with_as_replica_event_handler_root_with_resc_name"
         self.do_register(
             "replica_root_with_resc_name", resc_name=[REGISTER_RESC2A, REGISTER_RESC2B]
         )
@@ -1992,9 +1998,10 @@ class _Test_irods_sync_with_bad_filename:
     EH_SUFFIX = ""
     B64_CALCULATION = b64_calculation
     CHARACTER_MAPPING_TRANSFORM = None
-    LOGICAL_PATH_CALCULATION = lambda this: join(
-        this.dest_coll_path, this.unicode_error_filename
-    )
+
+    def LOGICAL_PATH_CALCULATION(this):
+        return join(this.dest_coll_path, this.unicode_error_filename)
+
     DETAILED_CHECK = True
     # Flag to indicate whether suffixes will be appended to data names for de-ambiguation
     ALLOW_LOGICAL_NAME_SUFFIX = False
@@ -2025,7 +2032,6 @@ class _Test_irods_sync_with_bad_filename:
             self.expected_logical_path = self.LOGICAL_PATH_CALCULATION()
 
     def noop_test(self):
-        x = 1
         pass
 
     def tearDown(self):
@@ -2328,9 +2334,10 @@ class Test_irods_sync_character_mapped_path(
     BAD_FILENAME = b"test-file~with@5!non.alphas"  # maybe add some unicode
     EH_SUFFIX = "_using_char_map"
     CHARACTER_MAPPING_TRANSFORM = character_mapping_transform
-    LOGICAL_PATH_CALCULATION = lambda this: join(
-        this.dest_coll_path, this.remapped_bad_filename
-    )
+
+    def LOGICAL_PATH_CALCULATION(this):
+        return join(this.dest_coll_path, this.remapped_bad_filename)
+
     ALLOW_LOGICAL_NAME_SUFFIX = True
     DETAILED_CHECK = False
     ANNOTATION_REASON = "character_map"

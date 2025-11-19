@@ -10,7 +10,6 @@ class event_handler(Core):
 
     @staticmethod
     def pre_data_obj_create(hdlr_mod, logger, session, meta, *args, **options):
-        target = meta["target"]
         path = meta["path"]
 
         r = get_redis(meta["config"])

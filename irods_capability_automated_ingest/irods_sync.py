@@ -166,7 +166,7 @@ def add_arguments(parser):
 
 def handle_start(args):
     ex_file_arg = args.exclude_file_type
-    if ex_file_arg != None:
+    if ex_file_arg is not None:
         ex_arg_list = [x.strip() for x in ex_file_arg[0].split(",")]
 
     check_event_handler(args.event_handler)
