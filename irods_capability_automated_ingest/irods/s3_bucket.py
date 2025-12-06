@@ -169,7 +169,11 @@ def single_stream_upload_from_S3(
         tfd = session.data_objects.open(dest, "w", **options)
 
     response = s3_client.get_object(bucket_name, object_name, offset=offset)
-    etag = response.getheader("Etag").replace('"', "")
+    # urllib3 replaced HTTPResponse.getheader with HTTPResponse.headers.get in 2.6.0.
+    if hasattr(response, "getheader"):
+        etag = response.getheader("Etag").replace('"', "")
+    else:
+        etag = response.headers.get("Etag").replace('"', "")
     recreated_etag = None
     # Preliminary way of determining if file is multipart or not; etag from amazonS3 will be >32 for multipart, 32 for regular
     # If offset, means we are appending, so treat as normal non-multipart
