@@ -11,6 +11,7 @@ services:
   irods-catalog-provider:
     build:
       context: irods_catalog_provider
+    hostname: irods-catalog-provider
     volumes:
       - shared_volume:/data/ufs
     depends_on:
@@ -30,6 +31,7 @@ services:
       - "IRODS_PASSWORD"
     volumes:
       - shared_volume:/data/ufs
+      - ../..:/ingest-repo
     depends_on:
       - redis
       - irods-catalog-provider
