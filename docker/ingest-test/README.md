@@ -21,14 +21,15 @@ Note that, depending on whether the iRODS major/minor version is 4.2 or 4.3, the
 
 Bring up the docker-compose project and the test suite will run on its own:
 ```
-docker compose --env-file icommands.env up
+docker compose --env-file icommands.env up --abort-on-container-exit
 ```
-The test suite is one of the services of the docker-compose project, so it will run on its own. The container is tied to the tests running, so it will exit once completed.
-The `--env-file` option is required in order to correctly configure the environment for the tests.
+The test suite is one of the services of the docker-compose project, so it will run on its own. The container is tied to the tests running, so it will exit once completed. The `--env-file` option is required in order to correctly configure the environment for the tests.
 
-## Step 3: Bring down the project
+If you wish to leave the other services running after the test run, omit the `--abort-on-container-exit` option in the command above.
 
-The project is not made to come down by itself (yet), so it has to be brought down after each run:
+## Step 3: Cleaning up after tests finish
+
+The tests expect to have a clean environment each time they are run. As such, we need to make sure to clean up after each test run. This can be done like this:
 ```
 docker compose down
 ```

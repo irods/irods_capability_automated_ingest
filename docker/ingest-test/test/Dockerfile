@@ -1,4 +1,6 @@
-FROM python:3.11
+ARG python_version=3.11
+
+FROM python:${python_version}
 
 RUN apt update && apt install -y netcat-traditional
 

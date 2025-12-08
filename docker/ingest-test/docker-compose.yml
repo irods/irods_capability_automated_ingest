@@ -1,41 +1,20 @@
-version: '3'
-
 services:
-  some-redis:
+  redis:
     image: redis
-    hostname: redis
-    networks:
-      default:
-        aliases:
-          - redis
 
-  icat:
+  irods-catalog:
     build:
-      context: icat
-      args:
-        postgres_password: testpassword
-    hostname: catalog.example.org
-    networks:
-      default:
-        aliases:
-          - catalog.example.org
+      context: irods_catalog
+    environment:
+      - POSTGRES_PASSWORD=testpassword
 
   irods-catalog-provider:
     build:
-      context: provider
-      args:
-        irods_version: 4.3.3-0~jammy
-        irods_version_major_minor: 4.3
-        py_version: 3
-    hostname: icat.example.org
-    networks:
-      default:
-        aliases:
-          - icat.example.org
+      context: irods_catalog_provider
     volumes:
       - shared_volume:/data/ufs
     depends_on:
-      - icat
+      - irods-catalog
 
   ingest-test:
     build:
@@ -52,8 +31,9 @@ services:
     volumes:
       - shared_volume:/data/ufs
     depends_on:
-      - some-redis
+      - redis
       - irods-catalog-provider
+      - minio
 
   minio:
     image: minio/minio:RELEASE.2024-09-13T20-26-02Z

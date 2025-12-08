@@ -2,7 +2,7 @@
 
 # Start the Postgres database.
 counter=0
-until pg_isready -h catalog.example.org -d ICAT -U irods -q
+until pg_isready -h irods-catalog -d ICAT -U irods -q
 do
     sleep 1
     ((counter += 1))
@@ -12,7 +12,7 @@ echo Postgres took approximately $counter seconds to fully start ...
 # Set up iRODS if not already done
 if [ ! -e /var/lib/irods/setup_complete ]
     then
-        python${PY_VERSION} /var/lib/irods/scripts/setup_irods.py < /irods_provider.input
+        python3 /var/lib/irods/scripts/setup_irods.py < /irods_provider.input
 fi
 
 # run the server
