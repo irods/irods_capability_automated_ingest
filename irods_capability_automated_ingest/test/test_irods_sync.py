@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from os import makedirs, listdir, remove
 from os.path import (
     join,
@@ -367,7 +367,7 @@ class automated_ingest_test_context(object):
                 s2 = size(session, rpath)
                 mtime2 = modify_time(session, rpath)
                 self.assertEqual(s1, s2)
-                self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
+                self.assertEqual(datetime.fromtimestamp(mtime1, timezone.utc), mtime2)
 
     def do_put(
         self,
@@ -569,7 +569,7 @@ class Test_event_handlers(automated_ingest_test_context, unittest.TestCase):
                     s2 = size(session, rpath)
                     mtime2 = modify_time(session, rpath)
                     self.assertEqual(s1, s2)
-                    self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
+                    self.assertEqual(datetime.fromtimestamp(mtime1, timezone.utc), mtime2)
 
     def test_create_dir(self):
         job_name = "test_create_dir"
@@ -911,7 +911,7 @@ class Test_update(automated_ingest_test_context, unittest.TestCase):
                 s2 = size(session, rpath)
                 mtime2 = modify_time(session, rpath)
                 self.assertEqual(s1, s2)
-                self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
+                self.assertEqual(datetime.fromtimestamp(mtime1, timezone.utc), mtime2)
 
     def test_update(self):
         register_job = "test_update.register"
@@ -1583,7 +1583,7 @@ class Test_update_metadata(automated_ingest_test_context, unittest.TestCase):
                 s2 = size(session, rpath)
                 mtime2 = modify_time(session, rpath)
                 self.assertEqual(s1, s2)
-                self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
+                self.assertEqual(datetime.fromtimestamp(mtime1, timezone.utc), mtime2)
 
     def test_update_metadata(self):
         register_job = "test_update_metadata.register"
@@ -2098,7 +2098,7 @@ class _Test_irods_sync_with_bad_filename:
     def assert_data_object_mtime(self, session):
         mtime1 = int(getmtime(self.bad_filepath))
         mtime2 = modify_time(session, self.expected_logical_path)
-        self.assertEqual(datetime.utcfromtimestamp(mtime1), mtime2)
+        self.assertEqual(datetime.fromtimestamp(mtime1, timezone.utc), mtime2)
 
     def do_assert_failed_queue(
         self, error_message=None, count=NFILES, job_name=DEFAULT_JOB_NAME
