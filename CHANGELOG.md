@@ -11,6 +11,21 @@ and this project **only** adheres to the following _(as defined at [Semantic Ver
 > - MINOR version when you add functionality in a backward compatible manner
 > - PATCH version when you make backward compatible bug fixes
 
+## [0.7.0] - 2026-06-16
+
+This release updates dependencies and fixes a compatibility issue with urllib3.
+
+### Changed
+
+- Update `requirements.txt` (#180).
+- Remove scandir dependency from `setup.py` (#180).
+- Bump urllib3 dependency to 2.6.3 ([73cfb7d](https://github.com/irods/irods_capability_automated_ingest/commit/73cfb7d9044e44363f64c65ec18b818138fc9290)).
+- Bump python-irodsclient dependency to <4.0.0 (#316).
+
+### Fixed
+
+- Fix compatibility issues caused by an interface change in `urllib3.response.HTTPResponse` (#313).
+
 ## [0.6.0] - 2024-10-14
 
 This release adds the ability to delete data objects and collections from iRODS which DO NOT exist in the source being ingested. The feature exposes two new events and an event handler method for controlling the delete mode.
