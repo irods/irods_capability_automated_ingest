@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import logging
 import re
@@ -16,9 +15,9 @@ def _re_wrapper(regex):
     return lambda ch: type(ch) is str and len(ch) == 1 and regex.match(ch)
 
 
-_string_replace = lambda _string, _map: _string.translate(
-    {ord(k): v for k, v in _map.items() if v is not None}
-)
+def _string_replace(_string, _map):
+    return _string.translate({ord(k): v for k, v in _map.items() if v is not None})
+
 
 _logger = logging.getLogger("char_map_util")
 
@@ -72,10 +71,12 @@ def _fallback(name=None):
         return h.digest()
 
 
-_change_encoding_test = lambda c: c
-_change_encoding_default = lambda c: (
-    chr(c).encode("utf8") if type(c) is int else c.encode("utf8")
-)
+def _change_encoding_test(c):
+    return c
+
+
+def _change_encoding_default(c):
+    return chr(c).encode("utf8") if isinstance(c, int) else c.encode("utf8")
 
 
 # must be called after first use of _encoded_differences()
@@ -109,7 +110,6 @@ def translate_string(s, mp):
 
 
 def _encoded_differences(filename, MapFn=None, xfunc=_change_encoding_default):
-    rx = _allowed_of_type("radixchars", map_fn=MapFn)
     newname = translate_string(filename, MapFn)
     gen = (
         (tuple(xfunc(_) for _ in a), b)

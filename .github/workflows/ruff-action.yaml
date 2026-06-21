@@ -1,0 +1,26 @@
+name: ruff-action
+
+on: pull_request
+
+jobs:
+  ruff-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+    
+      - name: Run Ruff formatter (check only)
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check --diff"
+
+  ruff-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Ruff check (check only)
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check --diff"

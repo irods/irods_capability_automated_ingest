@@ -3,23 +3,17 @@ import unittest
 import io
 import os
 import signal
-import shutil
 import subprocess
 import tempfile
 import textwrap
 import time
 
-from irods.data_object import irods_dirname, irods_basename
-from irods.exception import CollectionDoesNotExist
-from irods.meta import iRODSMeta
-from irods.models import Collection, DataObject
 from irods.session import iRODSSession
 
 from irods_capability_automated_ingest.celery import app
 from irods_capability_automated_ingest.redis_utils import get_redis
 from irods_capability_automated_ingest.sync_job import sync_job
-from irods_capability_automated_ingest.utils import DeleteMode, Operation
-import irods_capability_automated_ingest.examples
+from irods_capability_automated_ingest.utils import Operation
 
 from minio import Minio
 
