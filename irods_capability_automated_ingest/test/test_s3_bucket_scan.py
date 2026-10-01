@@ -94,7 +94,7 @@ class test_s3_sync_operations(unittest.TestCase):
         )
         cls.job_name = "test_s3_sync_job"
         # TODO(#286): Derive this from the environment...
-        cls.s3_endpoint_domain = "minio:19000"
+        cls.s3_endpoint_domain = "rustfs:19000"
         # TODO(#286): Derive these from the environment...
         cls.s3_access_key = "irods"
         cls.s3_secret_key = "irodsadmin"
