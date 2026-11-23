@@ -11,8 +11,6 @@ from .irods_task import IrodsTask
 
 from irods.exception import (
     CollectionDoesNotExist,
-    DataObjectDoesNotExist,
-    PycommandsException,
 )
 
 # See https://github.com/celery/celery/issues/5362 for information about billiard and Celery.

@@ -1,6 +1,4 @@
-import json
 import time
-import traceback
 
 MAX_RETRIES = 10
 
@@ -22,7 +20,7 @@ class redis_key_handle(object):
             try:
                 res = func(*args)
                 return res
-            except Exception as err:
+            except Exception:
                 retries += 1
 
                 # logger.info('Retrying. retries=' + str(retries), max_retries=max_retries, func=func, args=args, err=err, stacktrace=traceback.extract_tb(err.__traceback__))

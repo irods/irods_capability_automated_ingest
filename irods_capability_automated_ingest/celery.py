@@ -1,5 +1,6 @@
-from . import custom_event_handler, sync_logging
+from . import sync_logging
 
+from billiard import current_process
 from celery import Celery
 from celery.signals import task_prerun, task_postrun
 

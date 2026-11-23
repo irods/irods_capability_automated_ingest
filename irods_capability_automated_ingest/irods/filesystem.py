@@ -192,7 +192,6 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
 
     data_obj_info = {"objPath": dest_dataobj_logical_fullpath}
 
-    outdated_repl_nums = []
     found = False
 
     resc_name = event_handler.to_resource(session, **options)
@@ -412,7 +411,6 @@ def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
 
 def sync_data_from_dir(hdlr_mod, meta, logger, content, **options):
     target = meta["target"]
-    path = meta["path"]
 
     event_handler = custom_event_handler.custom_event_handler(meta)
     session = irods_utils.irods_session(

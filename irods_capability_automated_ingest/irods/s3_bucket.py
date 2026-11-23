@@ -2,15 +2,19 @@ from . import irods_utils
 from .. import custom_event_handler
 from ..utils import Operation
 
+from irods.parallel import _Multipart_close_manager
 from irods.models import Resource, DataObject, Collection
 import irods.keywords as kw
 
 from minio import Minio
 
 import base64
+import concurrent
 import hashlib
 import io
+import multiprocessing
 import os
+import threading
 
 
 def parallel_upload_from_S3(
@@ -394,16 +398,11 @@ def no_op(hdlr_mod, logger, session, meta, **options):
 
 def sync_file(hdlr_mod, logger, session, meta, scanner, op, **options):
     dest_dataobj_logical_fullpath = meta["target"]
-    source_physical_fullpath = meta["path"]
-    b64_path_str = meta.get("b64_path_str")
 
     event_handler = custom_event_handler.custom_event_handler(meta)
     resc_name = event_handler.to_resource(session, **options)
     if resc_name is not None:
         options["destRescName"] = resc_name
-
-    if b64_path_str is not None:
-        source_physical_fullpath = base64.b64decode(b64_path_str)
 
     logger.info(
         "syncing object %s, options = %s" % (dest_dataobj_logical_fullpath, options)
@@ -445,7 +444,6 @@ def update_metadata(hdlr_mod, logger, session, meta, **options):
 
     data_obj_info = {"objPath": dest_dataobj_logical_fullpath}
 
-    outdated_repl_nums = []
     found = False
 
     resc_name = event_handler.to_resource(session, **options)
@@ -665,7 +663,6 @@ def sync_dir_meta(hdlr_mod, logger, session, meta, **options):
 
 def sync_data_from_dir(hdlr_mod, meta, logger, content, **options):
     target = meta["target"]
-    path = meta["path"]
 
     event_handler = custom_event_handler.custom_event_handler(meta)
     session = irods_utils.irods_session(

@@ -1,17 +1,17 @@
 from .. import custom_event_handler, sync_logging
 from ..redis_utils import get_redis
-from ..utils import DeleteMode, Operation
+from ..utils import DeleteMode
 
-from irods.exception import CollectionDoesNotExist, NetworkException
+from irods.exception import NetworkException
 from irods.models import Collection, DataObject, Resource
 from irods.session import iRODSSession
 
-import base64
 import json
 import os
 import redis_lock
 import ssl
 import threading
+import time
 
 irods_session_map = {}
 irods_session_timer_map = {}
@@ -195,7 +195,6 @@ def create_dirs(logger, session, meta, **options):
 
 def create_dir(hdlr_mod, logger, session, meta, **options):
     target = meta["target"]
-    path = meta["path"]
     logger.info("creating collection " + target)
     session.collections.create(target)
 

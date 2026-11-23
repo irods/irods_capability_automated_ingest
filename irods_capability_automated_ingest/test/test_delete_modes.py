@@ -8,17 +8,13 @@ import tempfile
 import textwrap
 import time
 
-from irods.data_object import irods_dirname, irods_basename
 from irods.exception import CollectionDoesNotExist
-from irods.meta import iRODSMeta
-from irods.models import Collection, DataObject
 from irods.session import iRODSSession
 
 from irods_capability_automated_ingest.celery import app
 from irods_capability_automated_ingest.redis_utils import get_redis
 from irods_capability_automated_ingest.sync_job import sync_job
 from irods_capability_automated_ingest.utils import DeleteMode, Operation
-import irods_capability_automated_ingest.examples
 
 from . import test_lib
 
@@ -559,10 +555,10 @@ class test_delete_modes_with_sync_operations(unittest.TestCase):
         # Case 20
         self.do_DO_NOT_DELETE_does_not_delete_collections(Operation.PUT_APPEND)
 
-    def test_PUT_SYNC_and_UNREGISTER_are_incompatible(self):
+    def test_PUT_APPEND_and_UNREGISTER_are_incompatible(self):
         # Case 21
         self.do_incompatible_operation_and_delete_mode(
-            Operation.PUT_SYNC, DeleteMode.UNREGISTER
+            Operation.PUT_APPEND, DeleteMode.UNREGISTER
         )
 
     def test_PUT_APPEND_and_TRASH_deletes_collections(self):

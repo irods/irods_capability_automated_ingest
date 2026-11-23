@@ -15,9 +15,7 @@ from minio import Minio
 import base64
 import datetime
 import os
-import re
 import redis_lock
-import stat
 import time
 import traceback
 
@@ -155,11 +153,6 @@ def s3_bucket_sync_path(self, meta):
                     hostname=self.request.hostname,
                     index=current_process().index,
                 )
-
-        exclude_file_name = meta["exclude_file_name"]
-        exclude_directory_name = meta["exclude_directory_name"]
-        file_regex = [re.compile(r) for r in exclude_file_name]
-        dir_regex = [re.compile(r) for r in exclude_directory_name]
 
         for obj in itr:
             obj_stats = {}
