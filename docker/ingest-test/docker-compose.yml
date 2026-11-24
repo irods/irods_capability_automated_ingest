@@ -14,6 +14,13 @@ services:
     hostname: irods-catalog-provider
     volumes:
       - shared_volume:/data/ufs
+    healthcheck:
+      test: ["CMD-SHELL", "su - irods -c '[ -f /var/lib/irods/setup_complete ] && ils || exit 1'"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+      start_interval: 10s
     depends_on:
       - irods-catalog
 
@@ -33,9 +40,12 @@ services:
       - shared_volume:/data/ufs
       - ../..:/ingest-repo
     depends_on:
-      - redis
-      - irods-catalog-provider
-      - rustfs
+      redis:
+        condition: service_started
+      irods-catalog-provider:
+        condition: service_healthy
+      rustfs:
+        condition: service_started
 
   rustfs:
     image: rustfs/rustfs:1.0.0
