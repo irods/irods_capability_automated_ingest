@@ -40,13 +40,13 @@ setup(
     keywords="irods automated ingest landingzone filesystem",
     packages=find_packages(),
     install_requires=[
+        "celery[redis]>=5.7.0,<6.0.0",
         "minio",
-        "python-irodsclient<4.0.0",
-        "python-redis-lock>=3.2.0",
-        "redis>=3.4.1, <5.0.0",
-        "celery[redis]<6.0.0",
-        "structlog>=18.1.0",
         "progressbar2",
+        "python-irodsclient<4.0.0",
+        "python-redis-lock>=4.0.1,<5.0.0",
+        "redis>=6.4.0, <7.0.0",
+        "structlog>=18.1.0",
     ],
     setup_requires=["setuptools>=38.6.0"],
     entry_points={
